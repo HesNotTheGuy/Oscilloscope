@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oscilloscope</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Top status bar -->
+  <div class="topbar">
+    <span class="brand">DSO&#8209;1</span>
+    <div class="topbar-status">
+      <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
+      <span class="st-item" id="st-tb">1ms/div</span>
+      <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
+      <span class="st-item" id="st-freq">---</span>
+      <span class="st-item" id="st-src">No signal</span>
+    </div>
+    <button class="rec-btn" id="btn-record">● REC</button>
+    <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
+  </div>
+
+  <!-- Oscilloscope screen -->
+  <div class="scope-wrap">
+    <div class="crt-bezel">
+      <div class="crt-screen">
+        <canvas id="scope" width="900" height="500"></canvas>
+        <div class="crt-overlay" id="crt-overlay"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Front panel ─── -->
+  <div class="front-panel">
+
+    <!-- CH1 -->
+    <div class="fp-section">
+      <div class="fp-title">
+        <span class="ch-led active" id="ch1-led"></span>CH 1
+      </div>
+      <div class="knob-group">
+        <div class="knob" id="knob-ch1-vdiv" title="V/div — scroll or drag"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">V/DIV</div>
+          <div class="knob-value" id="val-ch1-vdiv">500mV</div>
+        </div>
+      </div>
+      <div class="knob-group">
+        <div class="knob small" id="knob-ch1-pos" title="Position"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">POS</div>
+          <div class="knob-value" id="val-ch1-pos">0.0</div>
+        </div>
+      </div>
+      <div class="coup-row" data-ch="1">
+        <button class="coup-btn active" data-coup="AC">AC</button>
+        <button class="coup-btn" data-coup="DC">DC</button>
+        <button class="coup-btn" data-coup="GND">GND</button>
+      </div>
+    </div>
+
+    <!-- CH2 -->
+    <div class="fp-section">
+      <div class="fp-title">
+        <span class="ch-led" id="ch2-led"></span>CH 2
+      </div>
+      <div class="knob-group">
+        <div class="knob" id="knob-ch2-vdiv" title="V/div — scroll or drag"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">V/DIV</div>
+          <div class="knob-value" id="val-ch2-vdiv">500mV</div>
+        </div>
+      </div>
+      <div class="knob-group">
+        <div class="knob small" id="knob-ch2-pos" title="Position"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">POS</div>
+          <div class="knob-value" id="val-ch2-pos">0.0</div>
+        </div>
+      </div>
+      <div class="coup-row" data-ch="2">
+        <button class="coup-btn active" data-coup="AC">AC</button>
+        <button class="coup-btn" data-coup="DC">DC</button>
+        <button class="coup-btn" data-coup="GND">GND</button>
+      </div>
+    </div>
+
+    <!-- Horizontal -->
+    <div class="fp-section">
+      <div class="fp-title">HORIZONTAL</div>
+      <div class="knob-group">
+        <div class="knob" id="knob-timebase" title="Time/div — scroll or drag"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">TIME/DIV</div>
+          <div class="knob-value" id="val-timebase">1ms</div>
+        </div>
+      </div>
+      <div class="knob-group">
+        <div class="knob small" id="knob-hpos" title="H-Position"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">POS</div>
+          <div class="knob-value" id="val-hpos">0</div>
+        </div>
+      </div>
+      <div class="mode-row">
+        <button class="mode-btn active" id="btn-yt">YT</button>
+        <button class="mode-btn" id="btn-xy">XY</button>
+      </div>
+    </div>
+
+    <!-- Trigger -->
+    <div class="fp-section">
+      <div class="fp-title">TRIGGER</div>
+      <div class="knob-group">
+        <div class="knob small" id="knob-trig-level" title="Trigger level"><div class="knob-mark"></div></div>
+        <div class="knob-sub">
+          <div class="knob-label">LEVEL</div>
+          <div class="knob-value" id="val-trig-level">0.00V</div>
+        </div>
+      </div>
+      <label class="fp-select-label">SRC
+        <select id="trig-source">
+          <option value="1">CH1</option>
+          <option value="2">CH2</option>
+        </select>
+      </label>
+      <label class="fp-select-label">SLOPE
+        <select id="trig-slope">
+          <option value="rising">↑ Rising</option>
+          <option value="falling">↓ Falling</option>
+        </select>
+      </label>
+      <div class="trig-mode-row">
+        <button class="trig-btn active" data-mode="auto">AUTO</button>
+        <button class="trig-btn" data-mode="normal">NORM</button>
+        <button class="trig-btn" data-mode="single">SING</button>
+      </div>
+    </div>
+
+    <!-- System controls -->
+    <div class="fp-section">
+      <div class="fp-title">CTRL</div>
+      <button class="sys-btn accent" id="btn-single">SINGLE</button>
+      <button class="sys-btn" id="btn-auto-set">AUTO SET</button>
+      <button class="sys-btn" id="btn-measure">
+        <span class="led-dot" id="meas-led"></span>MEASURE
+      </button>
+      <button class="sys-btn" id="btn-reset-pos">RESET POS</button>
+      <div class="display-toggles">
+        <label class="toggle-lbl"><input type="checkbox" id="show-grid" checked> Grid</label>
+        <label class="toggle-lbl"><input type="checkbox" id="crt-curve" checked> CRT</label>
+        <label class="toggle-lbl"><input type="checkbox" id="scanlines"> Scan</label>
+      </div>
+    </div>
+
+    <!-- Audio -->
+    <div class="fp-section fp-audio">
+      <div class="fp-title">AUDIO IN</div>
+      <label class="file-drop" id="file-drop">
+        <span id="file-label">Drop file / click</span>
+        <input type="file" id="audio-file" accept="audio/*" hidden>
+      </label>
+      <div class="audio-btns">
+        <button class="sys-btn" id="btn-play" disabled>▶ PLAY</button>
+        <button class="sys-btn" id="btn-stop-audio" disabled>■ STOP</button>
+        <button class="sys-btn" id="btn-mic">⏺ MIC</button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bg" id="progress-bg">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="time-lbl" id="time-lbl">0:00 / 0:00</div>
+      </div>
+      <label class="fp-range-label">VOL
+        <input type="range" id="volume" min="0" max="2" step="0.01" value="1">
+      </label>
+    </div>
+
+    <!-- Signal Generator -->
+    <div class="fp-section fp-siggen">
+      <div class="fp-title">SIGNAL GEN</div>
+      <label class="fp-select-label">WAVE
+        <select id="gen-wave">
+          <option value="sine">Sine</option>
+          <option value="square">Square</option>
+          <option value="triangle">Triangle</option>
+          <option value="sawtooth">Sawtooth</option>
+        </select>
+      </label>
+      <div class="gen-freq-row">
+        <label class="fp-label-sm">L (Hz)<input type="number" id="gen-freq-l" value="440" min="1" max="22050" step="1"></label>
+        <label class="fp-label-sm">R (Hz)<input type="number" id="gen-freq-r" value="440" min="1" max="22050" step="1"></label>
+      </div>
+      <label class="fp-range-label">Phase
+        <input type="range" id="gen-phase" min="0" max="360" step="1" value="90">
+        <span id="gen-phase-val">90°</span>
+      </label>
+      <label class="fp-range-label">Amp
+        <input type="range" id="gen-amp" min="0.05" max="1" step="0.01" value="0.8">
+        <span id="gen-amp-val">0.80</span>
+      </label>
+      <div class="ratio-section">
+        <div class="ratio-label">L:R RATIO</div>
+        <div class="ratio-row" id="gen-ratio-row">
+          <button class="ratio-btn active" data-ratio="1">1:1</button>
+          <button class="ratio-btn" data-ratio="2">1:2</button>
+          <button class="ratio-btn" data-ratio="1.5">2:3</button>
+          <button class="ratio-btn" data-ratio="1.3333">3:4</button>
+          <button class="ratio-btn" data-ratio="1.6667">3:5</button>
+          <button class="ratio-btn" data-ratio="1.6">5:8</button>
+        </div>
+      </div>
+      <div class="audio-btns">
+        <button class="sys-btn accent" id="btn-gen-start">▶ START</button>
+        <button class="sys-btn" id="btn-gen-stop" disabled>■ STOP</button>
+      </div>
+    </div>
+
+    <!-- Visual FX -->
+    <div class="fp-section fp-fx">
+      <div class="fp-title">VISUAL FX</div>
+      <div class="fx-grid">
+        <label class="fx-lbl"><input type="checkbox" id="fx-reactive"> Reactive</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-cycle"> Color Cycle</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-bloom"> Bloom</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-x"> Mirror X</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-y"> Mirror Y</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-rotate"> Rotation</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-invert"> Beat Invert</label>
+      </div>
+      <label class="fp-range-label">Cycle Spd
+        <input type="range" id="fx-cycle-speed" min="0.1" max="8" step="0.1" value="0.5">
+        <span id="fx-cs-val">0.5</span>
+      </label>
+      <label class="fp-range-label">Rot Spd
+        <input type="range" id="fx-rot-speed" min="0.001" max="0.05" step="0.001" value="0.003">
+        <span id="fx-rs-val">0.003</span>
+      </label>
+      <label class="fp-range-label">Beat Sens
+        <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
+        <span id="fx-bs-val">1.50</span>
+      </label>
+    </div>
+
+    <!-- Display / Customize -->
+    <div class="fp-section fp-display">
+      <div class="fp-title clickable" id="toggle-display">DISPLAY ▸</div>
+      <div id="display-controls" class="display-inner" style="display:none">
+        <div class="preset-row">
+          <button class="preset-btn" data-preset="classic">Green</button>
+          <button class="preset-btn" data-preset="amber">Amber</button>
+          <button class="preset-btn" data-preset="blue">Blue</button>
+          <button class="preset-btn" data-preset="white">White</button>
+          <button class="preset-btn" data-preset="neon">Neon</button>
+        </div>
+        <label class="fp-range-label">Color
+          <input type="color" id="phosphor-color" value="#00ff41">
+        </label>
+        <label class="fp-range-label">Beam
+          <input type="range" id="beam-width" min="0.5" max="4" step="0.1" value="1.5">
+          <span id="beam-width-val">1.5</span>
+        </label>
+        <label class="fp-range-label">Glow
+          <input type="range" id="glow" min="0" max="40" step="1" value="12">
+          <span id="glow-val">12</span>
+        </label>
+        <label class="fp-range-label">Persist
+          <input type="range" id="persistence" min="0.02" max="0.95" step="0.01" value="0.15">
+          <span id="persistence-val">0.15</span>
+        </label>
+      </div>
+    </div>
+
+  </div><!-- /front-panel -->
+</div><!-- /app -->
+<script src="app.js"></script>
+</body>
+</html>
