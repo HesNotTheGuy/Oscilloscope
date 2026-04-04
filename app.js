@@ -355,6 +355,69 @@ class AudioEngine {
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
   }
 
+  // ── Idle / ambient signal (visible only — connects to analysers, not output) ─
+  startIdleSignal() {
+    if (!this.actx) return;
+    this._stopIdleSignal();
+
+    // Fundamental + harmonics with slow LFO wobble → organic-looking waveform
+    const make = (freq, gain, type = 'sine') => {
+      const osc = this.actx.createOscillator();
+      const g   = this.actx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      g.gain.value = gain;
+      osc.connect(g);
+      return { osc, g };
+    };
+
+    const fund   = make(60,  0.55);            // 60 Hz fundamental
+    const h2     = make(120, 0.18);            // 2nd harmonic
+    const h3     = make(180, 0.09);            // 3rd harmonic
+    const h5     = make(300, 0.04);            // 5th harmonic
+
+    // Slow LFO slightly wobbles the fundamental pitch (±1.5 Hz, 0.15 Hz rate)
+    const lfo    = this.actx.createOscillator();
+    const lfoGn  = this.actx.createGain();
+    lfo.frequency.value  = 0.15;
+    lfoGn.gain.value     = 1.5;
+    lfo.connect(lfoGn);
+    lfoGn.connect(fund.osc.frequency);
+
+    // Tiny noise floor
+    const nLen  = this.actx.sampleRate * 2;
+    const nBuf  = this.actx.createBuffer(1, nLen, this.actx.sampleRate);
+    const nData = nBuf.getChannelData(0);
+    for (let i = 0; i < nLen; i++) nData[i] = (Math.random() * 2 - 1) * 0.004;
+    const noise = this.actx.createBufferSource();
+    noise.buffer = nBuf; noise.loop = true;
+    const noiseGn = this.actx.createGain();
+    noiseGn.gain.value = 1;
+    noise.connect(noiseGn);
+
+    // Connect everything to analysers only (silent — no audio output)
+    for (const n of [fund.g, h2.g, h3.g, h5.g, noiseGn]) {
+      n.connect(this.analyserL);
+      n.connect(this.analyserR);
+    }
+
+    [fund.osc, h2.osc, h3.osc, h5.osc, lfo, noise].forEach(n => n.start());
+    this._idleNodes   = [fund.osc, h2.osc, h3.osc, h5.osc, lfo, noise,
+                         fund.g, h2.g, h3.g, h5.g, lfoGn, noiseGn];
+    this.idleActive   = true;
+  }
+
+  _stopIdleSignal() {
+    if (this._idleNodes) {
+      for (const n of this._idleNodes) {
+        try { n.stop?.(); } catch (_) {}
+        try { n.disconnect(); } catch (_) {}
+      }
+      this._idleNodes = null;
+    }
+    this.idleActive = false;
+  }
+
   getDataL() {
     const d = new Float32Array(this.FFT_SIZE);
     if (this.analyserL) this.analyserL.getFloatTimeDomainData(d);
@@ -375,16 +438,594 @@ class AudioEngine {
   get sampleRate() { return this.actx ? this.actx.sampleRate : 44100; }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  ImageScene  —  samples image pixels into phosphor trace points via Sobel
+//                 edge detection or luminosity threshold, rendered by GL beam
+// ─────────────────────────────────────────────────────────────────────────────
+class ImageScene {
+  constructor() {
+    this.loaded    = false;
+    this.name      = '';
+    this._img      = new Image();   // in-memory, never added to DOM
+
+    // Transforms
+    this.rotZ      = 0;    // spin, degrees
+    this.tiltX     = 0;    // perspective squash on Y (degrees)
+    this.tiltY     = 0;    // perspective squash on X (degrees)
+    this.scale     = 0.7;
+    this.posX      = 0;    // px offset from centre
+    this.posY      = 0;
+
+    // Trace settings
+    this.traceMode = 'edges';  // 'edges' | 'lum'
+    this.threshold = 40;       // Sobel gradient or luminosity threshold (0-255)
+    this.sampleRes = 96;       // sample width; height scales with aspect ratio
+
+    // Music reactivity
+    this.autoSpin  = false;
+    this.spinSpeed = 0.5;   // deg/frame
+    this.beatPulse = true;
+    this.rmsDrive  = false;
+    this.showAudio = false;
+
+    // Internal
+    this._pulse     = 0;
+    this._traceNorm = [];   // [[nx, ny], ...] normalized in [-0.5, 0.5]
+  }
+
+  load(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        this._img.onload  = () => {
+          this.loaded = true;
+          this.name   = file.name;
+          this._computeTrace();
+          resolve(true);
+        };
+        this._img.onerror = () => resolve(false);
+        this._img.src = ev.target.result;
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Samples the image and builds _traceNorm — called once on load and on setting changes
+  _computeTrace() {
+    if (!this.loaded) return;
+    const iW = this._img.naturalWidth;
+    const iH = this._img.naturalHeight;
+    if (!iW || !iH) return;
+
+    const sW = this.sampleRes;
+    const sH = Math.max(1, Math.round(sW * iH / iW));
+
+    let data;
+    try {
+      const oc  = new OffscreenCanvas(sW, sH);
+      const ctx = oc.getContext('2d');
+      ctx.drawImage(this._img, 0, 0, sW, sH);
+      data = ctx.getImageData(0, 0, sW, sH).data;
+    } catch (e) {
+      console.warn('ImageScene._computeTrace failed:', e);
+      return;
+    }
+
+    // Luminosity of pixel (x, y) — alpha-premultiplied
+    const getLum = (x, y) => {
+      if (x < 0 || x >= sW || y < 0 || y >= sH) return 0;
+      const i = (y * sW + x) * 4;
+      const a = data[i + 3] / 255;
+      return (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) * a;
+    };
+
+    const pts = [];
+    const thr = this.threshold;
+
+    if (this.traceMode === 'lum') {
+      // Emit all pixels brighter than threshold
+      for (let y = 0; y < sH; y++) {
+        for (let x = 0; x < sW; x++) {
+          if (getLum(x, y) >= thr) {
+            pts.push([(x / (sW - 1)) - 0.5, (y / (sH - 1)) - 0.5]);
+          }
+        }
+      }
+    } else {
+      // Sobel edge detection — emit pixels with strong gradient
+      for (let y = 1; y < sH - 1; y++) {
+        for (let x = 1; x < sW - 1; x++) {
+          const gx = -getLum(x-1, y-1) + getLum(x+1, y-1)
+                    - 2*getLum(x-1, y)  + 2*getLum(x+1, y)
+                    - getLum(x-1, y+1)  + getLum(x+1, y+1);
+          const gy = -getLum(x-1, y-1) - 2*getLum(x, y-1) - getLum(x+1, y-1)
+                    + getLum(x-1, y+1)  + 2*getLum(x, y+1) + getLum(x+1, y+1);
+          if (Math.sqrt(gx * gx + gy * gy) >= thr) {
+            pts.push([(x / (sW - 1)) - 0.5, (y / (sH - 1)) - 0.5]);
+          }
+        }
+      }
+    }
+
+    this._traceNorm = pts;
+  }
+
+  // Returns array of 2-point segments [[sx0,sy0],[sx1,sy1]] for the GL/2D renderer
+  getTracePoints(W, H, rms = 0, beat = false) {
+    if (!this.loaded || !this._traceNorm.length) return [];
+
+    // Animate
+    if (this.autoSpin) this.rotZ = (this.rotZ + this.spinSpeed) % 360;
+    if (beat && this.beatPulse) this._pulse = 0.3;
+    if (this._pulse > 0.001)    this._pulse *= 0.82;
+
+    const rmsBoost = this.rmsDrive ? rms * 25 : 0;
+    const sc   = this.scale * (1 + this._pulse);
+    const scX  = sc * Math.cos((this.tiltY + rmsBoost) * Math.PI / 180);
+    const scY  = sc * Math.cos((this.tiltX + rmsBoost) * Math.PI / 180);
+    const cosR = Math.cos(this.rotZ * Math.PI / 180);
+    const sinR = Math.sin(this.rotZ * Math.PI / 180);
+    const cx   = W / 2 + this.posX;
+    const cy   = H / 2 + this.posY;
+
+    // Fit image the same way drawImage would (85% of canvas, preserve aspect)
+    const iW   = this._img.naturalWidth  || 1;
+    const iH   = this._img.naturalHeight || 1;
+    const fit  = Math.min(W * 0.85 / iW, H * 0.85 / iH);
+    const fitX = iW * fit;   // screen pixels for full image width
+    const fitY = iH * fit;   // screen pixels for full image height
+
+    const result = [];
+    for (const [nx, ny] of this._traceNorm) {
+      // Image-space → scaled → rotated → screen
+      const px = nx * fitX * scX;
+      const py = ny * fitY * scY;
+      const rx = px * cosR - py * sinR;
+      const ry = px * sinR + py * cosR;
+      const sx = cx + rx;
+      const sy = cy + ry;
+      result.push([[sx, sy], [sx + 0.5, sy]]);
+    }
+    return result;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ObjScene  —  parses .obj files and projects edges to screen space
+// ─────────────────────────────────────────────────────────────────────────────
+class ObjScene {
+  constructor() {
+    this.verts     = [];
+    this.edges     = [];
+    this.loaded    = false;
+    this.name      = '';
+
+    // Manual transforms (radians for rotation)
+    this.rotX      = 0;
+    this.rotY      = 0;
+    this.rotZ      = 0;
+    this.scale     = 0.8;
+    this.posX      = 0;
+    this.posY      = 0;
+
+    // Music reactivity
+    this.autoRotY  = true;
+    this.rotSpeed  = 0.5;   // degrees per frame (base)
+    this.beatPulse = true;
+    this.rmsDrive  = false;
+    this.showAudio = false;
+
+    // Internal FX state
+    this._pulse    = 0;
+  }
+
+  load(text, name = 'model') {
+    this.verts = []; this.edges = []; this.loaded = false;
+    const rawV   = [];
+    const edgeSet = new Set();
+    const addEdge = (a, b) => {
+      if (a === b) return;
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      if (!edgeSet.has(key)) { edgeSet.add(key); this.edges.push([a, b]); }
+    };
+
+    for (const rawLine of text.split('\n')) {
+      const parts = rawLine.trim().split(/\s+/);
+      const cmd   = parts[0];
+      if (cmd === 'v') {
+        rawV.push([parseFloat(parts[1]) || 0, parseFloat(parts[2]) || 0, parseFloat(parts[3]) || 0]);
+      } else if (cmd === 'f') {
+        const N = rawV.length;
+        const idx = parts.slice(1).map(p => {
+          const i = parseInt(p.split('/')[0], 10);
+          return i < 0 ? N + i : i - 1;
+        }).filter(i => i >= 0 && i < N);
+        for (let i = 0; i < idx.length; i++) addEdge(idx[i], idx[(i + 1) % idx.length]);
+      } else if (cmd === 'l') {
+        const N = rawV.length;
+        const idx = parts.slice(1).map(p => {
+          const i = parseInt(p.split('/')[0], 10);
+          return i < 0 ? N + i : i - 1;
+        }).filter(i => i >= 0 && i < N);
+        for (let i = 0; i < idx.length - 1; i++) addEdge(idx[i], idx[i + 1]);
+      }
+    }
+
+    if (!rawV.length) return false;
+
+    // Normalize vertices to [-1, 1]
+    let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity,z0=Infinity,z1=-Infinity;
+    for (const [x,y,z] of rawV) {
+      if(x<x0)x0=x; if(x>x1)x1=x;
+      if(y<y0)y0=y; if(y>y1)y1=y;
+      if(z<z0)z0=z; if(z>z1)z1=z;
+    }
+    const cx=(x0+x1)/2, cy=(y0+y1)/2, cz=(z0+z1)/2;
+    const range = Math.max(x1-x0, y1-y0, z1-z0) / 2 || 1;
+    this.verts  = rawV.map(([x,y,z]) => [(x-cx)/range, (y-cy)/range, (z-cz)/range]);
+    this.loaded = true;
+    this.name   = name;
+    return true;
+  }
+
+  // Returns array of [[x0,y0],[x1,y1]] screen-space edge pairs
+  getScreenEdges(W, H, rms = 0, beat = false) {
+    if (!this.loaded) return [];
+
+    // Auto-rotate Y
+    if (this.autoRotY) {
+      const spd = (this.rotSpeed * (this.rmsDrive ? 1 + rms * 3 : 1)) * Math.PI / 180;
+      this.rotY = (this.rotY + spd) % (Math.PI * 2);
+    }
+
+    // Beat pulse
+    if (beat && this.beatPulse) this._pulse = 0.3;
+    if (this._pulse > 0.001)    this._pulse *= 0.8;
+
+    const sc  = this.scale * (1 + this._pulse);
+    const rx  = this.rotX, ry = this.rotY, rz = this.rotZ;
+    const cxr = Math.cos(rx), sxr = Math.sin(rx);
+    const cyr = Math.cos(ry), syr = Math.sin(ry);
+    const czr = Math.cos(rz), szr = Math.sin(rz);
+
+    // Combined rotation: Rz → Rx → Ry
+    const xform = (x, y, z) => {
+      const x1 = x*czr - y*szr,  y1 = x*szr + y*czr;   // Rz
+      const y2 = y1*cxr - z*sxr, z2 = y1*sxr + z*cxr;  // Rx
+      const x3 = x1*cyr + z2*syr;                        // Ry
+      return [x3, y2];
+    };
+
+    const half = Math.min(W, H) * 0.45 * sc;
+    const sx   = v => W/2 + (v + this.posX) * half;
+    const sy   = v => H/2 - (v + this.posY) * half;  // flip Y
+
+    const result = [];
+    for (const [i0, i1] of this.edges) {
+      const [ax, ay] = xform(...this.verts[i0]);
+      const [bx, by] = xform(...this.verts[i1]);
+      result.push([[sx(ax), sy(ay)], [sx(bx), sy(by)]]);
+    }
+    return result;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  WaveGLRenderer  —  WebGL beam + GPU Gaussian glow, replaces Canvas shadowBlur
+// ─────────────────────────────────────────────────────────────────────────────
+class WaveGLRenderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.W = canvas.width;
+    this.H = canvas.height;
+
+    const gl = canvas.getContext('webgl', {
+      alpha: false, antialias: false, preserveDrawingBuffer: false, powerPreference: 'high-performance'
+    });
+    if (!gl) throw new Error('WebGL not available');
+    this.gl = gl;
+
+    this._buildPrograms();
+    this._buildQuadBuffer();
+    this._buildFBOs();
+    this._lineBuf  = gl.createBuffer();
+    this._lineVerts = new Float32Array(200000 * 2);
+
+    // 2D overlay canvas for grid / measurements / CRT vignette
+    const ov = document.createElement('canvas');
+    ov.width = this.W; ov.height = this.H;
+    ov.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    const parent = canvas.parentElement;
+    if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+    canvas.insertAdjacentElement('afterend', ov);
+    this.octx = ov.getContext('2d');
+    this._ovCanvas = ov;
+  }
+
+  _mkShader(type, src) {
+    const gl = this.gl, sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+      throw new Error('Shader: ' + gl.getShaderInfoLog(sh));
+    return sh;
+  }
+
+  _mkProg(vs, fs) {
+    const gl = this.gl, p = gl.createProgram();
+    gl.attachShader(p, this._mkShader(gl.VERTEX_SHADER,   vs));
+    gl.attachShader(p, this._mkShader(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+      throw new Error('Link: ' + gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  _buildPrograms() {
+    const gl = this.gl;
+
+    // 1. Beam: renders thick-line quads (screen-space → NDC)
+    this._pBeam = this._mkProg(
+      `attribute vec2 aP; uniform vec2 uR;
+       void main(){ vec2 c=(aP/uR)*2.0-1.0; gl_Position=vec4(c.x,-c.y,0.0,1.0); }`,
+      `precision mediump float; uniform vec4 uC;
+       void main(){ gl_FragColor=uC; }`
+    );
+    this._b_aP = gl.getAttribLocation(this._pBeam, 'aP');
+    this._b_uR = gl.getUniformLocation(this._pBeam, 'uR');
+    this._b_uC = gl.getUniformLocation(this._pBeam, 'uC');
+
+    // 2. Blur: separable 9-tap Gaussian (kernel sum = 1.000)
+    this._pBlur = this._mkProg(
+      `attribute vec2 aP; varying vec2 vU;
+       void main(){ vU=aP*0.5+0.5; gl_Position=vec4(aP,0.0,1.0); }`,
+      `precision mediump float;
+       uniform sampler2D uT; uniform vec2 uD; varying vec2 vU;
+       void main(){
+         vec4 s=vec4(0.0);
+         s+=texture2D(uT,vU+uD*-4.0)*0.0238;
+         s+=texture2D(uT,vU+uD*-3.0)*0.0667;
+         s+=texture2D(uT,vU+uD*-2.0)*0.1238;
+         s+=texture2D(uT,vU+uD*-1.0)*0.1745;
+         s+=texture2D(uT,vU        )*0.2224;
+         s+=texture2D(uT,vU+uD* 1.0)*0.1745;
+         s+=texture2D(uT,vU+uD* 2.0)*0.1238;
+         s+=texture2D(uT,vU+uD* 3.0)*0.0667;
+         s+=texture2D(uT,vU+uD* 4.0)*0.0238;
+         gl_FragColor=s;
+       }`
+    );
+    this._bl_aP = gl.getAttribLocation(this._pBlur, 'aP');
+    this._bl_uT = gl.getUniformLocation(this._pBlur, 'uT');
+    this._bl_uD = gl.getUniformLocation(this._pBlur, 'uD');
+
+    // 3. Composite: phosphor decay + glow + sharp beam
+    this._pComp = this._mkProg(
+      `attribute vec2 aP; varying vec2 vU;
+       void main(){ vU=aP*0.5+0.5; gl_Position=vec4(aP,0.0,1.0); }`,
+      `precision mediump float;
+       uniform sampler2D uPh, uGl, uBm;
+       uniform float uDk, uGS;
+       uniform vec3 uFl;
+       varying vec2 vU;
+       void main(){
+         vec3 ph=texture2D(uPh,vU).rgb*uDk;
+         vec3 gv=texture2D(uGl,vU).rgb*uGS;
+         vec3 bm=texture2D(uBm,vU).rgb;
+         gl_FragColor=vec4(clamp(ph+gv+bm+uFl,0.0,1.0),1.0);
+       }`
+    );
+    this._c_aP  = gl.getAttribLocation(this._pComp,  'aP');
+    this._c_uPh = gl.getUniformLocation(this._pComp, 'uPh');
+    this._c_uGl = gl.getUniformLocation(this._pComp, 'uGl');
+    this._c_uBm = gl.getUniformLocation(this._pComp, 'uBm');
+    this._c_uDk = gl.getUniformLocation(this._pComp, 'uDk');
+    this._c_uGS = gl.getUniformLocation(this._pComp, 'uGS');
+    this._c_uFl = gl.getUniformLocation(this._pComp, 'uFl');
+  }
+
+  _buildQuadBuffer() {
+    const gl = this.gl;
+    this._qBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._qBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  }
+
+  _mkTex() {
+    const gl = this.gl, t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.W, this.H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    return t;
+  }
+
+  _mkFBO(tex) {
+    const gl = this.gl, fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+      throw new Error('FBO incomplete');
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return fbo;
+  }
+
+  _buildFBOs() {
+    const gl = this.gl;
+    this._tBeam  = this._mkTex(); this._fBeam  = this._mkFBO(this._tBeam);
+    this._tBlurH = this._mkTex(); this._fBlurH = this._mkFBO(this._tBlurH);
+    this._tBlurV = this._mkTex(); this._fBlurV = this._mkFBO(this._tBlurV);
+    this._tPhA   = this._mkTex(); this._fPhA   = this._mkFBO(this._tPhA);
+    this._tPhB   = this._mkTex(); this._fPhB   = this._mkFBO(this._tPhB);
+    this._ping   = 0;
+    [this._fBeam,this._fBlurH,this._fBlurV,this._fPhA,this._fPhB].forEach(f => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  // Build triangle-strip quad geometry for a polyline (screen space)
+  _buildLineGeom(pts, hw) {
+    const v = this._lineVerts;
+    let vi = 0;
+    for (let i = 0, N = pts.length - 1; i < N; i++) {
+      const [x0,y0] = pts[i], [x1,y1] = pts[i+1];
+      const dx=x1-x0, dy=y1-y0, len=Math.sqrt(dx*dx+dy*dy)||1;
+      const nx=-dy/len*hw, ny=dx/len*hw;
+      if (vi+12 > v.length) break;
+      v[vi++]=x0-nx; v[vi++]=y0-ny;
+      v[vi++]=x1-nx; v[vi++]=y1-ny;
+      v[vi++]=x0+nx; v[vi++]=y0+ny;
+      v[vi++]=x0+nx; v[vi++]=y0+ny;
+      v[vi++]=x1-nx; v[vi++]=y1-ny;
+      v[vi++]=x1+nx; v[vi++]=y1+ny;
+    }
+    return vi >> 1;
+  }
+
+  _addLine(pts, rgba, hw) {
+    const gl = this.gl, nv = this._buildLineGeom(pts, hw);
+    if (!nv) return;
+    gl.useProgram(this._pBeam);
+    gl.uniform2f(this._b_uR, this.W, this.H);
+    gl.uniform4fv(this._b_uC, rgba);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._lineBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, this._lineVerts.subarray(0, nv*2), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this._b_aP);
+    gl.vertexAttribPointer(this._b_aP, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, nv);
+  }
+
+  _quad(prog, aLoc) {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._qBuf);
+    gl.enableVertexAttribArray(aLoc);
+    gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  _rgba(color, alpha=1) {
+    let r=0,g=1,b=0.25;
+    if (color.startsWith('#') && color.length>=7) {
+      r=parseInt(color.slice(1,3),16)/255;
+      g=parseInt(color.slice(3,5),16)/255;
+      b=parseInt(color.slice(5,7),16)/255;
+    } else if (color.startsWith('hsl')) {
+      const [h,s,l]=color.match(/[\d.]+/g).map(Number);
+      const a=s/100*Math.min(l/100,1-l/100);
+      const f=n=>{const k=(n+h/30)%12;return l/100-a*Math.max(-1,Math.min(k-3,9-k,1));};
+      r=f(0);g=f(8);b=f(4);
+    }
+    return new Float32Array([r,g,b,alpha]);
+  }
+
+  // Main per-frame call
+  // pointSets: Array of [x,y][] — primary + mirrors
+  // glow:      blur spread in pixels
+  // beamWidth: core line thickness in pixels
+  // decay:     phosphor persistence (0=instant clear, 1=never)  — maps to 1-persistence
+  // glowStr:   glow intensity multiplier
+  // flashRGB:  [r,g,b] beat flash or null
+  frame(pointSets, color, glow, beamWidth, decay, glowStr=0.7, flashRGB=null) {
+    const gl = this.gl;
+    const rgba = this._rgba(color, 1.0);
+    const hw   = Math.max(0.5, beamWidth * 0.5);
+    const step = Math.max(1.0, glow * 0.4);
+
+    // 1. Render all beams → fBeam (additive blending, clear first)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._fBeam);
+    gl.viewport(0, 0, this.W, this.H);
+    gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    for (const pts of pointSets) this._addLine(pts, rgba, hw);
+    gl.disable(gl.BLEND);
+
+    // 2. Horizontal Gaussian blur: fBeam → fBlurH
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._fBlurH);
+    gl.viewport(0, 0, this.W, this.H);
+    gl.useProgram(this._pBlur);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this._tBeam);
+    gl.uniform1i(this._bl_uT, 0); gl.uniform2f(this._bl_uD, step/this.W, 0);
+    this._quad(this._pBlur, this._bl_aP);
+
+    // 3. Vertical Gaussian blur: fBlurH → fBlurV  (= final glow texture)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._fBlurV);
+    gl.viewport(0, 0, this.W, this.H);
+    gl.bindTexture(gl.TEXTURE_2D, this._tBlurH);
+    gl.uniform2f(this._bl_uD, 0, step/this.H);
+    this._quad(this._pBlur, this._bl_aP);
+
+    // 4. Composite: prevPhosphor*decay + glow*glowStr + beam → curPhosphor
+    const [curF, curT, prevT] = this._ping === 0
+      ? [this._fPhA, this._tPhA, this._tPhB]
+      : [this._fPhB, this._tPhB, this._tPhA];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, curF);
+    gl.viewport(0, 0, this.W, this.H);
+    gl.useProgram(this._pComp);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, prevT);       gl.uniform1i(this._c_uPh, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this._tBlurV); gl.uniform1i(this._c_uGl, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this._tBeam);  gl.uniform1i(this._c_uBm, 2);
+    gl.uniform1f(this._c_uDk, 1.0 - decay);
+    gl.uniform1f(this._c_uGS, glowStr);
+    const fl = flashRGB || [0,0,0];
+    gl.uniform3f(this._c_uFl, fl[0], fl[1], fl[2]);
+    this._quad(this._pComp, this._c_aP);
+
+    // 5. Blit phosphor → screen (blur shader as identity copy: uD=(0,0) → kernel sums to 1.0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.W, this.H);
+    gl.useProgram(this._pBlur);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, curT);
+    gl.uniform1i(this._bl_uT, 0); gl.uniform2f(this._bl_uD, 0, 0);
+    this._quad(this._pBlur, this._bl_aP);
+
+    this._ping ^= 1;
+  }
+
+  destroy() {
+    this._ovCanvas.remove();
+    const gl = this.gl;
+    [this._fBeam,this._fBlurH,this._fBlurV,this._fPhA,this._fPhB].forEach(f=>gl.deleteFramebuffer(f));
+    [this._tBeam,this._tBlurH,this._tBlurV,this._tPhA,this._tPhB].forEach(t=>gl.deleteTexture(t));
+    [this._pBeam,this._pBlur,this._pComp].forEach(p=>gl.deleteProgram(p));
+    gl.deleteBuffer(this._qBuf); gl.deleteBuffer(this._lineBuf);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
 // ─────────────────────────────────────────────────────────────
 class Oscilloscope {
   constructor(canvas, engine) {
     this.canvas = canvas;
-    this.ctx    = canvas.getContext('2d');
     this.engine = engine;
     this.rafId  = null;
     this.running = false;
+
+    // Try WebGL renderer; fall back to Canvas 2D
+    try {
+      this._glr = new WaveGLRenderer(canvas);
+      this.ctx  = null;
+    } catch(e) {
+      console.warn('WebGL unavailable, using Canvas 2D fallback:', e);
+      this._glr = null;
+      // canvas.getContext('2d') returns null if a WebGL context was partially
+      // acquired before the error — in that case swap in a fresh canvas.
+      this.ctx = canvas.getContext('2d');
+      if (!this.ctx) {
+        const replacement = document.createElement('canvas');
+        replacement.id     = canvas.id;
+        replacement.width  = canvas.width;
+        replacement.height = canvas.height;
+        replacement.style.cssText = canvas.style.cssText;
+        canvas.parentElement.replaceChild(replacement, canvas);
+        this.canvas = replacement;
+        this.ctx    = replacement.getContext('2d');
+      }
+    }
 
     // ── Scope state ──
     this.isRunning  = true;
@@ -411,6 +1052,16 @@ class Oscilloscope {
     this.showGrid    = true;
     this.crtCurve    = true;
     this.showMeasure = true;
+    this.smooth      = false;
+    this.filterEnabled = false;
+    this.filterLow   = 200;
+    this.filterHigh  = 3000;
+
+    // OBJ 3D mode
+    this.objMode = false;
+    this._obj    = new ObjScene();
+    this.obj3dMode   = true;   // true = OBJ wireframe, false = image overlay
+    this._imgScene   = new ImageScene();
 
     // ── Visual FX state ──
     this.fx = {
@@ -441,13 +1092,15 @@ class Oscilloscope {
 
     this._beatDet = new BeatDetector();
 
-    // Phosphor buffer
-    this._phBuf = document.createElement('canvas');
-    this._phBuf.width  = canvas.width;
-    this._phBuf.height = canvas.height;
-    this._phCtx = this._phBuf.getContext('2d');
-    this._phCtx.fillStyle = '#000';
-    this._phCtx.fillRect(0, 0, canvas.width, canvas.height);
+    // Phosphor buffer (2D fallback only — WebGL handles this internally)
+    if (!this._glr) {
+      this._phBuf = document.createElement('canvas');
+      this._phBuf.width  = canvas.width;
+      this._phBuf.height = canvas.height;
+      this._phCtx = this._phBuf.getContext('2d');
+      this._phCtx.fillStyle = '#000';
+      this._phCtx.fillRect(0, 0, canvas.width, canvas.height);
+    }
   }
 
   // ── Coupling ─────────────────────────────────────────────────────────
@@ -460,6 +1113,43 @@ class Oscilloscope {
     const out = new Float32Array(data.length);
     for (let i = 0; i < data.length; i++) out[i] = data[i] - mean;
     return out;
+  }
+
+  // ── Frequency bandpass filter (biquad HP + LP chain) ─────────────────
+  _biquadCoeffs(type, fc, sr) {
+    const w0    = 2 * Math.PI * Math.max(1, Math.min(fc, sr / 2 - 1)) / sr;
+    const cosw0 = Math.cos(w0);
+    const alpha = Math.sin(w0) / (2 * 0.707);
+    const a0    = 1 + alpha;
+    if (type === 'lp') return {
+      b0: (1 - cosw0) / (2 * a0), b1: (1 - cosw0) / a0, b2: (1 - cosw0) / (2 * a0),
+      a1: -2 * cosw0 / a0, a2: (1 - alpha) / a0
+    };
+    // hp
+    return {
+      b0:  (1 + cosw0) / (2 * a0), b1: -(1 + cosw0) / a0, b2: (1 + cosw0) / (2 * a0),
+      a1: -2 * cosw0 / a0, a2: (1 - alpha) / a0
+    };
+  }
+
+  _runBiquad(data, c) {
+    const out = new Float32Array(data.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < data.length; i++) {
+      const x0 = data[i];
+      const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2;
+      out[i] = y0;
+      x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+    }
+    return out;
+  }
+
+  applyFilter(data) {
+    const sr  = this.engine.sampleRate;
+    const lo  = Math.min(this.filterLow,  this.filterHigh - 1);
+    const hi  = Math.max(this.filterHigh, lo + 1);
+    const hp  = this._runBiquad(data, this._biquadCoeffs('hp', lo, sr));
+    return this._runBiquad(hp, this._biquadCoeffs('lp', hi, sr));
   }
 
   // ── Trigger ──────────────────────────────────────────────────────────
@@ -607,10 +1297,23 @@ class Oscilloscope {
     const vs   = this.getVoltScale(ch);
     const start = Math.max(0, trigIdx + this.hPos);
     const pts  = [];
+    const spx  = Math.max(0.01, sampPx);
     for (let px = 0; px < W; px++) {
-      const si = start + Math.round(px * Math.max(0.01, sampPx));
-      if (si >= data.length) break;
-      pts.push([px, midY - Math.max(-2, Math.min(2, data[si])) * vs * (H/2)]);
+      const t  = start + px * spx;
+      let val;
+      if (this.smooth) {
+        const i0   = Math.floor(t);
+        const i1   = i0 + 1;
+        if (i0 >= data.length) break;
+        const s0   = data[i0];
+        const s1   = i1 < data.length ? data[i1] : s0;
+        val = s0 + (t - i0) * (s1 - s0);
+      } else {
+        const si = Math.round(t);
+        if (si >= data.length) break;
+        val = data[si];
+      }
+      pts.push([px, midY - Math.max(-2, Math.min(2, val)) * vs * (H/2)]);
     }
     return pts;
   }
@@ -704,8 +1407,8 @@ class Oscilloscope {
   }
 
   // ── CRT vignette ─────────────────────────────────────────────────────
-  applyCRTCurve() {
-    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
+  applyCRTCurve(ctx = this.ctx) {
+    const W = this.canvas.width, H = this.canvas.height;
     const vig = ctx.createRadialGradient(W/2,H/2,H*0.3, W/2,H/2,H*0.85);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
     vig.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -727,7 +1430,121 @@ class Oscilloscope {
   // ── Main render loop ─────────────────────────────────────────────────
   render() {
     if (!this.running) return;
+    if (this._glr) this._renderGL(); else this._render2D();
+    this.rafId = requestAnimationFrame(() => this.render());
+  }
 
+  // ── WebGL render path ────────────────────────────────────────────────
+  _renderGL() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const glr = this._glr;
+
+    // ① Get + process data
+    let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
+    let dataL, dataR;
+    if (this.isRunning) {
+      dataL = this.applyCoupling(rawL, this.ch1.coupling);
+      dataR = this.applyCoupling(rawR, this.ch2.coupling);
+      if (this.filterEnabled) { dataL = this.applyFilter(dataL); dataR = this.applyFilter(dataR); }
+      if (this._singleArmed) {
+        this.frozenData = { L: dataL, R: dataR };
+        this._singleArmed = false; this.isRunning = false;
+      } else { this.frozenData = { L: dataL, R: dataR }; }
+    } else {
+      dataL = this.frozenData?.L || rawL;
+      dataR = this.frozenData?.R || rawR;
+    }
+
+    // ② FX update
+    this._updateFX(dataL);
+    const color  = this._renderColor();
+    const glow   = this._renderGlow();
+    const bWidth = this._renderBeamWidth();
+
+    // ③ Build point arrays (primary + mirrors)
+    let allPts = [];
+    let measResult = null;
+
+    if (this.mode === 'YT') {
+      const trigIdx = this.findTrigger(dataL);
+      if (trigIdx >= 0) {
+        const sampPx = this.getSamplesPerPixel();
+        measResult = { trigIdx, sampPx };
+        let pts = this._buildYTPoints(dataL, this.ch1, trigIdx, sampPx, 0);
+        // Rotation: rotate points around canvas center
+        if (this.fx.rotation && this.fx._angle !== 0) {
+          const cos = Math.cos(this.fx._angle), sin = Math.sin(this.fx._angle);
+          const cx = W/2, cy = H/2;
+          pts = pts.map(([x,y]) => {
+            const dx=x-cx, dy=y-cy;
+            return [cx+dx*cos-dy*sin, cy+dx*sin+dy*cos];
+          });
+        }
+        allPts.push(pts);
+        if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
+        if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
+        if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+      }
+    } else {
+      // XY / Lissajous
+      const sx = (W/2) * this.getVoltScale(this.ch1) * 4;
+      const sy = (H/2) * this.getVoltScale(this.ch2) * 4;
+      const cx = W/2, cy = H/2;
+      const n  = Math.min(dataL.length, dataR.length);
+      const pts = [];
+      for (let i = 0; i < n; i++) pts.push([cx + dataL[i]*sx, cy - dataR[i]*sy]);
+      allPts.push(pts);
+      if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
+      if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
+      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+    }
+
+    // ③b OBJ / image overlay
+    if (this.objMode && this.obj3dMode) {
+      // 3D OBJ wireframe — edges feed the GL beam directly
+      if (this._obj.loaded) {
+        const edges = this._obj.getScreenEdges(W, H, this.fx._rms, this._lastBeat || false);
+        allPts = this._obj.showAudio ? [...allPts, ...edges] : edges;
+      }
+    } else if (this.objMode && !this.obj3dMode) {
+      // 2D image — phosphor-trace the image as beam-drawn segments
+      if (this._imgScene.loaded) {
+        const imgPts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false);
+        allPts = this._imgScene.showAudio ? [...allPts, ...imgPts] : imgPts;
+      }
+    }
+
+    // ④ Beat flash
+    let flashRGB = null;
+    if (this.fx._flash > 0.01) {
+      const rgba = glr._rgba(this.fx.beatInvert ? '#ffffff' : color);
+      const i = this.fx._flash * 0.35;
+      flashRGB = [rgba[0]*i, rgba[1]*i, rgba[2]*i];
+    }
+
+    // ⑤ GL frame: beam → blur → composite → blit
+    const glowStr = this.fx.bloom ? 1.4 : 0.7;
+    const glowPx  = this.fx.bloom ? glow * 1.5 : glow;
+    glr.frame(allPts, color, glowPx, bWidth, this.persistence, glowStr, flashRGB);
+
+    // ⑥ Overlay: grid + CRT + measurements
+    const octx = glr.octx;
+    octx.clearRect(0, 0, W, H);
+    if (this.showGrid)  this.drawGrid(octx);
+    if (this.crtCurve)  this.applyCRTCurve(octx);
+
+    // ⑦ Measurements
+    this._freqTimer++;
+    if (this._freqTimer >= 10 && measResult) {
+      this._freqTimer = 0;
+      this._meas    = this.calcMeasurements(dataL, measResult.trigIdx, measResult.sampPx, W);
+      this.measFreq = this.estimateFreq(dataL);
+    }
+    this.drawMeasurements(octx);
+  }
+
+  // ── Canvas 2D fallback render path (original logic) ──────────────────
+  _render2D() {
     const pctx = this._phCtx;
     const W = this.canvas.width, H = this.canvas.height;
 
@@ -743,32 +1560,27 @@ class Oscilloscope {
     // ③ Get data
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
     let dataL, dataR;
-
     if (this.isRunning) {
       dataL = this.applyCoupling(rawL, this.ch1.coupling);
       dataR = this.applyCoupling(rawR, this.ch2.coupling);
+      if (this.filterEnabled) { dataL = this.applyFilter(dataL); dataR = this.applyFilter(dataR); }
       if (this._singleArmed) {
         this.frozenData = { L: dataL, R: dataR };
-        this._singleArmed = false;
-        this.isRunning = false;
-      } else {
-        this.frozenData = { L: dataL, R: dataR };
-      }
+        this._singleArmed = false; this.isRunning = false;
+      } else { this.frozenData = { L: dataL, R: dataR }; }
     } else {
       dataL = this.frozenData?.L || rawL;
       dataR = this.frozenData?.R || rawR;
     }
 
-    // ④ FX update (beat, hue, rotation, rms)
+    // ④ FX update
     this._updateFX(dataL);
 
-    // ⑤ Apply rotation transform to phosphor ctx
+    // ⑤ Rotation
     const rotActive = this.fx.rotation && this.fx._angle !== 0;
     if (rotActive) {
       pctx.save();
-      pctx.translate(W/2, H/2);
-      pctx.rotate(this.fx._angle);
-      pctx.translate(-W/2, -H/2);
+      pctx.translate(W/2, H/2); pctx.rotate(this.fx._angle); pctx.translate(-W/2, -H/2);
     }
 
     // ⑥ Draw waveform
@@ -781,15 +1593,14 @@ class Oscilloscope {
       this.drawXY(pctx, dataL, dataR);
       this._drawMirrored(pctx, ctx => this.drawXY(ctx, dataL, dataR));
     }
-
     if (rotActive) pctx.restore();
 
     // ⑦ Beat flash overlay
     const fx = this.fx;
     if (fx._flash > 0.01) {
       pctx.save();
-      pctx.globalAlpha  = fx._flash * 0.35;
-      pctx.fillStyle    = fx.beatInvert ? '#ffffff' : this._renderColor();
+      pctx.globalAlpha = fx._flash * 0.35;
+      pctx.fillStyle   = fx.beatInvert ? '#ffffff' : this._renderColor();
       pctx.fillRect(0, 0, W, H);
       pctx.restore();
     }
@@ -810,7 +1621,27 @@ class Oscilloscope {
     if (this.crtCurve) this.applyCRTCurve();
     this.drawMeasurements(this.ctx);
 
-    this.rafId = requestAnimationFrame(() => this.render());
+    // ⑪ Image trace (2D fallback path) — draw phosphor dots for each trace point
+    if (this.objMode && !this.obj3dMode && this._imgScene.loaded) {
+      const tracePts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false);
+      if (tracePts.length) {
+        const color = this._renderColor();
+        const glow  = this._renderGlow() * 0.5;
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth   = this._renderBeamWidth();
+        this.ctx.shadowBlur  = glow;
+        this.ctx.shadowColor = color;
+        this.ctx.lineCap     = 'round';
+        this.ctx.beginPath();
+        for (const [[sx, sy], [ex, ey]] of tracePts) {
+          this.ctx.moveTo(sx, sy);
+          this.ctx.lineTo(ex, ey);
+        }
+        this.ctx.stroke();
+        this.ctx.restore();
+      }
+    }
   }
 
   start() { if (this.running) return; this.running = true; this.render(); }
@@ -972,10 +1803,129 @@ class UIController {
       document.getElementById('val-hpos').textContent = '0';
     });
 
+    document.getElementById('btn-idle-sig').addEventListener('click', async () => {
+      await this._ensureAudio();
+      const btn = document.getElementById('btn-idle-sig');
+      if (e.idleActive) {
+        e._stopIdleSignal();
+        btn.classList.remove('active');
+      } else {
+        e.startIdleSignal();
+        btn.classList.add('active');
+      }
+    });
+
     document.getElementById('show-grid').addEventListener('change', e => s.showGrid = e.target.checked);
     document.getElementById('crt-curve').addEventListener('change', e => s.crtCurve = e.target.checked);
+    document.getElementById('smooth').addEventListener('change', e => s.smooth = e.target.checked);
+    document.getElementById('freq-filter').addEventListener('change', e => s.filterEnabled = e.target.checked);
+    document.getElementById('filter-low').addEventListener('change',  e => s.filterLow  = Math.max(20, +e.target.value));
+    document.getElementById('filter-high').addEventListener('change', e => s.filterHigh = Math.min(20000, +e.target.value));
     document.getElementById('scanlines').addEventListener('change', e => {
       document.getElementById('crt-overlay').classList.toggle('scanlines', e.target.checked);
+    });
+
+    // ── OBJ 3D ─────────────────────────────────────────────────────────
+    document.getElementById('obj-mode').addEventListener('change', e => s.objMode = e.target.checked);
+    document.getElementById('obj-show-audio').addEventListener('change', e => s._obj.showAudio = e.target.checked);
+
+    const objDrop = document.getElementById('obj-drop-zone');
+    const objFile = document.getElementById('obj-file');
+    const loadObj = async file => {
+      if (!file || !file.name.toLowerCase().endsWith('.obj')) return;
+      document.getElementById('obj-name').textContent = 'Loading…';
+      const text = await file.text();
+      const ok   = s._obj.load(text, file.name);
+      const lbl  = ok
+        ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name)
+        : 'Parse error';
+      document.getElementById('obj-name').textContent = lbl;
+      objDrop.classList.toggle('loaded', ok);
+    };
+    objDrop.addEventListener('click',     () => objFile.click());
+    objFile.addEventListener('change',    e  => loadObj(e.target.files[0]));
+    objDrop.addEventListener('dragover',  e  => { e.preventDefault(); objDrop.classList.add('drag-over'); });
+    objDrop.addEventListener('dragleave', () => objDrop.classList.remove('drag-over'));
+    objDrop.addEventListener('drop',      e  => { e.preventDefault(); objDrop.classList.remove('drag-over'); loadObj(e.dataTransfer.files[0]); });
+
+    this._bindRange('obj-rx',    v => { s._obj.rotX  = v * Math.PI / 180; document.getElementById('obj-rx-val').textContent  = Math.round(v) + '°'; });
+    this._bindRange('obj-ry',    v => { s._obj.rotY  = v * Math.PI / 180; document.getElementById('obj-ry-val').textContent  = Math.round(v) + '°'; });
+    this._bindRange('obj-rz',    v => { s._obj.rotZ  = v * Math.PI / 180; document.getElementById('obj-rz-val').textContent  = Math.round(v) + '°'; });
+    this._bindRange('obj-scale', v => { s._obj.scale = v;                  document.getElementById('obj-scale-val').textContent = v.toFixed(2); });
+    this._bindRange('obj-px',    v => { s._obj.posX  = v;                  document.getElementById('obj-px-val').textContent    = v.toFixed(2); });
+    this._bindRange('obj-py',    v => { s._obj.posY  = v;                  document.getElementById('obj-py-val').textContent    = v.toFixed(2); });
+    this._bindRange('obj-rot-speed', v => { s._obj.rotSpeed = v; document.getElementById('obj-rs-val').textContent = v.toFixed(1); });
+    document.getElementById('obj-auto-rot').addEventListener('change',  e => s._obj.autoRotY  = e.target.checked);
+    document.getElementById('obj-beat-pulse').addEventListener('change', e => s._obj.beatPulse = e.target.checked);
+    document.getElementById('obj-rms-drive').addEventListener('change',  e => s._obj.rmsDrive  = e.target.checked);
+
+    // ── OBJ/IMG mode switch ────────────────────────────────────────────
+    document.getElementById('obj-mode-3d').addEventListener('click', () => {
+      s.obj3dMode = true;
+      document.getElementById('obj-mode-3d').classList.add('active');
+      document.getElementById('obj-mode-img').classList.remove('active');
+      document.getElementById('obj-3d-ctrls').style.display = '';
+      document.getElementById('obj-img-ctrls').style.display = 'none';
+    });
+    document.getElementById('obj-mode-img').addEventListener('click', () => {
+      s.obj3dMode = false;
+      document.getElementById('obj-mode-img').classList.add('active');
+      document.getElementById('obj-mode-3d').classList.remove('active');
+      document.getElementById('obj-3d-ctrls').style.display = 'none';
+      document.getElementById('obj-img-ctrls').style.display = '';
+    });
+
+    // ── Image file loading ─────────────────────────────────────────────
+    const imgDrop = document.getElementById('img-drop-zone');
+    const imgFile = document.getElementById('img-file');
+    const IMG_EXTS = new Set(['jpg','jpeg','png','gif','webp','bmp','svg','avif','tiff','tif','ico','heic','heif','jxl']);
+    const loadImg = async file => {
+      if (!file) return;
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if (!file.type.startsWith('image/') && !IMG_EXTS.has(ext)) return;
+      document.getElementById('img-name').textContent = 'Loading…';
+      const ok = await s._imgScene.load(file);
+      const lbl = ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Error';
+      document.getElementById('img-name').textContent = lbl;
+      if (ok) imgDrop.classList.add('loaded');
+    };
+    imgDrop.addEventListener('click',     () => imgFile.click());
+    imgFile.addEventListener('change',    e  => loadImg(e.target.files[0]));
+    imgDrop.addEventListener('dragover',  e  => { e.preventDefault(); imgDrop.classList.add('drag-over'); });
+    imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag-over'));
+    imgDrop.addEventListener('drop',      e  => { e.preventDefault(); imgDrop.classList.remove('drag-over'); loadImg(e.dataTransfer.files[0]); });
+
+    document.getElementById('img-show-audio').addEventListener('change',  e => s._imgScene.showAudio  = e.target.checked);
+    document.getElementById('img-auto-spin').addEventListener('change',   e => s._imgScene.autoSpin   = e.target.checked);
+    document.getElementById('img-beat-pulse').addEventListener('change',  e => s._imgScene.beatPulse  = e.target.checked);
+    document.getElementById('img-rms-drive').addEventListener('change',   e => s._imgScene.rmsDrive   = e.target.checked);
+    this._bindRange('img-rz',         v => { s._imgScene.rotZ      = v;  document.getElementById('img-rz-val').textContent    = Math.round(v) + '°'; });
+    this._bindRange('img-tx',         v => { s._imgScene.tiltX     = v;  document.getElementById('img-tx-val').textContent    = Math.round(v) + '°'; });
+    this._bindRange('img-ty',         v => { s._imgScene.tiltY     = v;  document.getElementById('img-ty-val').textContent    = Math.round(v) + '°'; });
+    this._bindRange('img-scale',      v => { s._imgScene.scale     = v;  document.getElementById('img-scale-val').textContent = v.toFixed(2); });
+    this._bindRange('img-px',         v => { s._imgScene.posX      = v;  document.getElementById('img-px-val').textContent    = Math.round(v); });
+    this._bindRange('img-py',         v => { s._imgScene.posY      = v;  document.getElementById('img-py-val').textContent    = Math.round(v); });
+    this._bindRange('img-spin-speed', v => { s._imgScene.spinSpeed = v;  document.getElementById('img-ss-val').textContent    = v.toFixed(1); });
+
+    // Trace mode toggle (Edges / Lum)
+    const imgTraceBtns = document.querySelectorAll('.img-trace-btn');
+    imgTraceBtns.forEach(btn => btn.addEventListener('click', () => {
+      imgTraceBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      s._imgScene.traceMode = btn.dataset.trace;
+      s._imgScene._computeTrace();
+    }));
+
+    // Threshold & density — recompute trace on change
+    this._bindRange('img-threshold', v => {
+      s._imgScene.threshold = v;
+      document.getElementById('img-thr-val').textContent = Math.round(v);
+      s._imgScene._computeTrace();
+    });
+    this._bindRange('img-density', v => {
+      s._imgScene.sampleRes = Math.round(v);
+      document.getElementById('img-den-val').textContent = Math.round(v);
+      s._imgScene._computeTrace();
     });
 
     // ── Audio ─────────────────────────────────────────────────────────
@@ -1248,5 +2198,11 @@ class UIController {
   const ui = new UIController(engine, scope, sigGen, recorder);
   ui._audioReady = false;
   ui._ensureAudio = ensureAudio;
-  ui.init();
+  try {
+    ui.init();
+  } catch(err) {
+    console.error('UIController.init() crashed:', err.message, '\n', err.stack);
+    document.body.style.cssText = 'background:#111;color:#f66;font:14px monospace;padding:20px';
+    document.body.innerHTML = '<b>Init error — open DevTools (Ctrl+Shift+I) for details:</b><br><pre>' + err.stack + '</pre>';
+  }
 })();

@@ -149,10 +149,17 @@
         <span class="led-dot" id="meas-led"></span>MEASURE
       </button>
       <button class="sys-btn" id="btn-reset-pos">RESET POS</button>
+      <button class="sys-btn" id="btn-idle-sig">IDLE SIG</button>
       <div class="display-toggles">
         <label class="toggle-lbl"><input type="checkbox" id="show-grid" checked> Grid</label>
         <label class="toggle-lbl"><input type="checkbox" id="crt-curve" checked> CRT</label>
         <label class="toggle-lbl"><input type="checkbox" id="scanlines"> Scan</label>
+        <label class="toggle-lbl"><input type="checkbox" id="smooth"> Smooth</label>
+      </div>
+      <div class="filter-row">
+        <label class="toggle-lbl"><input type="checkbox" id="freq-filter"> Filter</label>
+        <label class="fp-label-sm">Lo<input type="number" id="filter-low"  value="200"  min="20" max="20000" step="10"></label>
+        <label class="fp-label-sm">Hi<input type="number" id="filter-high" value="3000" min="20" max="20000" step="10"></label>
       </div>
     </div>
 
@@ -244,6 +251,120 @@
         <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
         <span id="fx-bs-val">1.50</span>
       </label>
+    </div>
+
+    <!-- OBJ 3D / IMG 2D -->
+    <div class="fp-section fp-obj">
+      <div class="fp-title">3D / 2D</div>
+
+      <!-- Enable + mode switch -->
+      <div class="obj-header-row">
+        <label class="toggle-lbl"><input type="checkbox" id="obj-mode"> Enable</label>
+        <div class="obj-mode-row">
+          <button class="obj-mode-btn active" id="obj-mode-3d">OBJ</button>
+          <button class="obj-mode-btn" id="obj-mode-img">IMG</button>
+        </div>
+      </div>
+
+      <!-- ── OBJ 3D controls ── -->
+      <div id="obj-3d-ctrls">
+        <div class="file-drop" id="obj-drop-zone">
+          <span id="obj-name">Drop .obj / click</span>
+          <input type="file" id="obj-file" accept=".obj" hidden>
+        </div>
+        <label class="toggle-lbl"><input type="checkbox" id="obj-show-audio"> + Audio</label>
+        <label class="fp-range-label">Rx
+          <input type="range" id="obj-rx" min="-180" max="180" value="0" step="1">
+          <span id="obj-rx-val">0°</span>
+        </label>
+        <label class="fp-range-label">Ry
+          <input type="range" id="obj-ry" min="-180" max="180" value="0" step="1">
+          <span id="obj-ry-val">0°</span>
+        </label>
+        <label class="fp-range-label">Rz
+          <input type="range" id="obj-rz" min="-180" max="180" value="0" step="1">
+          <span id="obj-rz-val">0°</span>
+        </label>
+        <label class="fp-range-label">Scale
+          <input type="range" id="obj-scale" min="0.1" max="2" value="0.8" step="0.05">
+          <span id="obj-scale-val">0.80</span>
+        </label>
+        <label class="fp-range-label">X
+          <input type="range" id="obj-px" min="-0.8" max="0.8" value="0" step="0.01">
+          <span id="obj-px-val">0.00</span>
+        </label>
+        <label class="fp-range-label">Y
+          <input type="range" id="obj-py" min="-0.8" max="0.8" value="0" step="0.01">
+          <span id="obj-py-val">0.00</span>
+        </label>
+        <div class="obj-fx-row">
+          <label class="toggle-lbl"><input type="checkbox" id="obj-auto-rot" checked> Auto Rot</label>
+          <label class="toggle-lbl"><input type="checkbox" id="obj-beat-pulse" checked> Beat</label>
+          <label class="toggle-lbl"><input type="checkbox" id="obj-rms-drive"> RMS</label>
+        </div>
+        <label class="fp-range-label">Spd
+          <input type="range" id="obj-rot-speed" min="0.1" max="5" value="0.5" step="0.1">
+          <span id="obj-rs-val">0.5</span>
+        </label>
+      </div>
+
+      <!-- ── IMG 2D controls ── -->
+      <div id="obj-img-ctrls" style="display:none">
+        <div class="file-drop" id="img-drop-zone">
+          <span id="img-name">Drop image / click</span>
+          <input type="file" id="img-file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.avif,.tiff,.tif,.ico,.heic,.heif,.jxl" hidden>
+        </div>
+
+        <!-- Trace mode: Edges (Sobel) vs Lum (brightness fill) -->
+        <div class="obj-mode-row" style="margin:4px 0">
+          <button class="img-trace-btn obj-mode-btn active" data-trace="edges">Edges</button>
+          <button class="img-trace-btn obj-mode-btn" data-trace="lum">Lum</button>
+        </div>
+        <label class="fp-range-label">Thresh
+          <input type="range" id="img-threshold" min="10" max="200" value="40" step="5">
+          <span id="img-thr-val">40</span>
+        </label>
+        <label class="fp-range-label">Density
+          <input type="range" id="img-density" min="32" max="256" value="96" step="8">
+          <span id="img-den-val">96</span>
+        </label>
+
+        <label class="toggle-lbl"><input type="checkbox" id="img-show-audio"> + Audio</label>
+        <label class="fp-range-label">Spin
+          <input type="range" id="img-rz" min="-180" max="180" value="0" step="1">
+          <span id="img-rz-val">0°</span>
+        </label>
+        <label class="fp-range-label">TiltX
+          <input type="range" id="img-tx" min="-75" max="75" value="0" step="1">
+          <span id="img-tx-val">0°</span>
+        </label>
+        <label class="fp-range-label">TiltY
+          <input type="range" id="img-ty" min="-75" max="75" value="0" step="1">
+          <span id="img-ty-val">0°</span>
+        </label>
+        <label class="fp-range-label">Scale
+          <input type="range" id="img-scale" min="0.1" max="2" value="0.7" step="0.05">
+          <span id="img-scale-val">0.70</span>
+        </label>
+        <label class="fp-range-label">X
+          <input type="range" id="img-px" min="-200" max="200" value="0" step="1">
+          <span id="img-px-val">0</span>
+        </label>
+        <label class="fp-range-label">Y
+          <input type="range" id="img-py" min="-200" max="200" value="0" step="1">
+          <span id="img-py-val">0</span>
+        </label>
+        <div class="obj-fx-row">
+          <label class="toggle-lbl"><input type="checkbox" id="img-auto-spin"> Auto Spin</label>
+          <label class="toggle-lbl"><input type="checkbox" id="img-beat-pulse" checked> Beat</label>
+          <label class="toggle-lbl"><input type="checkbox" id="img-rms-drive"> RMS</label>
+        </div>
+        <label class="fp-range-label">Spd
+          <input type="range" id="img-spin-speed" min="0.1" max="5" value="0.5" step="0.1">
+          <span id="img-ss-val">0.5</span>
+        </label>
+      </div>
+
     </div>
 
     <!-- Display / Customize -->

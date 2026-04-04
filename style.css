@@ -370,6 +370,55 @@ body {
 .toggle-lbl:hover { color: var(--text); }
 input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.filter-row .fp-label-sm { font-size: 10px; }
+.filter-row .fp-label-sm input[type="number"] { width: 46px; }
+
+/* ─── OBJ 3D / IMG 2D section ─── */
+.fp-obj { min-width: 160px; }
+
+.obj-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.obj-mode-row {
+  display: flex;
+  gap: 2px;
+}
+.obj-mode-btn {
+  font-family: inherit;
+  font-size: 9px;
+  background: #111;
+  border: 1px solid #333;
+  color: #555;
+  padding: 2px 7px;
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+}
+.obj-mode-btn.active {
+  background: #001800;
+  border-color: var(--p);
+  color: var(--p);
+}
+.obj-enable-row { margin-bottom: 4px; }
+.obj-fx-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* ─── Img trace mode buttons reuse .obj-mode-btn — no extra rule needed ─── */
+
 /* ─── Audio section ─── */
 .fp-audio { flex: 1; min-width: 170px; }
 
