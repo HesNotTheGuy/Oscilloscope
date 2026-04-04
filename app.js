@@ -439,38 +439,46 @@ class AudioEngine {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ImageScene  —  samples image pixels into phosphor trace points via Sobel
-//                 edge detection or luminosity threshold, rendered by GL beam
+//  ImageScene  —  samples image pixels into phosphor trace points.
+//  Transforms + music-reactivity properties mirror ObjScene for uniform UI.
 // ─────────────────────────────────────────────────────────────────────────────
 class ImageScene {
   constructor() {
     this.loaded    = false;
     this.name      = '';
-    this._img      = new Image();   // in-memory, never added to DOM
+    this._img      = new Image();
 
-    // Transforms
+    // Transforms — normalized coords matching ObjScene
     this.rotZ      = 0;    // spin, degrees
-    this.tiltX     = 0;    // perspective squash on Y (degrees)
-    this.tiltY     = 0;    // perspective squash on X (degrees)
-    this.scale     = 0.7;
-    this.posX      = 0;    // px offset from centre
+    this.tiltX     = 0;    // perspective squash Y axis (degrees)
+    this.tiltY     = 0;    // perspective squash X axis (degrees)
+    this.scale     = 0.8;
+    this.posX      = 0;    // normalized [-0.8, 0.8] — same scale as ObjScene
     this.posY      = 0;
 
     // Trace settings
-    this.traceMode = 'edges';  // 'edges' | 'lum'
-    this.threshold = 40;       // Sobel gradient or luminosity threshold (0-255)
-    this.sampleRes = 96;       // sample width; height scales with aspect ratio
+    this.traceMode = 'edges';   // 'outline' | 'edges' | 'lum'
+    this.threshold = 40;
+    this.sampleRes = 96;
 
-    // Music reactivity
+    // Shared music-reactivity (property names match ObjScene)
     this.autoSpin  = false;
-    this.spinSpeed = 0.5;   // deg/frame
+    this.rotSpeed  = 0.5;   // deg/frame
     this.beatPulse = true;
-    this.rmsDrive  = false;
     this.showAudio = false;
 
-    // Internal
+    // Music-sync animation modes
+    this.breathe   = false;   // smooth RMS-driven scale envelope
+    this.shake     = false;   // beat-triggered position jitter
+    this.warp      = false;   // audio waveform radially displaces trace pts
+    this.warpAmt   = 0.1;
+
+    // Internal state
     this._pulse     = 0;
-    this._traceNorm = [];   // [[nx, ny], ...] normalized in [-0.5, 0.5]
+    this._breatheSc = 1;
+    this._shakeX    = 0;
+    this._shakeY    = 0;
+    this._traceNorm = [];
   }
 
   load(file) {
@@ -491,7 +499,6 @@ class ImageScene {
     });
   }
 
-  // Samples the image and builds _traceNorm — called once on load and on setting changes
   _computeTrace() {
     if (!this.loaded) return;
     const iW = this._img.naturalWidth;
@@ -512,7 +519,10 @@ class ImageScene {
       return;
     }
 
-    // Luminosity of pixel (x, y) — alpha-premultiplied
+    const getAlpha = (x, y) => {
+      if (x < 0 || x >= sW || y < 0 || y >= sH) return 0;
+      return data[(y * sW + x) * 4 + 3];
+    };
     const getLum = (x, y) => {
       if (x < 0 || x >= sW || y < 0 || y >= sH) return 0;
       const i = (y * sW + x) * 4;
@@ -523,8 +533,22 @@ class ImageScene {
     const pts = [];
     const thr = this.threshold;
 
-    if (this.traceMode === 'lum') {
-      // Emit all pixels brighter than threshold
+    if (this.traceMode === 'outline') {
+      // Alpha-boundary trace — opaque pixels with ≥1 transparent 8-neighbour
+      const alphaThr = Math.max(10, thr);
+      for (let y = 0; y < sH; y++) {
+        for (let x = 0; x < sW; x++) {
+          if (getAlpha(x, y) >= alphaThr) {
+            if (getAlpha(x-1, y)   < alphaThr || getAlpha(x+1, y)   < alphaThr ||
+                getAlpha(x,   y-1) < alphaThr || getAlpha(x,   y+1) < alphaThr ||
+                getAlpha(x-1, y-1) < alphaThr || getAlpha(x+1, y-1) < alphaThr ||
+                getAlpha(x-1, y+1) < alphaThr || getAlpha(x+1, y+1) < alphaThr) {
+              pts.push([(x / (sW - 1)) - 0.5, (y / (sH - 1)) - 0.5]);
+            }
+          }
+        }
+      }
+    } else if (this.traceMode === 'lum') {
       for (let y = 0; y < sH; y++) {
         for (let x = 0; x < sW; x++) {
           if (getLum(x, y) >= thr) {
@@ -533,7 +557,7 @@ class ImageScene {
         }
       }
     } else {
-      // Sobel edge detection — emit pixels with strong gradient
+      // Sobel edge detection
       for (let y = 1; y < sH - 1; y++) {
         for (let x = 1; x < sW - 1; x++) {
           const gx = -getLum(x-1, y-1) + getLum(x+1, y-1)
@@ -551,41 +575,64 @@ class ImageScene {
     this._traceNorm = pts;
   }
 
-  // Returns array of 2-point segments [[sx0,sy0],[sx1,sy1]] for the GL/2D renderer
-  getTracePoints(W, H, rms = 0, beat = false) {
+  // Returns [[sx0,sy0],[sx1,sy1]] segments for the GL/2D renderer.
+  // audioBuf: Float32Array time-domain samples from the analyser (for Warp mode)
+  getTracePoints(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded || !this._traceNorm.length) return [];
 
-    // Animate
-    if (this.autoSpin) this.rotZ = (this.rotZ + this.spinSpeed) % 360;
+    // Animate spin
+    if (this.autoSpin) this.rotZ = (this.rotZ + this.rotSpeed) % 360;
+
+    // Beat pulse
     if (beat && this.beatPulse) this._pulse = 0.3;
     if (this._pulse > 0.001)    this._pulse *= 0.82;
 
-    const rmsBoost = this.rmsDrive ? rms * 25 : 0;
-    const sc   = this.scale * (1 + this._pulse);
-    const scX  = sc * Math.cos((this.tiltY + rmsBoost) * Math.PI / 180);
-    const scY  = sc * Math.cos((this.tiltX + rmsBoost) * Math.PI / 180);
+    // Breathe — exponentially-smoothed RMS → scale
+    this._breatheSc = this._breatheSc * 0.88 + (this.breathe ? 1 + rms * 2.5 : 1) * 0.12;
+
+    // Shake — position jitter on beat, decays each frame
+    if (beat && this.shake) {
+      const h = Math.min(W, H) * 0.45;
+      this._shakeX = (Math.random() - 0.5) * h * 0.12;
+      this._shakeY = (Math.random() - 0.5) * h * 0.12;
+    }
+    this._shakeX *= 0.7;
+    this._shakeY *= 0.7;
+
+    const sc   = this.scale * (1 + this._pulse) * this._breatheSc;
+    const scX  = sc * Math.cos(this.tiltY * Math.PI / 180);
+    const scY  = sc * Math.cos(this.tiltX * Math.PI / 180);
     const cosR = Math.cos(this.rotZ * Math.PI / 180);
     const sinR = Math.sin(this.rotZ * Math.PI / 180);
-    const cx   = W / 2 + this.posX;
-    const cy   = H / 2 + this.posY;
+    const half = Math.min(W, H) * 0.45;
+    const cx   = W / 2 + this.posX * half + this._shakeX;
+    const cy   = H / 2 - this.posY * half + this._shakeY;  // flip Y to match OBJ
 
-    // Fit image the same way drawImage would (85% of canvas, preserve aspect)
     const iW   = this._img.naturalWidth  || 1;
     const iH   = this._img.naturalHeight || 1;
     const fit  = Math.min(W * 0.85 / iW, H * 0.85 / iH);
-    const fitX = iW * fit;   // screen pixels for full image width
-    const fitY = iH * fit;   // screen pixels for full image height
+    const fitX = iW * fit;
+    const fitY = iH * fit;
+
+    const bufLen = audioBuf ? audioBuf.length : 0;
 
     const result = [];
-    for (const [nx, ny] of this._traceNorm) {
-      // Image-space → scaled → rotated → screen
+    for (let [nx, ny] of this._traceNorm) {
+      // Warp — radially displace each point using the audio waveform
+      if (this.warp && bufLen > 0) {
+        const angle = Math.atan2(ny, nx);
+        const sIdx  = Math.floor(((angle / (Math.PI * 2)) + 0.5) * bufLen) % bufLen;
+        const d     = audioBuf[sIdx] * this.warpAmt;
+        const dist  = Math.sqrt(nx * nx + ny * ny) || 0.001;
+        nx += (nx / dist) * d;
+        ny += (ny / dist) * d;
+      }
+
       const px = nx * fitX * scX;
       const py = ny * fitY * scY;
       const rx = px * cosR - py * sinR;
       const ry = px * sinR + py * cosR;
-      const sx = cx + rx;
-      const sy = cy + ry;
-      result.push([[sx, sy], [sx + 0.5, sy]]);
+      result.push([[cx + rx, cy + ry], [cx + rx + 0.5, cy + ry]]);
     }
     return result;
   }
@@ -609,15 +656,23 @@ class ObjScene {
     this.posX      = 0;
     this.posY      = 0;
 
-    // Music reactivity
+    // Shared music-reactivity (matches ImageScene property names)
     this.autoRotY  = true;
-    this.rotSpeed  = 0.5;   // degrees per frame (base)
+    this.rotSpeed  = 0.5;   // degrees per frame
     this.beatPulse = true;
-    this.rmsDrive  = false;
     this.showAudio = false;
 
+    // Music-sync animation modes
+    this.breathe   = false;   // smooth RMS-driven scale envelope
+    this.shake     = false;   // beat-triggered position jitter
+    this.warp      = false;   // audio waveform displaces projected edge points
+    this.warpAmt   = 0.1;
+
     // Internal FX state
-    this._pulse    = 0;
+    this._pulse     = 0;
+    this._breatheSc = 1;
+    this._shakeX    = 0;
+    this._shakeY    = 0;
   }
 
   load(text, name = 'model') {
@@ -669,21 +724,32 @@ class ObjScene {
     return true;
   }
 
-  // Returns array of [[x0,y0],[x1,y1]] screen-space edge pairs
-  getScreenEdges(W, H, rms = 0, beat = false) {
+  // Returns [[x0,y0],[x1,y1]] screen-space edge pairs.
+  // audioBuf: Float32Array time-domain samples (for Warp mode)
+  getScreenEdges(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded) return [];
 
     // Auto-rotate Y
     if (this.autoRotY) {
-      const spd = (this.rotSpeed * (this.rmsDrive ? 1 + rms * 3 : 1)) * Math.PI / 180;
-      this.rotY = (this.rotY + spd) % (Math.PI * 2);
+      this.rotY = (this.rotY + this.rotSpeed * Math.PI / 180) % (Math.PI * 2);
     }
 
     // Beat pulse
     if (beat && this.beatPulse) this._pulse = 0.3;
     if (this._pulse > 0.001)    this._pulse *= 0.8;
 
-    const sc  = this.scale * (1 + this._pulse);
+    // Breathe — exponentially-smoothed RMS → scale
+    this._breatheSc = this._breatheSc * 0.88 + (this.breathe ? 1 + rms * 2.5 : 1) * 0.12;
+
+    // Shake — position jitter on beat, decays each frame
+    if (beat && this.shake) {
+      this._shakeX = (Math.random() - 0.5) * 0.12;
+      this._shakeY = (Math.random() - 0.5) * 0.12;
+    }
+    this._shakeX *= 0.7;
+    this._shakeY *= 0.7;
+
+    const sc  = this.scale * (1 + this._pulse) * this._breatheSc;
     const rx  = this.rotX, ry = this.rotY, rz = this.rotZ;
     const cxr = Math.cos(rx), sxr = Math.sin(rx);
     const cyr = Math.cos(ry), syr = Math.sin(ry);
@@ -691,21 +757,38 @@ class ObjScene {
 
     // Combined rotation: Rz → Rx → Ry
     const xform = (x, y, z) => {
-      const x1 = x*czr - y*szr,  y1 = x*szr + y*czr;   // Rz
-      const y2 = y1*cxr - z*sxr, z2 = y1*sxr + z*cxr;  // Rx
-      const x3 = x1*cyr + z2*syr;                        // Ry
+      const x1 = x*czr - y*szr,  y1 = x*szr + y*czr;
+      const y2 = y1*cxr - z*sxr, z2 = y1*sxr + z*cxr;
+      const x3 = x1*cyr + z2*syr;
       return [x3, y2];
     };
 
-    const half = Math.min(W, H) * 0.45 * sc;
-    const sx   = v => W/2 + (v + this.posX) * half;
-    const sy   = v => H/2 - (v + this.posY) * half;  // flip Y
+    const half   = Math.min(W, H) * 0.45 * sc;
+    const ox     = this.posX + this._shakeX;
+    const oy     = this.posY + this._shakeY;
+    const toSx   = v => W/2 + (v + ox) * half;
+    const toSy   = v => H/2 - (v + oy) * half;
+    const bufLen = audioBuf ? audioBuf.length : 0;
 
     const result = [];
     for (const [i0, i1] of this.edges) {
-      const [ax, ay] = xform(...this.verts[i0]);
-      const [bx, by] = xform(...this.verts[i1]);
-      result.push([[sx(ax), sy(ay)], [sx(bx), sy(by)]]);
+      let [ax, ay] = xform(...this.verts[i0]);
+      let [bx, by] = xform(...this.verts[i1]);
+
+      // Warp — radially displace projected 2D points using the audio waveform
+      if (this.warp && bufLen > 0) {
+        const ws = this.warpAmt * 0.5;
+        const a0 = Math.atan2(ay, ax), a1 = Math.atan2(by, bx);
+        const s0 = Math.floor(((a0 / (Math.PI*2)) + 0.5) * bufLen) % bufLen;
+        const s1 = Math.floor(((a1 / (Math.PI*2)) + 0.5) * bufLen) % bufLen;
+        const d0 = audioBuf[s0] * ws, d1 = audioBuf[s1] * ws;
+        const r0 = Math.sqrt(ax*ax + ay*ay) || 0.001;
+        const r1 = Math.sqrt(bx*bx + by*by) || 0.001;
+        ax += (ax/r0) * d0;  ay += (ay/r0) * d0;
+        bx += (bx/r1) * d1;  by += (by/r1) * d1;
+      }
+
+      result.push([[toSx(ax), toSy(ay)], [toSx(bx), toSy(by)]]);
     }
     return result;
   }
@@ -1503,13 +1586,13 @@ class Oscilloscope {
     if (this.objMode && this.obj3dMode) {
       // 3D OBJ wireframe — edges feed the GL beam directly
       if (this._obj.loaded) {
-        const edges = this._obj.getScreenEdges(W, H, this.fx._rms, this._lastBeat || false);
+        const edges = this._obj.getScreenEdges(W, H, this.fx._rms, this._lastBeat || false, rawL);
         allPts = this._obj.showAudio ? [...allPts, ...edges] : edges;
       }
     } else if (this.objMode && !this.obj3dMode) {
       // 2D image — phosphor-trace the image as beam-drawn segments
       if (this._imgScene.loaded) {
-        const imgPts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false);
+        const imgPts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false, rawL);
         allPts = this._imgScene.showAudio ? [...allPts, ...imgPts] : imgPts;
       }
     }
@@ -1623,7 +1706,7 @@ class Oscilloscope {
 
     // ⑪ Image trace (2D fallback path) — draw phosphor dots for each trace point
     if (this.objMode && !this.obj3dMode && this._imgScene.loaded) {
-      const tracePts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false);
+      const tracePts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false, rawL);
       if (tracePts.length) {
         const color = this._renderColor();
         const glow  = this._renderGlow() * 0.5;
@@ -1825,10 +1908,23 @@ class UIController {
       document.getElementById('crt-overlay').classList.toggle('scanlines', e.target.checked);
     });
 
-    // ── OBJ 3D ─────────────────────────────────────────────────────────
+    // ── 3D/2D scene — enable + mode switch ────────────────────────────
     document.getElementById('obj-mode').addEventListener('change', e => s.objMode = e.target.checked);
-    document.getElementById('obj-show-audio').addEventListener('change', e => s._obj.showAudio = e.target.checked);
 
+    const _showMode = is3d => {
+      s.obj3dMode = is3d;
+      document.getElementById('obj-mode-3d').classList.toggle('active',  is3d);
+      document.getElementById('obj-mode-img').classList.toggle('active', !is3d);
+      document.getElementById('obj-drop-zone').style.display    = is3d  ? '' : 'none';
+      document.getElementById('img-drop-zone').style.display    = is3d  ? 'none' : '';
+      document.getElementById('obj-rot-ctrls').style.display    = is3d  ? '' : 'none';
+      document.getElementById('img-tilt-ctrls').style.display   = is3d  ? 'none' : '';
+      document.getElementById('img-trace-ctrls').style.display  = is3d  ? 'none' : '';
+    };
+    document.getElementById('obj-mode-3d').addEventListener('click', () => _showMode(true));
+    document.getElementById('obj-mode-img').addEventListener('click', () => _showMode(false));
+
+    // ── OBJ file loading ───────────────────────────────────────────────
     const objDrop = document.getElementById('obj-drop-zone');
     const objFile = document.getElementById('obj-file');
     const loadObj = async file => {
@@ -1836,10 +1932,8 @@ class UIController {
       document.getElementById('obj-name').textContent = 'Loading…';
       const text = await file.text();
       const ok   = s._obj.load(text, file.name);
-      const lbl  = ok
-        ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name)
-        : 'Parse error';
-      document.getElementById('obj-name').textContent = lbl;
+      document.getElementById('obj-name').textContent =
+        ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Parse error';
       objDrop.classList.toggle('loaded', ok);
     };
     objDrop.addEventListener('click',     () => objFile.click());
@@ -1848,34 +1942,11 @@ class UIController {
     objDrop.addEventListener('dragleave', () => objDrop.classList.remove('drag-over'));
     objDrop.addEventListener('drop',      e  => { e.preventDefault(); objDrop.classList.remove('drag-over'); loadObj(e.dataTransfer.files[0]); });
 
-    this._bindRange('obj-rx',    v => { s._obj.rotX  = v * Math.PI / 180; document.getElementById('obj-rx-val').textContent  = Math.round(v) + '°'; });
-    this._bindRange('obj-ry',    v => { s._obj.rotY  = v * Math.PI / 180; document.getElementById('obj-ry-val').textContent  = Math.round(v) + '°'; });
-    this._bindRange('obj-rz',    v => { s._obj.rotZ  = v * Math.PI / 180; document.getElementById('obj-rz-val').textContent  = Math.round(v) + '°'; });
-    this._bindRange('obj-scale', v => { s._obj.scale = v;                  document.getElementById('obj-scale-val').textContent = v.toFixed(2); });
-    this._bindRange('obj-px',    v => { s._obj.posX  = v;                  document.getElementById('obj-px-val').textContent    = v.toFixed(2); });
-    this._bindRange('obj-py',    v => { s._obj.posY  = v;                  document.getElementById('obj-py-val').textContent    = v.toFixed(2); });
-    this._bindRange('obj-rot-speed', v => { s._obj.rotSpeed = v; document.getElementById('obj-rs-val').textContent = v.toFixed(1); });
-    document.getElementById('obj-auto-rot').addEventListener('change',  e => s._obj.autoRotY  = e.target.checked);
-    document.getElementById('obj-beat-pulse').addEventListener('change', e => s._obj.beatPulse = e.target.checked);
-    document.getElementById('obj-rms-drive').addEventListener('change',  e => s._obj.rmsDrive  = e.target.checked);
+    // ── OBJ-only: Rx / Ry ──────────────────────────────────────────────
+    this._bindRange('obj-rx', v => { s._obj.rotX = v * Math.PI / 180; document.getElementById('obj-rx-val').textContent = Math.round(v) + '°'; });
+    this._bindRange('obj-ry', v => { s._obj.rotY = v * Math.PI / 180; document.getElementById('obj-ry-val').textContent = Math.round(v) + '°'; });
 
-    // ── OBJ/IMG mode switch ────────────────────────────────────────────
-    document.getElementById('obj-mode-3d').addEventListener('click', () => {
-      s.obj3dMode = true;
-      document.getElementById('obj-mode-3d').classList.add('active');
-      document.getElementById('obj-mode-img').classList.remove('active');
-      document.getElementById('obj-3d-ctrls').style.display = '';
-      document.getElementById('obj-img-ctrls').style.display = 'none';
-    });
-    document.getElementById('obj-mode-img').addEventListener('click', () => {
-      s.obj3dMode = false;
-      document.getElementById('obj-mode-img').classList.add('active');
-      document.getElementById('obj-mode-3d').classList.remove('active');
-      document.getElementById('obj-3d-ctrls').style.display = 'none';
-      document.getElementById('obj-img-ctrls').style.display = '';
-    });
-
-    // ── Image file loading ─────────────────────────────────────────────
+    // ── IMG file loading ───────────────────────────────────────────────
     const imgDrop = document.getElementById('img-drop-zone');
     const imgFile = document.getElementById('img-file');
     const IMG_EXTS = new Set(['jpg','jpeg','png','gif','webp','bmp','svg','avif','tiff','tif','ico','heic','heif','jxl']);
@@ -1885,8 +1956,8 @@ class UIController {
       if (!file.type.startsWith('image/') && !IMG_EXTS.has(ext)) return;
       document.getElementById('img-name').textContent = 'Loading…';
       const ok = await s._imgScene.load(file);
-      const lbl = ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Error';
-      document.getElementById('img-name').textContent = lbl;
+      document.getElementById('img-name').textContent =
+        ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Error';
       if (ok) imgDrop.classList.add('loaded');
     };
     imgDrop.addEventListener('click',     () => imgFile.click());
@@ -1895,19 +1966,7 @@ class UIController {
     imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag-over'));
     imgDrop.addEventListener('drop',      e  => { e.preventDefault(); imgDrop.classList.remove('drag-over'); loadImg(e.dataTransfer.files[0]); });
 
-    document.getElementById('img-show-audio').addEventListener('change',  e => s._imgScene.showAudio  = e.target.checked);
-    document.getElementById('img-auto-spin').addEventListener('change',   e => s._imgScene.autoSpin   = e.target.checked);
-    document.getElementById('img-beat-pulse').addEventListener('change',  e => s._imgScene.beatPulse  = e.target.checked);
-    document.getElementById('img-rms-drive').addEventListener('change',   e => s._imgScene.rmsDrive   = e.target.checked);
-    this._bindRange('img-rz',         v => { s._imgScene.rotZ      = v;  document.getElementById('img-rz-val').textContent    = Math.round(v) + '°'; });
-    this._bindRange('img-tx',         v => { s._imgScene.tiltX     = v;  document.getElementById('img-tx-val').textContent    = Math.round(v) + '°'; });
-    this._bindRange('img-ty',         v => { s._imgScene.tiltY     = v;  document.getElementById('img-ty-val').textContent    = Math.round(v) + '°'; });
-    this._bindRange('img-scale',      v => { s._imgScene.scale     = v;  document.getElementById('img-scale-val').textContent = v.toFixed(2); });
-    this._bindRange('img-px',         v => { s._imgScene.posX      = v;  document.getElementById('img-px-val').textContent    = Math.round(v); });
-    this._bindRange('img-py',         v => { s._imgScene.posY      = v;  document.getElementById('img-py-val').textContent    = Math.round(v); });
-    this._bindRange('img-spin-speed', v => { s._imgScene.spinSpeed = v;  document.getElementById('img-ss-val').textContent    = v.toFixed(1); });
-
-    // Trace mode toggle (Edges / Lum)
+    // ── IMG-only: trace mode, TiltX/TiltY ─────────────────────────────
     const imgTraceBtns = document.querySelectorAll('.img-trace-btn');
     imgTraceBtns.forEach(btn => btn.addEventListener('click', () => {
       imgTraceBtns.forEach(b => b.classList.remove('active'));
@@ -1915,8 +1974,6 @@ class UIController {
       s._imgScene.traceMode = btn.dataset.trace;
       s._imgScene._computeTrace();
     }));
-
-    // Threshold & density — recompute trace on change
     this._bindRange('img-threshold', v => {
       s._imgScene.threshold = v;
       document.getElementById('img-thr-val').textContent = Math.round(v);
@@ -1926,6 +1983,55 @@ class UIController {
       s._imgScene.sampleRes = Math.round(v);
       document.getElementById('img-den-val').textContent = Math.round(v);
       s._imgScene._computeTrace();
+    });
+    this._bindRange('img-tx', v => { s._imgScene.tiltX = v; document.getElementById('img-tx-val').textContent = Math.round(v) + '°'; });
+    this._bindRange('img-ty', v => { s._imgScene.tiltY = v; document.getElementById('img-ty-val').textContent = Math.round(v) + '°'; });
+
+    // ── Shared transforms (set both scenes simultaneously) ─────────────
+    this._bindRange('sc-scale', v => {
+      s._obj.scale = v; s._imgScene.scale = v;
+      document.getElementById('sc-scale-val').textContent = v.toFixed(2);
+    });
+    this._bindRange('sc-rz', v => {
+      s._obj.rotZ = v * Math.PI / 180;  // OBJ uses radians
+      s._imgScene.rotZ = v;             // IMG uses degrees
+      document.getElementById('sc-rz-val').textContent = Math.round(v) + '°';
+    });
+    this._bindRange('sc-px', v => {
+      s._obj.posX = v; s._imgScene.posX = v;
+      document.getElementById('sc-px-val').textContent = v.toFixed(2);
+    });
+    this._bindRange('sc-py', v => {
+      s._obj.posY = v; s._imgScene.posY = v;
+      document.getElementById('sc-py-val').textContent = v.toFixed(2);
+    });
+
+    // ── Shared animation + music sync ──────────────────────────────────
+    document.getElementById('sc-auto-rot').addEventListener('change', e => {
+      s._obj.autoRotY = e.target.checked; s._imgScene.autoSpin = e.target.checked;
+    });
+    document.getElementById('sc-beat-pulse').addEventListener('change', e => {
+      s._obj.beatPulse = e.target.checked; s._imgScene.beatPulse = e.target.checked;
+    });
+    document.getElementById('sc-show-audio').addEventListener('change', e => {
+      s._obj.showAudio = e.target.checked; s._imgScene.showAudio = e.target.checked;
+    });
+    this._bindRange('sc-rot-speed', v => {
+      s._obj.rotSpeed = v; s._imgScene.rotSpeed = v;
+      document.getElementById('sc-rs-val').textContent = v.toFixed(1);
+    });
+    document.getElementById('sc-breathe').addEventListener('change', e => {
+      s._obj.breathe = e.target.checked; s._imgScene.breathe = e.target.checked;
+    });
+    document.getElementById('sc-shake').addEventListener('change', e => {
+      s._obj.shake = e.target.checked; s._imgScene.shake = e.target.checked;
+    });
+    document.getElementById('sc-warp').addEventListener('change', e => {
+      s._obj.warp = e.target.checked; s._imgScene.warp = e.target.checked;
+    });
+    this._bindRange('sc-warp-amt', v => {
+      s._obj.warpAmt = v; s._imgScene.warpAmt = v;
+      document.getElementById('sc-warp-val').textContent = v.toFixed(2);
     });
 
     // ── Audio ─────────────────────────────────────────────────────────
