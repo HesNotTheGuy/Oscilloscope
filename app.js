@@ -2042,7 +2042,6 @@ class UIController {
     const btnStop   = document.getElementById('btn-stop-audio');
     const stSrc     = document.getElementById('st-src');
 
-    fileDrop.addEventListener('click', () => fileInput.click());
     fileDrop.addEventListener('dragover', ev => { ev.preventDefault(); fileDrop.classList.add('drag-over'); });
     fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('drag-over'));
     fileDrop.addEventListener('drop', ev => {
