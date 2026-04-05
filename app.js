@@ -436,6 +436,77 @@ class AudioEngine {
 
   setVolume(v) { if (this.gainNode) this.gainNode.gain.value = v; }
   get sampleRate() { return this.actx ? this.actx.sampleRate : 44100; }
+
+  // ── Draw sound — oscilloscope CRT hum that ramps with draw power ──────
+  // Connects to speakers only (not the visualiser analysers)
+  startDrawSound() {
+    if (!this.actx || this._drawActive) return;
+
+    // Sawtooth oscillator — sweeps from ~40 Hz (idle buzz) to ~600 Hz (full scan)
+    this._drawOsc = this.actx.createOscillator();
+    this._drawOsc.type = 'sawtooth';
+    this._drawOsc.frequency.value = 40;
+
+    // Band-pass filtered noise — adds the magnetic-coil texture
+    const bufLen = this.actx.sampleRate * 2;
+    const nBuf   = this.actx.createBuffer(1, bufLen, this.actx.sampleRate);
+    const nd     = nBuf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) nd[i] = Math.random() * 2 - 1;
+    this._drawNoise = this.actx.createBufferSource();
+    this._drawNoise.buffer = nBuf;
+    this._drawNoise.loop   = true;
+
+    this._drawFilter = this.actx.createBiquadFilter();
+    this._drawFilter.type            = 'bandpass';
+    this._drawFilter.frequency.value = 120;
+    this._drawFilter.Q.value         = 1.5;
+
+    // Separate gains so we can mix osc vs noise
+    this._drawOscGain   = this.actx.createGain();
+    this._drawNoiseGain = this.actx.createGain();
+    this._drawGain      = this.actx.createGain();
+    this._drawGain.gain.value = 0;
+
+    this._drawOsc.connect(this._drawOscGain);
+    this._drawNoise.connect(this._drawFilter);
+    this._drawFilter.connect(this._drawNoiseGain);
+    this._drawOscGain.connect(this._drawGain);
+    this._drawNoiseGain.connect(this._drawGain);
+    this._drawGain.connect(this.actx.destination);   // speakers only — NOT analysers
+
+    this._drawOsc.start();
+    this._drawNoise.start();
+    this._drawActive = true;
+  }
+
+  // Call every frame while draw power is < 1
+  updateDrawSound(power) {
+    if (!this._drawActive || !this._drawGain) return;
+    const now  = this.actx.currentTime;
+    const p    = Math.max(0, Math.min(1, power));
+    // Frequency sweeps from 40 Hz to 580 Hz with a slight power-curve feel
+    const freq = 40 + Math.pow(p, 0.6) * 540;
+    this._drawOsc.frequency.setTargetAtTime(freq, now, 0.04);
+    this._drawFilter.frequency.setTargetAtTime(freq * 2.5, now, 0.04);
+    // Noise is louder at low power (crackle / static), quieter when running fast
+    this._drawOscGain.gain.setTargetAtTime(p * 0.06, now, 0.04);
+    this._drawNoiseGain.gain.setTargetAtTime((1 - p * 0.7) * 0.04, now, 0.04);
+    this._drawGain.gain.setTargetAtTime(0.55, now, 0.04);
+  }
+
+  stopDrawSound() {
+    if (!this._drawActive) return;
+    const now = this.actx.currentTime;
+    this._drawGain.gain.setTargetAtTime(0, now, 0.15);
+    setTimeout(() => {
+      try { this._drawOsc.stop();   } catch (_) {}
+      try { this._drawNoise.stop(); } catch (_) {}
+      try { this._drawGain.disconnect(); } catch (_) {}
+      this._drawOsc = this._drawNoise = this._drawFilter = null;
+      this._drawOscGain = this._drawNoiseGain = this._drawGain = null;
+      this._drawActive = false;
+    }, 400);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -472,6 +543,12 @@ class ImageScene {
     this.shake     = false;   // beat-triggered position jitter
     this.warp      = false;   // audio waveform radially displaces trace pts
     this.warpAmt   = 0.1;
+
+    // Draw power — 0: blank, 1: fully drawn (slices trace point array)
+    this.power      = 1;
+    this.autoPower  = false;  // auto-ramp from 0 → 1
+    this.powerSpeed = 0.004;  // fraction per frame
+    this.powerLoop  = false;  // loop: reset to 0 when reaching 1
 
     // Internal state
     this._pulse     = 0;
@@ -580,6 +657,14 @@ class ImageScene {
   getTracePoints(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded || !this._traceNorm.length) return [];
 
+    // Auto-ramp draw power (scanline fill from top to bottom)
+    if (this.autoPower) {
+      this.power += this.powerSpeed;
+      if (this.power >= 1) {
+        this.power = this.powerLoop ? 0 : 1;
+      }
+    }
+
     // Animate spin
     if (this.autoSpin) this.rotZ = (this.rotZ + this.rotSpeed) % 360;
 
@@ -614,10 +699,12 @@ class ImageScene {
     const fitX = iW * fit;
     const fitY = iH * fit;
 
-    const bufLen = audioBuf ? audioBuf.length : 0;
+    const bufLen   = audioBuf ? audioBuf.length : 0;
+    const drawCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this._traceNorm.length);
 
     const result = [];
-    for (let [nx, ny] of this._traceNorm) {
+    for (let i = 0; i < drawCount; i++) {
+      let [nx, ny] = this._traceNorm[i];
       // Warp — radially displace each point using the audio waveform
       if (this.warp && bufLen > 0) {
         const angle = Math.atan2(ny, nx);
@@ -663,10 +750,16 @@ class ObjScene {
     this.showAudio = false;
 
     // Music-sync animation modes
-    this.breathe   = false;   // smooth RMS-driven scale envelope
-    this.shake     = false;   // beat-triggered position jitter
-    this.warp      = false;   // audio waveform displaces projected edge points
+    this.breathe   = false;
+    this.shake     = false;
+    this.warp      = false;
     this.warpAmt   = 0.1;
+
+    // Draw power — 0: blank, 1: all edges drawn
+    this.power      = 1;
+    this.autoPower  = false;
+    this.powerSpeed = 0.004;
+    this.powerLoop  = false;
 
     // Internal FX state
     this._pulse     = 0;
@@ -768,10 +861,20 @@ class ObjScene {
     const oy     = this.posY + this._shakeY;
     const toSx   = v => W/2 + (v + ox) * half;
     const toSy   = v => H/2 - (v + oy) * half;
-    const bufLen = audioBuf ? audioBuf.length : 0;
+    // Auto-ramp draw power
+    if (this.autoPower) {
+      this.power += this.powerSpeed;
+      if (this.power >= 1) {
+        this.power = this.powerLoop ? 0 : 1;
+      }
+    }
+
+    const bufLen   = audioBuf ? audioBuf.length : 0;
+    const edgeCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this.edges.length);
 
     const result = [];
-    for (const [i0, i1] of this.edges) {
+    for (let ei = 0; ei < edgeCount; ei++) {
+      const [i0, i1] = this.edges[ei];
       let [ax, ay] = xform(...this.verts[i0]);
       let [bx, by] = xform(...this.verts[i1]);
 
@@ -1597,6 +1700,20 @@ class Oscilloscope {
       }
     }
 
+    // ③c Draw sound — oscilloscope hum tied to draw power
+    if (this.objMode) {
+      const scene = this.obj3dMode ? this._obj : this._imgScene;
+      const p = scene.power;
+      if (scene.autoPower || p < 1) {
+        this.engine.startDrawSound();           // no-op if already running
+        this.engine.updateDrawSound(p);
+      } else {
+        this.engine.stopDrawSound();
+      }
+    } else {
+      this.engine.stopDrawSound();
+    }
+
     // ④ Beat flash
     let flashRGB = null;
     if (this.fx._flash > 0.01) {
@@ -2032,6 +2149,27 @@ class UIController {
     this._bindRange('sc-warp-amt', v => {
       s._obj.warpAmt = v; s._imgScene.warpAmt = v;
       document.getElementById('sc-warp-val').textContent = v.toFixed(2);
+    });
+
+    // ── Draw power + ramp ──────────────────────────────────────────────
+    this._bindRange('sc-power', v => {
+      s._obj.power = v; s._imgScene.power = v;
+      document.getElementById('sc-power-val').textContent = v.toFixed(2);
+    });
+    document.getElementById('sc-auto-power').addEventListener('change', e => {
+      const on = e.target.checked;
+      s._obj.autoPower = on; s._imgScene.autoPower = on;
+      // Reset to 0 when ramp is enabled so it starts from scratch
+      if (on) { s._obj.power = 0; s._imgScene.power = 0;
+        document.getElementById('sc-power').value = 0;
+        document.getElementById('sc-power-val').textContent = '0.00'; }
+    });
+    document.getElementById('sc-power-loop').addEventListener('change', e => {
+      s._obj.powerLoop = e.target.checked; s._imgScene.powerLoop = e.target.checked;
+    });
+    this._bindRange('sc-power-speed', v => {
+      s._obj.powerSpeed = v; s._imgScene.powerSpeed = v;
+      document.getElementById('sc-ps-val').textContent = v.toFixed(3);
     });
 
     // ── Audio ─────────────────────────────────────────────────────────

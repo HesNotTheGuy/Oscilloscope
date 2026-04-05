@@ -417,6 +417,17 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   margin-top: 2px;
 }
 
+/* ─── Section divider label inside panels ─── */
+.fp-section-divider {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #4a7a4a;
+  border-top: 1px solid #1e3d1e;
+  margin: 6px 0 3px;
+  padding-top: 4px;
+  text-align: left;
+}
+
 /* ─── Img trace mode buttons reuse .obj-mode-btn — no extra rule needed ─── */
 
 /* ─── Audio section ─── */

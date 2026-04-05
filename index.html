@@ -229,27 +229,35 @@
     <!-- Visual FX -->
     <div class="fp-section fp-fx">
       <div class="fp-title">VISUAL FX</div>
+
+      <!-- Global beam effects — work in all modes -->
+      <div class="fp-section-divider">BEAM</div>
       <div class="fx-grid">
         <label class="fx-lbl"><input type="checkbox" id="fx-reactive"> Reactive</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-cycle"> Color Cycle</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-bloom"> Bloom</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-x"> Mirror X</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-y"> Mirror Y</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-rotate"> Rotation</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-invert"> Beat Invert</label>
       </div>
       <label class="fp-range-label">Cycle Spd
         <input type="range" id="fx-cycle-speed" min="0.1" max="8" step="0.1" value="0.5">
         <span id="fx-cs-val">0.5</span>
       </label>
-      <label class="fp-range-label">Rot Spd
-        <input type="range" id="fx-rot-speed" min="0.001" max="0.05" step="0.001" value="0.003">
-        <span id="fx-rs-val">0.003</span>
-      </label>
       <label class="fp-range-label">Beat Sens
         <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
         <span id="fx-bs-val">1.50</span>
+      </label>
+
+      <!-- Signal/waveform only effects -->
+      <div class="fp-section-divider">WAVE</div>
+      <div class="fx-grid">
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-x"> Mirror X</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-y"> Mirror Y</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-rotate"> Rotation</label>
+      </div>
+      <label class="fp-range-label">Rot Spd
+        <input type="range" id="fx-rot-speed" min="0.001" max="0.05" step="0.001" value="0.003">
+        <span id="fx-rs-val">0.003</span>
       </label>
     </div>
 
@@ -353,6 +361,21 @@
       <label class="fp-range-label">Warp
         <input type="range" id="sc-warp-amt" min="0.01" max="0.5" value="0.1" step="0.01">
         <span id="sc-warp-val">0.10</span>
+      </label>
+
+      <!-- ── Draw power ── -->
+      <div class="fp-section-divider">DRAW POWER</div>
+      <label class="fp-range-label">Power
+        <input type="range" id="sc-power" min="0" max="1" value="1" step="0.01">
+        <span id="sc-power-val">1.00</span>
+      </label>
+      <div class="obj-fx-row">
+        <label class="toggle-lbl"><input type="checkbox" id="sc-auto-power"> Ramp</label>
+        <label class="toggle-lbl"><input type="checkbox" id="sc-power-loop"> Loop</label>
+      </div>
+      <label class="fp-range-label">Rate
+        <input type="range" id="sc-power-speed" min="0.001" max="0.02" value="0.004" step="0.001">
+        <span id="sc-ps-val">0.004</span>
       </label>
 
     </div>
