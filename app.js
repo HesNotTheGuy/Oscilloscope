@@ -1417,19 +1417,16 @@ class Oscilloscope {
     this.fx = {
       reactive:   false,  // glow/beam scale with amplitude
       beatFlash:  false,  // color flash on beat
-      colorCycle: false,  // hue animates over time
       bloom:      false,  // wide glow halo
       mirrorX:    false,  // horizontal flip copy
       mirrorY:    false,  // vertical flip copy
       rotation:   false,  // slow rotation
       beatInvert: false,  // invert colors on beat
 
-      cycleSpeed: 0.5,    // hue degrees/frame
       rotSpeed:   0.003,  // radians/frame
       beatSens:   1.5,    // beat sensitivity
 
       // Internal animation state
-      _hue:   120,
       _angle: 0,
       _flash: 0,
       _rms:   0,
@@ -1567,11 +1564,6 @@ class Oscilloscope {
     if (beat && fx.beatFlash) fx._flash = 1.0;
     if (fx._flash > 0) fx._flash *= 0.72;
 
-    // Color cycle
-    if (fx.colorCycle) {
-      fx._hue = (fx._hue + fx.cycleSpeed) % 360;
-    }
-
     // Rotation
     if (fx.rotation) {
       fx._angle = (fx._angle + fx.rotSpeed) % (Math.PI * 2);
@@ -1579,9 +1571,7 @@ class Oscilloscope {
   }
 
   _renderColor() {
-    return this.fx.colorCycle
-      ? `hsl(${this.fx._hue}, 100%, 55%)`
-      : this.color;
+    return this.color;
   }
 
   _renderGlow() {
@@ -2482,14 +2472,12 @@ class UIController {
     };
     fxBindCheck('fx-reactive',  'reactive');
     fxBindCheck('fx-beat',      'beatFlash');
-    fxBindCheck('fx-cycle',     'colorCycle');
     fxBindCheck('fx-bloom',     'bloom');
     fxBindCheck('fx-mirror-x',  'mirrorX');
     fxBindCheck('fx-mirror-y',  'mirrorY');
     fxBindCheck('fx-rotate',    'rotation');
     fxBindCheck('fx-invert',    'beatInvert');
 
-    this._bindRange('fx-cycle-speed', v => { s.fx.cycleSpeed = v; document.getElementById('fx-cs-val').textContent = v.toFixed(1); });
     this._bindRange('fx-rot-speed',   v => { s.fx.rotSpeed   = v; document.getElementById('fx-rs-val').textContent = v.toFixed(3); });
     this._bindRange('fx-beat-sens',   v => { s.fx.beatSens   = v; document.getElementById('fx-bs-val').textContent = v.toFixed(2); });
 
@@ -2516,38 +2504,28 @@ class UIController {
       document.getElementById('toggle-display').textContent = open ? 'DISPLAY ▾' : 'DISPLAY ▸';
     });
 
+    // ── Color swatches ────────────────────────────────────────────────
+    const _applyColor = (hex) => {
+      s.color = hex;
+      document.getElementById('phosphor-color').value = hex;
+      document.documentElement.style.setProperty('--p', hex);
+      document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+      const match = document.querySelector(`.color-swatch[data-color="${hex}"]`);
+      if (match) match.classList.add('active');
+    };
+    document.querySelectorAll('.color-swatch').forEach(btn => {
+      btn.addEventListener('click', () => _applyColor(btn.dataset.color));
+    });
     document.getElementById('phosphor-color').addEventListener('input', ev => {
+      // Custom color — deselect swatches, apply raw value
       s.color = ev.target.value;
       document.documentElement.style.setProperty('--p', ev.target.value);
+      document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
     });
+
     this._bindRange('beam-width',  v => { s.beamWidth   = v; document.getElementById('beam-width-val').textContent  = v.toFixed(1); });
     this._bindRange('glow',        v => { s.glowAmount  = v; document.getElementById('glow-val').textContent         = Math.round(v); });
     this._bindRange('persistence', v => { s.persistence = v; document.getElementById('persistence-val').textContent = v.toFixed(2); });
-
-    const PRESETS = {
-      classic: { color: '#00ff41', glow: 12, persistence: 0.15, beam: 1.5 },
-      amber:   { color: '#ffb000', glow: 14, persistence: 0.12, beam: 1.5 },
-      blue:    { color: '#00aaff', glow: 16, persistence: 0.18, beam: 1.2 },
-      white:   { color: '#e0e0e0', glow: 8,  persistence: 0.22, beam: 1.0 },
-      neon:    { color: '#ff00ff', glow: 20, persistence: 0.08, beam: 2.0 },
-    };
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const p = PRESETS[btn.dataset.preset]; if (!p) return;
-        s.color = p.color; s.glowAmount = p.glow; s.persistence = p.persistence; s.beamWidth = p.beam;
-        document.getElementById('phosphor-color').value = p.color;
-        ['glow','persistence','beam-width'].forEach(id => {
-          const el = document.getElementById(id);
-          if (id === 'glow') el.value = p.glow;
-          else if (id === 'persistence') el.value = p.persistence;
-          else el.value = p.beam;
-        });
-        document.getElementById('glow-val').textContent         = p.glow;
-        document.getElementById('persistence-val').textContent  = p.persistence.toFixed(2);
-        document.getElementById('beam-width-val').textContent   = p.beam.toFixed(1);
-        document.documentElement.style.setProperty('--p', p.color);
-      });
-    });
 
     // ── Progress & status polling ─────────────────────────────────────
     setInterval(() => {

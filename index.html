@@ -245,17 +245,33 @@
     <!-- Beam FX — phosphor beam effects, work in all modes -->
     <div class="fp-section fp-fx" data-panel-id="beamfx">
       <div class="fp-title">BEAM FX</div>
+
+      <!-- ── Color presets ── -->
+      <div class="fp-section-divider">COLOR</div>
+      <div class="color-swatch-grid">
+        <button class="color-swatch active" data-color="#00ff41" style="background:#00ff41" title="Classic Green"></button>
+        <button class="color-swatch" data-color="#ffb000" style="background:#ffb000" title="Amber"></button>
+        <button class="color-swatch" data-color="#00ffff" style="background:#00ffff" title="Cyan"></button>
+        <button class="color-swatch" data-color="#00aaff" style="background:#00aaff" title="Blue"></button>
+        <button class="color-swatch" data-color="#4488ff" style="background:#4488ff" title="Indigo"></button>
+        <button class="color-swatch" data-color="#aa44ff" style="background:#aa44ff" title="Violet"></button>
+        <button class="color-swatch" data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
+        <button class="color-swatch" data-color="#ff3333" style="background:#ff3333" title="Red"></button>
+        <button class="color-swatch" data-color="#ff6600" style="background:#ff6600" title="Orange"></button>
+        <button class="color-swatch" data-color="#ffff00" style="background:#ffff00" title="Yellow"></button>
+        <button class="color-swatch" data-color="#88ff00" style="background:#88ff00" title="Lime"></button>
+        <button class="color-swatch" data-color="#e0e0e0" style="background:#e0e0e0" title="White"></button>
+      </div>
+      <input type="color" id="phosphor-color" value="#00ff41" title="Custom color" class="color-custom-picker">
+
+      <!-- ── Beam effects ── -->
+      <div class="fp-section-divider">EFFECTS</div>
       <div class="fx-grid">
         <label class="fx-lbl"><input type="checkbox" id="fx-reactive"> Reactive</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-cycle"> Color Cycle</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-bloom"> Bloom</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-invert"> Beat Invert</label>
       </div>
-      <label class="fp-range-label">Cycle Spd
-        <input type="range" id="fx-cycle-speed" min="0.1" max="8" step="0.1" value="0.5">
-        <span id="fx-cs-val">0.5</span>
-      </label>
       <label class="fp-range-label">Beat Sens
         <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
         <span id="fx-bs-val">1.50</span>
@@ -434,16 +450,6 @@
     <div class="fp-section fp-display" data-panel-id="display">
       <div class="fp-title clickable" id="toggle-display">DISPLAY ▸</div>
       <div id="display-controls" class="display-inner" style="display:none">
-        <div class="preset-row">
-          <button class="preset-btn" data-preset="classic">Green</button>
-          <button class="preset-btn" data-preset="amber">Amber</button>
-          <button class="preset-btn" data-preset="blue">Blue</button>
-          <button class="preset-btn" data-preset="white">White</button>
-          <button class="preset-btn" data-preset="neon">Neon</button>
-        </div>
-        <label class="fp-range-label">Color
-          <input type="color" id="phosphor-color" value="#00ff41">
-        </label>
         <label class="fp-range-label">Beam
           <input type="range" id="beam-width" min="0.5" max="4" step="0.1" value="1.5">
           <span id="beam-width-val">1.5</span>
