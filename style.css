@@ -737,3 +737,165 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .fp-section.panel-drop-after {
   border-right: 2px solid #00ff41;
 }
+
+/* ─── Keyboard Shortcuts Help Overlay ─── */
+#kb-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0.15s;
+}
+#kb-help-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.kb-help-box {
+  background: #0a0a0a;
+  border: 1px solid #1a3a1a;
+  border-radius: 6px;
+  padding: 24px 32px;
+  max-width: 520px;
+  width: 90%;
+  box-shadow: 0 0 40px rgba(0, 255, 65, 0.08), inset 0 0 60px rgba(0, 0, 0, 0.5);
+}
+.kb-help-title {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #00ff41;
+  text-shadow: 0 0 10px #00ff41;
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #1a3a1a;
+}
+.kb-help-columns {
+  display: flex;
+  gap: 32px;
+}
+.kb-help-col {
+  flex: 1;
+}
+.kb-help-section {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #4a7a4a;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #1e3d1e;
+}
+.kb-help-section:first-child {
+  margin-top: 0;
+}
+.kb-help-row {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: #00ff41;
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kb-help-row kbd {
+  display: inline-block;
+  min-width: 28px;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  background: #141414;
+  border: 1px solid #2a4a2a;
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: #00ff41;
+  text-shadow: 0 0 4px rgba(0, 255, 65, 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Presets Panel ─── */
+.fp-presets { min-width: 140px; }
+
+.preset-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.preset-slot {
+  position: relative;
+  background: var(--input-bg);
+  border: 1px solid #2a2a2a;
+  border-radius: 2px;
+  color: #444;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  padding: 5px 2px;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.1s;
+  min-height: 26px;
+  line-height: 1.2;
+}
+.preset-slot:hover { border-color: #555; color: #888; }
+.preset-slot.filled {
+  border-color: #1a5a1a;
+  color: #00cc33;
+  background: rgba(0, 255, 65, 0.04);
+  text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+}
+.preset-slot.filled:hover {
+  border-color: var(--p);
+  color: var(--p);
+}
+.preset-slot.active-slot {
+  border-color: var(--p);
+  color: var(--p);
+  box-shadow: 0 0 6px rgba(0, 255, 65, 0.3);
+}
+.preset-slot .preset-del {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+  color: #666;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 2px;
+  cursor: pointer;
+  display: none;
+  padding: 0;
+}
+.preset-slot:hover .preset-del.visible { display: block; }
+.preset-slot .preset-del:hover { color: #ff4444; border-color: #ff4444; }
+
+.preset-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.preset-actions .sys-btn { flex: 1; justify-content: center; font-size: 9px; padding: 4px 4px; }
+
+.sys-btn.save-mode {
+  border-color: #ff8800 !important;
+  color: #ff8800 !important;
+  animation: blink-save 0.8s step-start infinite;
+}
+@keyframes blink-save {
+  50% { opacity: 0.5; }
+}

@@ -156,6 +156,7 @@
         <label class="toggle-lbl"><input type="checkbox" id="crt-curve" checked> CRT</label>
         <label class="toggle-lbl"><input type="checkbox" id="scanlines"> Scan</label>
       </div>
+      <button class="sys-btn" id="btn-screenshot">📷 SCREENSHOT</button>
       <button class="sys-btn" id="btn-popout" title="Pop display out to a second window" style="display:none">⤢ POP OUT</button>
     </div>
 
@@ -445,6 +446,18 @@
         <span id="sc-ps-val">0.004</span>
       </label>
 
+    </div>
+
+    <!-- Presets -->
+    <div class="fp-section fp-presets" data-panel-id="presets">
+      <div class="fp-title">PRESETS</div>
+      <div class="preset-slot-grid" id="preset-slots"></div>
+      <div class="preset-actions">
+        <button class="sys-btn" id="btn-preset-save">SAVE</button>
+        <button class="sys-btn" id="btn-preset-export">EXPORT</button>
+        <button class="sys-btn" id="btn-preset-import">IMPORT</button>
+        <input type="file" id="preset-import-file" accept=".json" hidden>
+      </div>
     </div>
 
     <!-- Display / Customize -->
