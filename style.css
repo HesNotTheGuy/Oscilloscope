@@ -682,6 +682,21 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 #panel-lock-btn:hover { border-color: #555; color: #888; }
 #panel-lock-btn.locked { color: #00ff41; border-color: #00ff41; }
 
+/* ── Inline speed slider (auto-rotate rows) ── */
+.inline-spd {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  accent-color: var(--p);
+  margin: 0 4px;
+}
+.spd-val {
+  font-size: 9px;
+  color: #555;
+  min-width: 20px;
+  text-align: right;
+}
+
 /* ── Drag-to-reorder ── */
 .fp-section[draggable="true"] {
   cursor: grab;
