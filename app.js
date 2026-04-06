@@ -2048,6 +2048,374 @@ class Oscilloscope {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  PresetManager — save/load/export/import visual presets
+// ─────────────────────────────────────────────────────────────
+class PresetManager {
+  constructor(scope) {
+    this.scope = scope;
+    this.SLOT_COUNT = 8;
+    this.STORAGE_KEY = 'osc_presets';
+    this._slots = this._loadSlots();
+  }
+
+  _loadSlots() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === this.SLOT_COUNT) return parsed;
+      }
+    } catch (_) {}
+    return new Array(this.SLOT_COUNT).fill(null);
+  }
+
+  _saveSlots() {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this._slots));
+  }
+
+  capture() {
+    const s = this.scope;
+    const obj = s._obj;
+    const img = s._imgScene;
+    return {
+      // Beam
+      color: s.color,
+      beamWidth: s.beamWidth,
+      glowAmount: s.glowAmount,
+      persistence: s.persistence,
+      // FX
+      fx: {
+        reactive: s.fx.reactive,
+        beatFlash: s.fx.beatFlash,
+        bloom: s.fx.bloom,
+        mirrorX: s.fx.mirrorX,
+        mirrorY: s.fx.mirrorY,
+        rotation: s.fx.rotation,
+        beatInvert: s.fx.beatInvert,
+        rotSpeed: s.fx.rotSpeed,
+        beatSens: s.fx.beatSens,
+      },
+      // Signal FX
+      smooth: s.smooth,
+      filterEnabled: s.filterEnabled,
+      filterLow: s.filterLow,
+      filterHigh: s.filterHigh,
+      // Scene
+      objMode: s.objMode,
+      obj3dMode: s.obj3dMode,
+      scale: obj.scale,
+      rotZ: s.obj3dMode ? (obj.rotZ * 180 / Math.PI) : img.rotZ,
+      posX: obj.posX,
+      posY: obj.posY,
+      tileX: obj.tileX,
+      tileY: obj.tileY,
+      radialN: obj.radialN,
+      scrollX: obj.scrollX,
+      scrollY: obj.scrollY,
+      breathe: obj.breathe,
+      shake: obj.shake,
+      warp: obj.warp,
+      warpAmt: obj.warpAmt,
+      power: obj.power,
+      autoPower: obj.autoPower,
+      powerLoop: obj.powerLoop,
+      powerSpeed: obj.powerSpeed,
+      autoRotX: obj.autoRotX,
+      autoRotY: obj.autoRotY,
+      autoRotZ: obj.autoRotZ,
+      rotSpeedX: obj.rotSpeedX,
+      rotSpeedY: obj.rotSpeed,
+      rotSpeedZ: obj.rotSpeedZ,
+      beatPulse: obj.beatPulse,
+      showAudio: obj.showAudio,
+      // Display
+      showGrid: s.showGrid,
+      crtCurve: s.crtCurve,
+    };
+  }
+
+  apply(preset) {
+    const s = this.scope;
+    const obj = s._obj;
+    const img = s._imgScene;
+
+    // Beam
+    s.color = preset.color;
+    s.beamWidth = preset.beamWidth;
+    s.glowAmount = preset.glowAmount;
+    s.persistence = preset.persistence;
+
+    // FX
+    if (preset.fx) {
+      s.fx.reactive = preset.fx.reactive;
+      s.fx.beatFlash = preset.fx.beatFlash;
+      s.fx.bloom = preset.fx.bloom;
+      s.fx.mirrorX = preset.fx.mirrorX;
+      s.fx.mirrorY = preset.fx.mirrorY;
+      s.fx.rotation = preset.fx.rotation;
+      s.fx.beatInvert = preset.fx.beatInvert;
+      s.fx.rotSpeed = preset.fx.rotSpeed;
+      s.fx.beatSens = preset.fx.beatSens;
+    }
+
+    // Signal FX
+    s.smooth = preset.smooth;
+    s.filterEnabled = preset.filterEnabled;
+    s.filterLow = preset.filterLow;
+    s.filterHigh = preset.filterHigh;
+
+    // Scene
+    s.objMode = preset.objMode;
+    s.obj3dMode = preset.obj3dMode;
+
+    // Apply to both scenes
+    const rz = preset.rotZ || 0;
+    obj.scale = preset.scale; img.scale = preset.scale;
+    obj.rotZ = rz * Math.PI / 180; img.rotZ = rz;
+    obj.posX = preset.posX; img.posX = preset.posX;
+    obj.posY = preset.posY; img.posY = preset.posY;
+    obj.tileX = preset.tileX; img.tileX = preset.tileX;
+    obj.tileY = preset.tileY; img.tileY = preset.tileY;
+    obj.radialN = preset.radialN; img.radialN = preset.radialN;
+    obj.scrollX = preset.scrollX; img.scrollX = preset.scrollX;
+    obj.scrollY = preset.scrollY; img.scrollY = preset.scrollY;
+    obj.breathe = preset.breathe; img.breathe = preset.breathe;
+    obj.shake = preset.shake; img.shake = preset.shake;
+    obj.warp = preset.warp; img.warp = preset.warp;
+    obj.warpAmt = preset.warpAmt; img.warpAmt = preset.warpAmt;
+    obj.power = preset.power; img.power = preset.power;
+    obj.autoPower = preset.autoPower; img.autoPower = preset.autoPower;
+    obj.powerLoop = preset.powerLoop; img.powerLoop = preset.powerLoop;
+    obj.powerSpeed = preset.powerSpeed; img.powerSpeed = preset.powerSpeed;
+
+    // Auto-rotate
+    obj.autoRotX = preset.autoRotX; img.autoRotX3d = preset.autoRotX;
+    obj.autoRotY = preset.autoRotY; img.autoRotY3d = preset.autoRotY;
+    obj.autoRotZ = preset.autoRotZ; img.autoSpin = preset.autoRotZ;
+    obj.rotSpeedX = preset.rotSpeedX; img.rotSpeedX3d = preset.rotSpeedX;
+    obj.rotSpeed = preset.rotSpeedY; img.rotSpeedY3d = preset.rotSpeedY;
+    obj.rotSpeedZ = preset.rotSpeedZ; img.rotSpeed = preset.rotSpeedZ;
+    obj.beatPulse = preset.beatPulse; img.beatPulse = preset.beatPulse;
+    obj.showAudio = preset.showAudio; img.showAudio = preset.showAudio;
+
+    // Display
+    s.showGrid = preset.showGrid;
+    s.crtCurve = preset.crtCurve;
+
+    // Update all UI
+    this._updateUI(preset);
+  }
+
+  _updateUI(p) {
+    // Helper to set value and dispatch input event
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const setCheck = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.checked !== val) {
+        el.checked = val;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+    const setSelect = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = String(val);
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    // Color — apply via swatch or picker
+    const hex = p.color;
+    document.getElementById('phosphor-color').value = hex;
+    document.documentElement.style.setProperty('--p', hex);
+    document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+    const match = document.querySelector(`.color-swatch[data-color="${hex}"]`);
+    if (match) match.classList.add('active');
+
+    // Beam display
+    setVal('beam-width', p.beamWidth);
+    document.getElementById('beam-width-val').textContent = p.beamWidth.toFixed(1);
+    setVal('glow', p.glowAmount);
+    document.getElementById('glow-val').textContent = Math.round(p.glowAmount);
+    setVal('persistence', p.persistence);
+    document.getElementById('persistence-val').textContent = p.persistence.toFixed(2);
+
+    // Make sure display controls are visible so user sees the change
+    const dc = document.getElementById('display-controls');
+    if (dc) { dc.style.cssText = 'display:flex;flex-direction:column;gap:6px'; }
+    const tgl = document.getElementById('toggle-display');
+    if (tgl) tgl.textContent = 'DISPLAY \u25BE';
+
+    // FX checkboxes
+    if (p.fx) {
+      setCheck('fx-reactive', p.fx.reactive);
+      setCheck('fx-beat', p.fx.beatFlash);
+      setCheck('fx-bloom', p.fx.bloom);
+      setCheck('fx-invert', p.fx.beatInvert);
+      setCheck('fx-mirror-x', p.fx.mirrorX);
+      setCheck('fx-mirror-y', p.fx.mirrorY);
+      setCheck('fx-rotate', p.fx.rotation);
+      setVal('fx-rot-speed', p.fx.rotSpeed);
+      document.getElementById('fx-rs-val').textContent = p.fx.rotSpeed.toFixed(3);
+      setVal('fx-beat-sens', p.fx.beatSens);
+      document.getElementById('fx-bs-val').textContent = p.fx.beatSens.toFixed(2);
+    }
+
+    // Signal FX
+    setCheck('smooth', p.smooth);
+    setCheck('freq-filter', p.filterEnabled);
+    const flEl = document.getElementById('filter-low');
+    if (flEl) { flEl.value = p.filterLow; flEl.dispatchEvent(new Event('change', { bubbles: true })); }
+    const fhEl = document.getElementById('filter-high');
+    if (fhEl) { fhEl.value = p.filterHigh; fhEl.dispatchEvent(new Event('change', { bubbles: true })); }
+
+    // Scene
+    setCheck('obj-mode', p.objMode);
+    // Mode switch (3D vs IMG)
+    if (p.obj3dMode) {
+      document.getElementById('obj-mode-3d').click();
+    } else {
+      document.getElementById('obj-mode-img').click();
+    }
+
+    // Scene transforms
+    setVal('sc-scale', p.scale);
+    document.getElementById('sc-scale-val').textContent = p.scale.toFixed(2);
+    setVal('sc-rz', p.rotZ || 0);
+    document.getElementById('sc-rz-val').textContent = Math.round(p.rotZ || 0) + '\u00B0';
+    setVal('sc-px', p.posX);
+    document.getElementById('sc-px-val').textContent = p.posX.toFixed(2);
+    setVal('sc-py', p.posY);
+    document.getElementById('sc-py-val').textContent = p.posY.toFixed(2);
+
+    // Tiling
+    setSelect('sc-tile-x', p.tileX);
+    setSelect('sc-tile-y', p.tileY);
+    setSelect('sc-radial', p.radialN);
+
+    // Auto-rotate
+    setCheck('sc-auto-rot-x', p.autoRotX);
+    setCheck('sc-auto-rot-y', p.autoRotY);
+    setCheck('sc-auto-rot-z', p.autoRotZ);
+    setVal('sc-rot-spd-x', p.rotSpeedX);
+    document.getElementById('sc-rsx-val').textContent = p.rotSpeedX.toFixed(1);
+    setVal('sc-rot-spd-y', p.rotSpeedY);
+    document.getElementById('sc-rsy-val').textContent = p.rotSpeedY.toFixed(1);
+    setVal('sc-rot-spd-z', p.rotSpeedZ);
+    document.getElementById('sc-rsz-val').textContent = p.rotSpeedZ.toFixed(1);
+
+    setCheck('sc-beat-pulse', p.beatPulse);
+    setCheck('sc-show-audio', p.showAudio);
+
+    // Scroll
+    setVal('sc-scroll-x', p.scrollX);
+    document.getElementById('sc-sx-val').textContent = p.scrollX.toFixed(2);
+    setVal('sc-scroll-y', p.scrollY);
+    document.getElementById('sc-sy-val').textContent = p.scrollY.toFixed(2);
+
+    // Breathe/shake/warp
+    setCheck('sc-breathe', p.breathe);
+    setCheck('sc-shake', p.shake);
+    setCheck('sc-warp', p.warp);
+    setVal('sc-warp-amt', p.warpAmt);
+    document.getElementById('sc-warp-val').textContent = p.warpAmt.toFixed(2);
+
+    // Draw power
+    setVal('sc-power', p.power);
+    document.getElementById('sc-power-val').textContent = p.power.toFixed(2);
+    setCheck('sc-auto-power', p.autoPower);
+    setCheck('sc-power-loop', p.powerLoop);
+    setVal('sc-power-speed', p.powerSpeed);
+    document.getElementById('sc-ps-val').textContent = p.powerSpeed.toFixed(3);
+
+    // Display toggles
+    setCheck('show-grid', p.showGrid);
+    setCheck('crt-curve', p.crtCurve);
+  }
+
+  save(slotIndex, name) {
+    if (slotIndex < 0 || slotIndex >= this.SLOT_COUNT) return;
+    const data = this.capture();
+    data._name = name || `Preset ${slotIndex + 1}`;
+    this._slots[slotIndex] = data;
+    this._saveSlots();
+  }
+
+  load(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= this.SLOT_COUNT) return false;
+    const preset = this._slots[slotIndex];
+    if (!preset) return false;
+    this.apply(preset);
+    return true;
+  }
+
+  delete(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= this.SLOT_COUNT) return;
+    this._slots[slotIndex] = null;
+    this._saveSlots();
+  }
+
+  exportJSON(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= this.SLOT_COUNT) return;
+    const preset = this._slots[slotIndex];
+    if (!preset) return;
+    const json = JSON.stringify(preset, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `osc_preset_${(preset._name || 'preset').replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  importJSON(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const preset = JSON.parse(ev.target.result);
+          // Find next empty slot
+          let idx = this._slots.findIndex(s => s === null);
+          if (idx === -1) idx = this.SLOT_COUNT - 1; // overwrite last if all full
+          if (!preset._name) preset._name = file.name.replace(/\.json$/i, '');
+          this._slots[idx] = preset;
+          this._saveSlots();
+          resolve(idx);
+        } catch (e) {
+          console.error('Preset import failed:', e);
+          resolve(-1);
+        }
+      };
+      reader.onerror = () => resolve(-1);
+      reader.readAsText(file);
+    });
+  }
+
+  getSlot(i) { return this._slots[i]; }
+  getSlots() { return this._slots; }
+
+  // Install built-in presets into empty storage (first run only)
+  installDefaults(builtins) {
+    // Only install if storage is completely empty
+    const hasAny = this._slots.some(s => s !== null);
+    if (hasAny) return;
+    builtins.forEach((p, i) => {
+      if (i < this.SLOT_COUNT) this._slots[i] = p;
+    });
+    this._saveSlots();
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────
 //  UIController
 // ─────────────────────────────────────────────────────────────
 class UIController {
@@ -2191,6 +2559,40 @@ class UIController {
         e.startIdleSignal();
         btn.classList.add('active');
       }
+    });
+
+    // ── Screenshot ─────────────────────────────────────────────────────
+    document.getElementById('btn-screenshot').addEventListener('click', () => {
+      const canvas = s.canvas;
+      let dataURL;
+
+      if (s._glr) {
+        // WebGL: composite GL canvas + 2D overlay (grid/measurements) onto a temp canvas
+        const tmp = document.createElement('canvas');
+        tmp.width = canvas.width;
+        tmp.height = canvas.height;
+        const tctx = tmp.getContext('2d');
+
+        // Draw WebGL canvas content
+        tctx.drawImage(canvas, 0, 0);
+
+        // Overlay canvas (grid, measurements, CRT vignette)
+        if (s._glr._ovCanvas) {
+          tctx.drawImage(s._glr._ovCanvas, 0, 0);
+        }
+        dataURL = tmp.toDataURL('image/png');
+      } else {
+        // Canvas 2D path — everything is already on the main canvas
+        dataURL = canvas.toDataURL('image/png');
+      }
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const a = document.createElement('a');
+      a.href = dataURL;
+      a.download = `osc_screenshot_${ts}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     });
 
     document.getElementById('show-grid').addEventListener('change', e => s.showGrid = e.target.checked);
@@ -2551,6 +2953,9 @@ class UIController {
     this._bindRange('glow',        v => { s.glowAmount  = v; document.getElementById('glow-val').textContent         = Math.round(v); });
     this._bindRange('persistence', v => { s.persistence = v; document.getElementById('persistence-val').textContent = v.toFixed(2); });
 
+    // ── Presets ───────────────────────────────────────────────────────
+    this._setupPresets(s);
+
     // ── Progress & status polling ─────────────────────────────────────
     setInterval(() => {
       if (e.buffer) {
@@ -2569,6 +2974,7 @@ class UIController {
     s.start();
     this._setupPanels();
     this._setupPopOut();
+    this._setupKeyboard();
   }
 
   _setupPopOut() {
@@ -2620,6 +3026,309 @@ class UIController {
       btn.textContent = '⤢ POP OUT';
       btn.classList.remove('accent');
     });
+  }
+
+  _setupPresets(s) {
+    // Built-in presets
+    const BUILTIN_PRESETS = [
+      {
+        _name: 'Classic',
+        color: '#00ff41', beamWidth: 1.5, glowAmount: 12, persistence: 0.15,
+        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        smooth: false, filterEnabled: false, filterLow: 200, filterHigh: 3000,
+        objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
+        tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
+        breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
+        autoRotX: false, autoRotY: true, autoRotZ: false,
+        rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,
+        beatPulse: true, showAudio: false, showGrid: true, crtCurve: true,
+      },
+      {
+        _name: 'Neon Glow',
+        color: '#ff00ff', beamWidth: 2.0, glowAmount: 30, persistence: 0.06,
+        fx: { reactive: true, beatFlash: true, bloom: true, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        smooth: false, filterEnabled: false, filterLow: 200, filterHigh: 3000,
+        objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
+        tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
+        breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
+        autoRotX: false, autoRotY: true, autoRotZ: false,
+        rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,
+        beatPulse: true, showAudio: false, showGrid: true, crtCurve: false,
+      },
+      {
+        _name: 'Amber Retro',
+        color: '#ffb000', beamWidth: 1.8, glowAmount: 18, persistence: 0.55,
+        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        smooth: true, filterEnabled: false, filterLow: 200, filterHigh: 3000,
+        objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
+        tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
+        breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
+        autoRotX: false, autoRotY: true, autoRotZ: false,
+        rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,
+        beatPulse: true, showAudio: false, showGrid: true, crtCurve: true,
+      },
+    ];
+
+    const pm = new PresetManager(s);
+    pm.installDefaults(BUILTIN_PRESETS);
+    this.presetMgr = pm;
+
+    let saveMode = false;
+    let activeSlot = -1;
+    const slotsEl = document.getElementById('preset-slots');
+    const btnSave = document.getElementById('btn-preset-save');
+    const btnExport = document.getElementById('btn-preset-export');
+    const btnImport = document.getElementById('btn-preset-import');
+    const importFile = document.getElementById('preset-import-file');
+
+    const renderSlots = () => {
+      slotsEl.innerHTML = '';
+      for (let i = 0; i < pm.SLOT_COUNT; i++) {
+        const slot = pm.getSlot(i);
+        const btn = document.createElement('button');
+        btn.className = 'preset-slot';
+        if (slot) {
+          btn.classList.add('filled');
+          const name = slot._name || `P${i + 1}`;
+          btn.textContent = name.length > 5 ? name.slice(0, 5) : name;
+          btn.title = name;
+
+          // Delete button
+          const del = document.createElement('span');
+          del.className = 'preset-del visible';
+          del.textContent = '\u00D7';
+          del.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            pm.delete(i);
+            if (activeSlot === i) activeSlot = -1;
+            renderSlots();
+          });
+          btn.appendChild(del);
+        } else {
+          btn.textContent = String(i + 1);
+          btn.title = `Empty slot ${i + 1}`;
+        }
+        if (i === activeSlot) btn.classList.add('active-slot');
+
+        btn.addEventListener('click', () => {
+          if (saveMode) {
+            // Save mode: prompt for name and save
+            const name = prompt('Preset name:', pm.getSlot(i)?._name || `Preset ${i + 1}`);
+            if (name === null) { exitSaveMode(); return; }
+            pm.save(i, name);
+            activeSlot = i;
+            exitSaveMode();
+            renderSlots();
+          } else if (slot) {
+            // Load mode
+            pm.load(i);
+            activeSlot = i;
+            renderSlots();
+          }
+        });
+
+        slotsEl.appendChild(btn);
+      }
+    };
+
+    const exitSaveMode = () => {
+      saveMode = false;
+      btnSave.classList.remove('save-mode');
+      btnSave.textContent = 'SAVE';
+    };
+
+    btnSave.addEventListener('click', () => {
+      if (saveMode) {
+        exitSaveMode();
+      } else {
+        saveMode = true;
+        btnSave.classList.add('save-mode');
+        btnSave.textContent = 'PICK SLOT';
+      }
+    });
+
+    btnExport.addEventListener('click', () => {
+      if (activeSlot >= 0 && pm.getSlot(activeSlot)) {
+        pm.exportJSON(activeSlot);
+      } else {
+        // Export first filled slot if none selected
+        const idx = pm.getSlots().findIndex(s => s !== null);
+        if (idx >= 0) pm.exportJSON(idx);
+      }
+    });
+
+    btnImport.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', async (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const idx = await pm.importJSON(file);
+      if (idx >= 0) {
+        activeSlot = idx;
+        renderSlots();
+      }
+      importFile.value = '';
+    });
+
+    renderSlots();
+  }
+
+  _setupKeyboard() {
+    const e = this.engine, s = this.scope;
+    this._kbHelpVisible = false;
+
+    document.addEventListener('keydown', ev => {
+      // Don't fire shortcuts when typing in form elements
+      const tag = ev.target.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+      const key = ev.key;
+
+      // ── Help overlay (? key) ──
+      if (key === '?') {
+        ev.preventDefault();
+        this._toggleHelp();
+        return;
+      }
+
+      // ── Dismiss help overlay ──
+      if (this._kbHelpVisible && key === 'Escape') {
+        ev.preventDefault();
+        this._toggleHelp();
+        return;
+      }
+
+      // ── Playback ──
+      if (key === ' ') {
+        ev.preventDefault();
+        document.getElementById('btn-play').click();
+        return;
+      }
+      if (key === 'Escape') {
+        ev.preventDefault();
+        document.getElementById('btn-stop-audio').click();
+        return;
+      }
+
+      // ── Display toggles ──
+      if (key === 'g' || key === 'G') {
+        ev.preventDefault();
+        const cb = document.getElementById('show-grid');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+        return;
+      }
+      if (key === 'c' || key === 'C') {
+        ev.preventDefault();
+        const cb = document.getElementById('crt-curve');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+        return;
+      }
+      if (key === 'm' || key === 'M') {
+        ev.preventDefault();
+        document.getElementById('btn-measure').click();
+        return;
+      }
+      if (key === 'f' || key === 'F' || key === 'F11') {
+        ev.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen();
+        }
+        return;
+      }
+
+      // ── Scope mode ──
+      if (key === '1') {
+        ev.preventDefault();
+        document.getElementById('btn-yt').click();
+        return;
+      }
+      if (key === '2') {
+        ev.preventDefault();
+        document.getElementById('btn-xy').click();
+        return;
+      }
+      if (key === 'r' || key === 'R') {
+        ev.preventDefault();
+        document.getElementById('btn-run-stop').click();
+        return;
+      }
+      if (key === 's' || key === 'S') {
+        ev.preventDefault();
+        document.getElementById('btn-single').click();
+        return;
+      }
+
+      // ── Scene ──
+      if (key === '3') {
+        ev.preventDefault();
+        const cb = document.getElementById('obj-mode');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+        return;
+      }
+      if (key === 'Tab') {
+        // Only intercept Tab when scene is enabled
+        const cb = document.getElementById('obj-mode');
+        if (!cb.checked) return;
+        ev.preventDefault();
+        if (s.obj3dMode) {
+          document.getElementById('obj-mode-img').click();
+        } else {
+          document.getElementById('obj-mode-3d').click();
+        }
+        return;
+      }
+    });
+  }
+
+  _toggleHelp() {
+    let overlay = document.getElementById('kb-help-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'kb-help-overlay';
+      overlay.innerHTML = `
+        <div class="kb-help-box">
+          <div class="kb-help-title">KEYBOARD SHORTCUTS</div>
+          <div class="kb-help-columns">
+            <div class="kb-help-col">
+              <div class="kb-help-section">PLAYBACK</div>
+              <div class="kb-help-row"><kbd>Space</kbd> Play / Pause</div>
+              <div class="kb-help-row"><kbd>Esc</kbd> Stop audio</div>
+
+              <div class="kb-help-section">DISPLAY</div>
+              <div class="kb-help-row"><kbd>G</kbd> Toggle grid</div>
+              <div class="kb-help-row"><kbd>C</kbd> Toggle CRT curve</div>
+              <div class="kb-help-row"><kbd>M</kbd> Toggle measurements</div>
+              <div class="kb-help-row"><kbd>F</kbd> Toggle fullscreen</div>
+              <div class="kb-help-row"><kbd>F11</kbd> Toggle fullscreen</div>
+            </div>
+            <div class="kb-help-col">
+              <div class="kb-help-section">SCOPE</div>
+              <div class="kb-help-row"><kbd>1</kbd> YT mode</div>
+              <div class="kb-help-row"><kbd>2</kbd> XY mode</div>
+              <div class="kb-help-row"><kbd>R</kbd> Run / Stop</div>
+              <div class="kb-help-row"><kbd>S</kbd> Single trigger</div>
+
+              <div class="kb-help-section">SCENE</div>
+              <div class="kb-help-row"><kbd>3</kbd> Toggle OBJ/IMG enable</div>
+              <div class="kb-help-row"><kbd>Tab</kbd> Switch OBJ / IMG</div>
+
+              <div class="kb-help-section" style="margin-top:12px;opacity:0.5">
+                Press <kbd>?</kbd> or <kbd>Esc</kbd> to close
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    this._kbHelpVisible = !this._kbHelpVisible;
+    overlay.classList.toggle('visible', this._kbHelpVisible);
   }
 
   _updateStatus() {
