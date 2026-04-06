@@ -123,22 +123,25 @@ class BeatDetector {
     this._history  = new Float32Array(60);  // ~1s history at 60fps
     this._head     = 0;
     this._cooldown = 0;
-    this.sensitivity = 1.5; // multiplier over average energy
+    this._runSum   = 0;      // running sum of history entries (avoids .reduce() each frame)
+    this.sensitivity = 1.5;
   }
 
-  detect(data) {
-    // Compute RMS energy
-    let e = 0;
-    for (let i = 0; i < data.length; i++) e += data[i] * data[i];
-    e = Math.sqrt(e / data.length);
-
-    const avg = this._history.reduce((a, b) => a + b, 0) / this._history.length;
-    this._history[this._head % this._history.length] = e;
+  detect(rms) {
+    // Accept pre-computed RMS instead of raw data (avoids double-computing)
+    const e   = rms;
+    const len = this._history.length;
+    const idx = this._head % len;
+    this._runSum -= this._history[idx];   // subtract oldest
+    this._history[idx] = e;
+    this._runSum += e;                    // add newest
     this._head++;
+
+    const avg = this._runSum / len;
     this._cooldown = Math.max(0, this._cooldown - 1);
 
     if (e > avg * this.sensitivity && e > 0.02 && this._cooldown === 0) {
-      this._cooldown = 18; // ~300ms at 60fps
+      this._cooldown = 18;
       return { beat: true, energy: e, avg };
     }
     return { beat: false, energy: e, avg };
@@ -278,6 +281,9 @@ class AudioEngine {
     this.pauseOffset = 0;
     this.startTime   = 0;
     this.FFT_SIZE    = 8192;
+    // Pre-allocated buffers — avoids ~120 Float32Array allocations per second
+    this._bufL = new Float32Array(this.FFT_SIZE);
+    this._bufR = new Float32Array(this.FFT_SIZE);
   }
 
   async init() {
@@ -419,14 +425,14 @@ class AudioEngine {
   }
 
   getDataL() {
-    const d = new Float32Array(this.FFT_SIZE);
-    if (this.analyserL) this.analyserL.getFloatTimeDomainData(d);
-    return d;
+    if (this.analyserL) this.analyserL.getFloatTimeDomainData(this._bufL);
+    else this._bufL.fill(0);
+    return this._bufL;
   }
   getDataR() {
-    const d = new Float32Array(this.FFT_SIZE);
-    if (this.analyserR) this.analyserR.getFloatTimeDomainData(d);
-    return d;
+    if (this.analyserR) this.analyserR.getFloatTimeDomainData(this._bufR);
+    else this._bufR.fill(0);
+    return this._bufR;
   }
 
   getCurrentTime() {
@@ -1257,6 +1263,8 @@ class WaveGLRenderer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  // Reusable buffer — avoids allocating a new Float32Array every frame
+  _rgbaBuf = new Float32Array(4);
   _rgba(color, alpha=1) {
     let r=0,g=1,b=0.25;
     if (color.startsWith('#') && color.length>=7) {
@@ -1269,7 +1277,8 @@ class WaveGLRenderer {
       const f=n=>{const k=(n+h/30)%12;return l/100-a*Math.max(-1,Math.min(k-3,9-k,1));};
       r=f(0);g=f(8);b=f(4);
     }
-    return new Float32Array([r,g,b,alpha]);
+    this._rgbaBuf[0]=r; this._rgbaBuf[1]=g; this._rgbaBuf[2]=b; this._rgbaBuf[3]=alpha;
+    return this._rgbaBuf;
   }
 
   // Main per-frame call
@@ -1548,17 +1557,17 @@ class Oscilloscope {
 
   // ── FX: compute runtime color + glow ─────────────────────────────────
   _updateFX(data) {
-    const fx = this.fx;
+    const fx  = this.fx;
+    const len = data.length;
 
-    // RMS
+    // RMS — computed once, shared with beat detector
     let sumSq = 0;
-    for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i];
-    fx._rms = Math.sqrt(sumSq / data.length);
+    for (let i = 0; i < len; i++) sumSq += data[i] * data[i];
+    fx._rms = Math.sqrt(sumSq / len);
 
-    // Beat detection
-    fx._beatSensCache = fx.beatSens;
+    // Beat detection — pass pre-computed RMS (avoids recomputing over 8192 samples)
     this._beatDet.sensitivity = fx.beatSens;
-    const { beat } = this._beatDet.detect(data);
+    const { beat } = this._beatDet.detect(fx._rms);
     this._lastBeat = beat;
 
     if (beat && fx.beatFlash) fx._flash = 1.0;
@@ -1590,26 +1599,34 @@ class Oscilloscope {
   drawGrid(ctx) {
     const W = this.canvas.width, H = this.canvas.height;
     ctx.save();
+
+    // Fine grid — single batched path (was 91 individual strokes)
     ctx.strokeStyle = 'rgba(70,70,70,0.22)'; ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 50; i++) {
-      ctx.beginPath(); ctx.moveTo(i * W/50, 0); ctx.lineTo(i * W/50, H); ctx.stroke();
-    }
-    for (let i = 0; i <= 40; i++) {
-      ctx.beginPath(); ctx.moveTo(0, i * H/40); ctx.lineTo(W, i * H/40); ctx.stroke();
-    }
+    ctx.beginPath();
+    for (let i = 0; i <= 50; i++) { const x = i * W / 50; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let i = 0; i <= 40; i++) { const y = i * H / 40; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke();
+
+    // Major grid — single batched path (was 19 individual strokes)
     ctx.strokeStyle = 'rgba(90,90,90,0.4)'; ctx.lineWidth = 0.8;
-    for (let i = 0; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(i*W/10, 0); ctx.lineTo(i*W/10, H); ctx.stroke(); }
-    for (let i = 0; i <= 8;  i++) { ctx.beginPath(); ctx.moveTo(0, i*H/8);  ctx.lineTo(W, i*H/8);  ctx.stroke(); }
+    ctx.beginPath();
+    for (let i = 0; i <= 10; i++) { const x = i * W / 10; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let i = 0; i <= 8;  i++) { const y = i * H / 8;  ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke();
+
+    // Center crosshair
     ctx.strokeStyle = 'rgba(110,110,110,0.55)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H);
+    ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2);
+    ctx.stroke();
 
     // Trigger level marker
     const vs   = this.getVoltScale(this.trigSource === 1 ? this.ch1 : this.ch2);
-    const trigY = H/2 - this.trigLevel * vs * (H/2);
+    const trigY = H / 2 - this.trigLevel * vs * (H / 2);
     const rgb  = this._hexToRgb(this._renderColor());
     ctx.fillStyle = `rgba(${rgb},0.7)`;
-    ctx.beginPath(); ctx.moveTo(W-9, trigY-4); ctx.lineTo(W, trigY); ctx.lineTo(W-9, trigY+4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(W - 9, trigY - 4); ctx.lineTo(W, trigY); ctx.lineTo(W - 9, trigY + 4); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
@@ -1755,16 +1772,23 @@ class Oscilloscope {
     ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
   }
 
+  // Cache: avoids re-parsing the same hex string 3-5 times per frame
+  _hexRgbCache = '';
+  _hexRgbCacheKey = '';
   _hexToRgb(hex) {
-    // Handle hsl() strings too
+    if (hex === this._hexRgbCacheKey) return this._hexRgbCache;
+    this._hexRgbCacheKey = hex;
     if (hex.startsWith('hsl')) {
       const [h, s, l] = hex.match(/[\d.]+/g).map(Number);
       const a = s/100 * Math.min(l/100, 1 - l/100);
       const f = n => { const k = (n + h/30) % 12; return Math.round((l/100 - a*Math.max(-1, Math.min(k-3, 9-k, 1))) * 255); };
-      return `${f(0)},${f(8)},${f(4)}`;
+      this._hexRgbCache = `${f(0)},${f(8)},${f(4)}`;
+    } else if (!hex.startsWith('#') || hex.length < 7) {
+      this._hexRgbCache = '0,255,65';
+    } else {
+      this._hexRgbCache = `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
     }
-    if (!hex.startsWith('#') || hex.length < 7) return '0,255,65';
-    return `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
+    return this._hexRgbCache;
   }
 
   // ── Main render loop ─────────────────────────────────────────────────
@@ -2633,6 +2657,7 @@ class UIController {
   }
 
   _resetPhosphor() {
+    if (!this.scope._phCtx) return; // WebGL path handles phosphor internally
     this.scope._phCtx.fillStyle = '#000';
     this.scope._phCtx.fillRect(0, 0, this.scope.canvas.width, this.scope.canvas.height);
   }
