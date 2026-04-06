@@ -539,8 +539,14 @@ class ImageScene {
     this.showAudio = false;
 
     // True 3D rotation of image plane (degrees) — replaces tiltX/tiltY approx
-    this.rotX3d    = 0;   // rotation around X axis (vertical flip / top-bottom tilt)
-    this.rotY3d    = 0;   // rotation around Y axis (horizontal flip / left-right tilt)
+    this.rotX3d      = 0;     // rotation around X axis
+    this.rotY3d      = 0;     // rotation around Y axis
+    // Per-axis auto-rotation
+    this.autoRotX3d  = false;
+    this.rotSpeedX3d = 0.5;   // deg/frame for X3D
+    this.autoRotY3d  = false;
+    this.rotSpeedY3d = 0.5;   // deg/frame for Y3D
+    // rotSpeed (existing) drives Z spin (autoSpin)
 
     // Music-sync animation modes
     this.breathe   = false;
@@ -553,6 +559,10 @@ class ImageScene {
     this.tileY     = 1;   // grid rows (1-5)
     this.radialN   = 1;   // rotated copies arranged in a ring (1-8)
 
+    // Infinite scroll (tile steps per second; wraps seamlessly with tiling)
+    this.scrollX   = 0;
+    this.scrollY   = 0;
+
     // Draw power — 0: blank, 1: fully drawn (slices trace point array)
     this.power      = 1;
     this.autoPower  = false;
@@ -560,11 +570,14 @@ class ImageScene {
     this.powerLoop  = false;
 
     // Internal state
-    this._pulse     = 0;
-    this._breatheSc = 1;
-    this._shakeX    = 0;
-    this._shakeY    = 0;
-    this._traceNorm = [];
+    this._pulse      = 0;
+    this._breatheSc  = 1;
+    this._shakeX     = 0;
+    this._shakeY     = 0;
+    this._traceNorm  = [];
+    this._scrollOffX = 0;
+    this._scrollOffY = 0;
+    this._lastScrollT = 0;
   }
 
   load(file) {
@@ -672,7 +685,11 @@ class ImageScene {
       if (this.power >= 1) this.power = this.powerLoop ? 0 : 1;
     }
 
-    // Animate spin
+    // Auto-rotate 3D axes
+    if (this.autoRotX3d) this.rotX3d = (this.rotX3d + this.rotSpeedX3d) % 360;
+    if (this.autoRotY3d) this.rotY3d = (this.rotY3d + this.rotSpeedY3d) % 360;
+
+    // Animate Z spin
     if (this.autoSpin) this.rotZ = (this.rotZ + this.rotSpeed) % 360;
 
     // Beat pulse
@@ -764,15 +781,32 @@ class ImageScene {
       return sym;
     }
 
-    // Tiling — repeat in a grid, spaced by image display footprint
-    if (this.tileX > 1 || this.tileY > 1) {
-      const tiled = [];
+    // Tiling + infinite scroll (scroll wraps seamlessly within the tile period)
+    const hasScroll = this.scrollX !== 0 || this.scrollY !== 0;
+    const hasTile   = this.tileX > 1 || this.tileY > 1;
+    if (hasTile || hasScroll) {
       const stepX = fitX * 1.08;
       const stepY = fitY * 1.08;
-      for (let ty = 0; ty < this.tileY; ty++) {
-        for (let tx = 0; tx < this.tileX; tx++) {
-          const offX = (tx - (this.tileX - 1) / 2) * stepX;
-          const offY = (ty - (this.tileY - 1) / 2) * stepY;
+
+      if (hasScroll) {
+        const now = performance.now() / 1000;
+        const dt  = this._lastScrollT > 0 ? Math.min(now - this._lastScrollT, 0.05) : 0;
+        this._lastScrollT = now;
+        this._scrollOffX = ((this._scrollOffX + this.scrollX * stepX * dt) % stepX + stepX) % stepX;
+        this._scrollOffY = ((this._scrollOffY + this.scrollY * stepY * dt) % stepY + stepY) % stepY;
+      }
+
+      // Extra tiles on each scrolling edge so wrapping is seamless
+      const extraX = this.scrollX !== 0 ? 1 : 0;
+      const extraY = this.scrollY !== 0 ? 1 : 0;
+      const totalX = Math.max(this.tileX, 1) + extraX * 2;
+      const totalY = Math.max(this.tileY, 1) + extraY * 2;
+
+      const tiled = [];
+      for (let ty = 0; ty < totalY; ty++) {
+        for (let tx = 0; tx < totalX; tx++) {
+          const offX = (tx - (totalX - 1) / 2) * stepX + this._scrollOffX;
+          const offY = (ty - (totalY - 1) / 2) * stepY + this._scrollOffY;
           for (const [[x0,y0],[x1,y1]] of result) {
             tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
           }
@@ -805,9 +839,14 @@ class ObjScene {
 
     // Shared music-reactivity (matches ImageScene property names)
     this.autoRotY  = true;
-    this.rotSpeed  = 0.5;   // degrees per frame
+    this.rotSpeed  = 0.5;   // degrees per frame (Y axis)
     this.beatPulse = true;
     this.showAudio = false;
+    // Per-axis auto-rotation
+    this.autoRotX  = false;
+    this.rotSpeedX = 0.5;   // deg/frame for X
+    this.autoRotZ  = false;
+    this.rotSpeedZ = 0.5;   // deg/frame for Z
 
     // Music-sync animation modes
     this.breathe   = false;
@@ -820,6 +859,10 @@ class ObjScene {
     this.tileY     = 1;
     this.radialN   = 1;
 
+    // Infinite scroll (tile steps per second; wraps seamlessly with tiling)
+    this.scrollX   = 0;
+    this.scrollY   = 0;
+
     // Draw power — 0: blank, 1: all edges drawn
     this.power      = 1;
     this.autoPower  = false;
@@ -827,10 +870,13 @@ class ObjScene {
     this.powerLoop  = false;
 
     // Internal FX state
-    this._pulse     = 0;
-    this._breatheSc = 1;
-    this._shakeX    = 0;
-    this._shakeY    = 0;
+    this._pulse      = 0;
+    this._breatheSc  = 1;
+    this._shakeX     = 0;
+    this._shakeY     = 0;
+    this._scrollOffX = 0;
+    this._scrollOffY = 0;
+    this._lastScrollT = 0;
   }
 
   load(text, name = 'model') {
@@ -887,10 +933,10 @@ class ObjScene {
   getScreenEdges(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded) return [];
 
-    // Auto-rotate Y
-    if (this.autoRotY) {
-      this.rotY = (this.rotY + this.rotSpeed * Math.PI / 180) % (Math.PI * 2);
-    }
+    // Auto-rotate per axis
+    if (this.autoRotX) this.rotX = (this.rotX + this.rotSpeedX * Math.PI / 180) % (Math.PI * 2);
+    if (this.autoRotY) this.rotY = (this.rotY + this.rotSpeed  * Math.PI / 180) % (Math.PI * 2);
+    if (this.autoRotZ) this.rotZ = (this.rotZ + this.rotSpeedZ * Math.PI / 180) % (Math.PI * 2);
 
     // Beat pulse
     if (beat && this.beatPulse) this._pulse = 0.3;
@@ -977,16 +1023,32 @@ class ObjScene {
       return sym;
     }
 
-    // Tiling — repeat in a grid
-    if (this.tileX > 1 || this.tileY > 1) {
-      const tiled = [];
-      const objSize = half * 2 * 1.1;  // approximate object diameter + gap
+    // Tiling + infinite scroll
+    const hasScroll = this.scrollX !== 0 || this.scrollY !== 0;
+    const hasTile   = this.tileX > 1 || this.tileY > 1;
+    if (hasTile || hasScroll) {
+      const objSize = half * 2 * 1.1;
       const stepX   = objSize;
       const stepY   = objSize;
-      for (let ty = 0; ty < this.tileY; ty++) {
-        for (let tx = 0; tx < this.tileX; tx++) {
-          const offX = (tx - (this.tileX - 1) / 2) * stepX;
-          const offY = (ty - (this.tileY - 1) / 2) * stepY;
+
+      if (hasScroll) {
+        const now = performance.now() / 1000;
+        const dt  = this._lastScrollT > 0 ? Math.min(now - this._lastScrollT, 0.05) : 0;
+        this._lastScrollT = now;
+        this._scrollOffX = ((this._scrollOffX + this.scrollX * stepX * dt) % stepX + stepX) % stepX;
+        this._scrollOffY = ((this._scrollOffY + this.scrollY * stepY * dt) % stepY + stepY) % stepY;
+      }
+
+      const extraX = this.scrollX !== 0 ? 1 : 0;
+      const extraY = this.scrollY !== 0 ? 1 : 0;
+      const totalX = Math.max(this.tileX, 1) + extraX * 2;
+      const totalY = Math.max(this.tileY, 1) + extraY * 2;
+
+      const tiled = [];
+      for (let ty = 0; ty < totalY; ty++) {
+        for (let tx = 0; tx < totalX; tx++) {
+          const offX = (tx - (totalX - 1) / 2) * stepX + this._scrollOffX;
+          const offY = (ty - (totalY - 1) / 2) * stepY + this._scrollOffY;
           for (const [[x0,y0],[x1,y1]] of result) {
             tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
           }
@@ -2238,8 +2300,27 @@ class UIController {
     });
 
     // ── Shared animation + music sync ──────────────────────────────────
-    document.getElementById('sc-auto-rot').addEventListener('change', e => {
-      s._obj.autoRotY = e.target.checked; s._imgScene.autoSpin = e.target.checked;
+    // Per-axis auto-rotate  (X = obj.rotX / img.rotX3d,  Y = obj.rotY / img.rotY3d,  Z = obj.rotZ / img.spinZ)
+    document.getElementById('sc-auto-rot-x').addEventListener('change', e => {
+      s._obj.autoRotX = e.target.checked; s._imgScene.autoRotX3d = e.target.checked;
+    });
+    document.getElementById('sc-auto-rot-y').addEventListener('change', e => {
+      s._obj.autoRotY = e.target.checked; s._imgScene.autoRotY3d = e.target.checked;
+    });
+    document.getElementById('sc-auto-rot-z').addEventListener('change', e => {
+      s._obj.autoRotZ = e.target.checked; s._imgScene.autoSpin = e.target.checked;
+    });
+    this._bindRange('sc-rot-spd-x', v => {
+      s._obj.rotSpeedX = v; s._imgScene.rotSpeedX3d = v;
+      document.getElementById('sc-rsx-val').textContent = v.toFixed(1);
+    });
+    this._bindRange('sc-rot-spd-y', v => {
+      s._obj.rotSpeed = v; s._imgScene.rotSpeedY3d = v;
+      document.getElementById('sc-rsy-val').textContent = v.toFixed(1);
+    });
+    this._bindRange('sc-rot-spd-z', v => {
+      s._obj.rotSpeedZ = v; s._imgScene.rotSpeed = v;
+      document.getElementById('sc-rsz-val').textContent = v.toFixed(1);
     });
     document.getElementById('sc-beat-pulse').addEventListener('change', e => {
       s._obj.beatPulse = e.target.checked; s._imgScene.beatPulse = e.target.checked;
@@ -2247,9 +2328,14 @@ class UIController {
     document.getElementById('sc-show-audio').addEventListener('change', e => {
       s._obj.showAudio = e.target.checked; s._imgScene.showAudio = e.target.checked;
     });
-    this._bindRange('sc-rot-speed', v => {
-      s._obj.rotSpeed = v; s._imgScene.rotSpeed = v;
-      document.getElementById('sc-rs-val').textContent = v.toFixed(1);
+    // Infinite scroll
+    this._bindRange('sc-scroll-x', v => {
+      s._obj.scrollX = v; s._imgScene.scrollX = v;
+      document.getElementById('sc-sx-val').textContent = v.toFixed(2);
+    });
+    this._bindRange('sc-scroll-y', v => {
+      s._obj.scrollY = v; s._imgScene.scrollY = v;
+      document.getElementById('sc-sy-val').textContent = v.toFixed(2);
     });
     document.getElementById('sc-breathe').addEventListener('change', e => {
       s._obj.breathe = e.target.checked; s._imgScene.breathe = e.target.checked;
