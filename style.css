@@ -638,3 +638,63 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   transition: all 0.1s;
 }
 .preset-btn:hover { border-color: var(--p); color: var(--p); }
+
+/* ── Collapsible panels ── */
+.fp-title {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fp-title::before {
+  content: '▾';
+  font-size: 8px;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.fp-section.collapsed .fp-title::before {
+  transform: rotate(-90deg);
+}
+.fp-section.collapsed > *:not(.fp-title) {
+  display: none !important;
+}
+.fp-section.collapsed {
+  min-width: 0 !important;
+  width: auto;
+  padding: 6px 8px;
+}
+
+/* ── Panel layout lock button ── */
+#panel-lock-btn {
+  align-self: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid #333;
+  color: #555;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+#panel-lock-btn:hover { border-color: #555; color: #888; }
+#panel-lock-btn.locked { color: #00ff41; border-color: #00ff41; }
+
+/* ── Drag-to-reorder ── */
+.fp-section[draggable="true"] {
+  cursor: grab;
+}
+.fp-section[draggable="true"]:active {
+  cursor: grabbing;
+}
+.fp-section.panel-dragging {
+  opacity: 0.4;
+}
+.fp-section.panel-drop-before {
+  border-left: 2px solid #00ff41;
+}
+.fp-section.panel-drop-after {
+  border-right: 2px solid #00ff41;
+}

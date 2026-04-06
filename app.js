@@ -2479,6 +2479,7 @@ class UIController {
 
     this._updateStatus();
     s.start();
+    this._setupPanels();
   }
 
   _updateStatus() {
@@ -2525,6 +2526,137 @@ class UIController {
     await this.engine.init();
     this.sigGen.init(this.engine.actx);
     this._audioReady = true;
+  }
+
+  _setupPanels() {
+    const panel = document.querySelector('.front-panel');
+    if (!panel) return;
+
+    // ── Restore saved order ──────────────────────────────────────────────
+    const savedOrder = JSON.parse(localStorage.getItem('osc_panelOrder') || 'null');
+    if (savedOrder) {
+      savedOrder.forEach(id => {
+        const sec = panel.querySelector(`[data-panel-id="${id}"]`);
+        if (sec) panel.appendChild(sec);
+      });
+    }
+
+    // ── Restore saved collapsed state ────────────────────────────────────
+    const savedCollapsed = JSON.parse(localStorage.getItem('osc_panelCollapsed') || '{}');
+
+    const saveState = () => {
+      const order = [];
+      const collapsed = {};
+      panel.querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
+        const id = s.dataset.panelId;
+        order.push(id);
+        collapsed[id] = s.classList.contains('collapsed');
+      });
+      localStorage.setItem('osc_panelOrder', JSON.stringify(order));
+      localStorage.setItem('osc_panelCollapsed', JSON.stringify(collapsed));
+    };
+
+    // ── Layout lock ───────────────────────────────────────────────────────
+    let locked = localStorage.getItem('osc_panelLocked') === 'true';
+    const lockBtn = document.getElementById('panel-lock-btn');
+
+    const applyLock = () => {
+      panel.querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
+        s.setAttribute('draggable', locked ? 'false' : 'true');
+      });
+      if (lockBtn) {
+        lockBtn.textContent = locked ? '🔒' : '🔓';
+        lockBtn.classList.toggle('locked', locked);
+        lockBtn.title = locked ? 'Unlock panel layout' : 'Lock panel layout';
+      }
+      localStorage.setItem('osc_panelLocked', locked);
+    };
+
+    if (lockBtn) {
+      lockBtn.addEventListener('click', () => {
+        locked = !locked;
+        applyLock();
+      });
+    }
+
+    let dragSrc = null;
+
+    panel.querySelectorAll('.fp-section[data-panel-id]').forEach(sec => {
+      const id = sec.dataset.panelId;
+
+      // Apply saved collapsed state
+      if (savedCollapsed[id]) sec.classList.add('collapsed');
+
+      // ── Collapse toggle on title click ───────────────────────────────
+      const title = sec.querySelector('.fp-title');
+      if (title) {
+        title.addEventListener('click', e => {
+          // Don't collapse when clicking interactive children of title
+          if (e.target !== title && e.target.closest('.fp-title') !== title) return;
+          sec.classList.toggle('collapsed');
+          saveState();
+        });
+      }
+
+      // ── Drag to reorder ──────────────────────────────────────────────
+      sec.setAttribute('draggable', 'true');
+
+      sec.addEventListener('dragstart', e => {
+        if (locked) { e.preventDefault(); return; }
+        dragSrc = sec;
+        sec.classList.add('panel-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', id);
+      });
+
+      sec.addEventListener('dragend', () => {
+        dragSrc = null;
+        sec.classList.remove('panel-dragging');
+        panel.querySelectorAll('.fp-section').forEach(s => {
+          s.classList.remove('panel-drop-before', 'panel-drop-after');
+        });
+        saveState();
+      });
+
+      sec.addEventListener('dragover', e => {
+        if (locked) return;
+        e.preventDefault();
+        if (!dragSrc || dragSrc === sec) return;
+        e.dataTransfer.dropEffect = 'move';
+        const rect = sec.getBoundingClientRect();
+        const mid  = rect.left + rect.width / 2;
+        panel.querySelectorAll('.fp-section').forEach(s => {
+          s.classList.remove('panel-drop-before', 'panel-drop-after');
+        });
+        if (e.clientX < mid) {
+          sec.classList.add('panel-drop-before');
+        } else {
+          sec.classList.add('panel-drop-after');
+        }
+      });
+
+      sec.addEventListener('dragleave', () => {
+        sec.classList.remove('panel-drop-before', 'panel-drop-after');
+      });
+
+      sec.addEventListener('drop', e => {
+        if (locked) return;
+        e.preventDefault();
+        if (!dragSrc || dragSrc === sec) return;
+        const rect = sec.getBoundingClientRect();
+        const mid  = rect.left + rect.width / 2;
+        if (e.clientX < mid) {
+          panel.insertBefore(dragSrc, sec);
+        } else {
+          sec.after(dragSrc);
+        }
+        sec.classList.remove('panel-drop-before', 'panel-drop-after');
+        saveState();
+      });
+    });
+
+    // Apply initial lock state after all sections are set up
+    applyLock();
   }
 }
 
