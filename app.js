@@ -538,17 +538,26 @@ class ImageScene {
     this.beatPulse = true;
     this.showAudio = false;
 
+    // True 3D rotation of image plane (degrees) — replaces tiltX/tiltY approx
+    this.rotX3d    = 0;   // rotation around X axis (vertical flip / top-bottom tilt)
+    this.rotY3d    = 0;   // rotation around Y axis (horizontal flip / left-right tilt)
+
     // Music-sync animation modes
-    this.breathe   = false;   // smooth RMS-driven scale envelope
-    this.shake     = false;   // beat-triggered position jitter
-    this.warp      = false;   // audio waveform radially displaces trace pts
+    this.breathe   = false;
+    this.shake     = false;
+    this.warp      = false;
     this.warpAmt   = 0.1;
+
+    // Tiling & radial symmetry (shared with ObjScene)
+    this.tileX     = 1;   // grid columns (1-5)
+    this.tileY     = 1;   // grid rows (1-5)
+    this.radialN   = 1;   // rotated copies arranged in a ring (1-8)
 
     // Draw power — 0: blank, 1: fully drawn (slices trace point array)
     this.power      = 1;
-    this.autoPower  = false;  // auto-ramp from 0 → 1
-    this.powerSpeed = 0.004;  // fraction per frame
-    this.powerLoop  = false;  // loop: reset to 0 when reaching 1
+    this.autoPower  = false;
+    this.powerSpeed = 0.004;
+    this.powerLoop  = false;
 
     // Internal state
     this._pulse     = 0;
@@ -657,12 +666,10 @@ class ImageScene {
   getTracePoints(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded || !this._traceNorm.length) return [];
 
-    // Auto-ramp draw power (scanline fill from top to bottom)
+    // Auto-ramp draw power
     if (this.autoPower) {
       this.power += this.powerSpeed;
-      if (this.power >= 1) {
-        this.power = this.powerLoop ? 0 : 1;
-      }
+      if (this.power >= 1) this.power = this.powerLoop ? 0 : 1;
     }
 
     // Animate spin
@@ -672,10 +679,10 @@ class ImageScene {
     if (beat && this.beatPulse) this._pulse = 0.3;
     if (this._pulse > 0.001)    this._pulse *= 0.82;
 
-    // Breathe — exponentially-smoothed RMS → scale
+    // Breathe
     this._breatheSc = this._breatheSc * 0.88 + (this.breathe ? 1 + rms * 2.5 : 1) * 0.12;
 
-    // Shake — position jitter on beat, decays each frame
+    // Shake
     if (beat && this.shake) {
       const h = Math.min(W, H) * 0.45;
       this._shakeX = (Math.random() - 0.5) * h * 0.12;
@@ -685,27 +692,33 @@ class ImageScene {
     this._shakeY *= 0.7;
 
     const sc   = this.scale * (1 + this._pulse) * this._breatheSc;
-    const scX  = sc * Math.cos(this.tiltY * Math.PI / 180);
-    const scY  = sc * Math.cos(this.tiltX * Math.PI / 180);
     const cosR = Math.cos(this.rotZ * Math.PI / 180);
     const sinR = Math.sin(this.rotZ * Math.PI / 180);
     const half = Math.min(W, H) * 0.45;
     const cx   = W / 2 + this.posX * half + this._shakeX;
-    const cy   = H / 2 - this.posY * half + this._shakeY;  // flip Y to match OBJ
+    const cy   = H / 2 - this.posY * half + this._shakeY;
 
     const iW   = this._img.naturalWidth  || 1;
     const iH   = this._img.naturalHeight || 1;
     const fit  = Math.min(W * 0.85 / iW, H * 0.85 / iH);
-    const fitX = iW * fit;
-    const fitY = iH * fit;
+    const fitX = iW * fit * sc;
+    const fitY = iH * fit * sc;
 
-    const bufLen   = audioBuf ? audioBuf.length : 0;
+    // True 3D rotation — rotate the image plane around X and Y axes
+    const cosX3 = Math.cos(this.rotX3d * Math.PI / 180);
+    const sinX3 = Math.sin(this.rotX3d * Math.PI / 180);
+    const cosY3 = Math.cos(this.rotY3d * Math.PI / 180);
+    const sinY3 = Math.sin(this.rotY3d * Math.PI / 180);
+    const fov3d = 2.0;   // perspective depth (normalized units)
+
+    const bufLen    = audioBuf ? audioBuf.length : 0;
     const drawCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this._traceNorm.length);
 
     const result = [];
     for (let i = 0; i < drawCount; i++) {
       let [nx, ny] = this._traceNorm[i];
-      // Warp — radially displace each point using the audio waveform
+
+      // Warp
       if (this.warp && bufLen > 0) {
         const angle = Math.atan2(ny, nx);
         const sIdx  = Math.floor(((angle / (Math.PI * 2)) + 0.5) * bufLen) % bufLen;
@@ -715,12 +728,59 @@ class ImageScene {
         ny += (ny / dist) * d;
       }
 
-      const px = nx * fitX * scX;
-      const py = ny * fitY * scY;
+      // 3D rotation of image plane (Y-axis then X-axis, then perspective divide)
+      let x3 = nx, y3 = ny, z3 = 0;
+      const x3r = x3 * cosY3 + z3 * sinY3;
+      z3 = -x3 * sinY3 + z3 * cosY3;  x3 = x3r;
+      const y3r = y3 * cosX3 - z3 * sinX3;
+      z3 = y3 * sinX3 + z3 * cosX3;   y3 = y3r;
+      if (z3 <= -(fov3d - 0.01)) continue;   // behind camera — skip
+      const persp = fov3d / (fov3d + z3);
+      nx = x3 * persp;
+      ny = y3 * persp;
+
+      // Scale → spin rotation → screen
+      const px = nx * fitX;
+      const py = ny * fitY;
       const rx = px * cosR - py * sinR;
       const ry = px * sinR + py * cosR;
       result.push([[cx + rx, cy + ry], [cx + rx + 0.5, cy + ry]]);
     }
+
+    // Radial symmetry — N rotated copies arranged in a ring
+    if (this.radialN > 1) {
+      const sym = [];
+      for (let i = 0; i < this.radialN; i++) {
+        const a = (i / this.radialN) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        for (const [[x0,y0],[x1,y1]] of result) {
+          const dx0=x0-cx, dy0=y0-cy, dx1=x1-cx, dy1=y1-cy;
+          sym.push([
+            [cx + dx0*ca - dy0*sa, cy + dx0*sa + dy0*ca],
+            [cx + dx1*ca - dy1*sa, cy + dx1*sa + dy1*ca]
+          ]);
+        }
+      }
+      return sym;
+    }
+
+    // Tiling — repeat in a grid, spaced by image display footprint
+    if (this.tileX > 1 || this.tileY > 1) {
+      const tiled = [];
+      const stepX = fitX * 1.08;
+      const stepY = fitY * 1.08;
+      for (let ty = 0; ty < this.tileY; ty++) {
+        for (let tx = 0; tx < this.tileX; tx++) {
+          const offX = (tx - (this.tileX - 1) / 2) * stepX;
+          const offY = (ty - (this.tileY - 1) / 2) * stepY;
+          for (const [[x0,y0],[x1,y1]] of result) {
+            tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
+          }
+        }
+      }
+      return tiled;
+    }
+
     return result;
   }
 }
@@ -754,6 +814,11 @@ class ObjScene {
     this.shake     = false;
     this.warp      = false;
     this.warpAmt   = 0.1;
+
+    // Tiling & radial symmetry
+    this.tileX     = 1;
+    this.tileY     = 1;
+    this.radialN   = 1;
 
     // Draw power — 0: blank, 1: all edges drawn
     this.power      = 1;
@@ -893,6 +958,43 @@ class ObjScene {
 
       result.push([[toSx(ax), toSy(ay)], [toSx(bx), toSy(by)]]);
     }
+
+    // Radial symmetry — N rotated copies in a ring
+    if (this.radialN > 1) {
+      const sym = [];
+      const cxs = W / 2, cys = H / 2;
+      for (let i = 0; i < this.radialN; i++) {
+        const a = (i / this.radialN) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        for (const [[x0,y0],[x1,y1]] of result) {
+          const dx0=x0-cxs, dy0=y0-cys, dx1=x1-cxs, dy1=y1-cys;
+          sym.push([
+            [cxs + dx0*ca - dy0*sa, cys + dx0*sa + dy0*ca],
+            [cxs + dx1*ca - dy1*sa, cys + dx1*sa + dy1*ca]
+          ]);
+        }
+      }
+      return sym;
+    }
+
+    // Tiling — repeat in a grid
+    if (this.tileX > 1 || this.tileY > 1) {
+      const tiled = [];
+      const objSize = half * 2 * 1.1;  // approximate object diameter + gap
+      const stepX   = objSize;
+      const stepY   = objSize;
+      for (let ty = 0; ty < this.tileY; ty++) {
+        for (let tx = 0; tx < this.tileX; tx++) {
+          const offX = (tx - (this.tileX - 1) / 2) * stepX;
+          const offY = (ty - (this.tileY - 1) / 2) * stepY;
+          for (const [[x0,y0],[x1,y1]] of result) {
+            tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
+          }
+        }
+      }
+      return tiled;
+    }
+
     return result;
   }
 }
@@ -2101,8 +2203,20 @@ class UIController {
       document.getElementById('img-den-val').textContent = Math.round(v);
       s._imgScene._computeTrace();
     });
-    this._bindRange('img-tx', v => { s._imgScene.tiltX = v; document.getElementById('img-tx-val').textContent = Math.round(v) + '°'; });
-    this._bindRange('img-ty', v => { s._imgScene.tiltY = v; document.getElementById('img-ty-val').textContent = Math.round(v) + '°'; });
+    this._bindRange('img-rx3d', v => { s._imgScene.rotX3d = v; document.getElementById('img-rx3d-val').textContent = Math.round(v) + '°'; });
+    this._bindRange('img-ry3d', v => { s._imgScene.rotY3d = v; document.getElementById('img-ry3d-val').textContent = Math.round(v) + '°'; });
+
+    // ── Shared: tiling & radial symmetry ──────────────────────────────
+    const setTile = () => {
+      const tx = +document.getElementById('sc-tile-x').value;
+      const ty = +document.getElementById('sc-tile-y').value;
+      const rn = +document.getElementById('sc-radial').value;
+      s._obj.tileX = tx; s._obj.tileY = ty; s._obj.radialN = rn;
+      s._imgScene.tileX = tx; s._imgScene.tileY = ty; s._imgScene.radialN = rn;
+    };
+    document.getElementById('sc-tile-x').addEventListener('change', setTile);
+    document.getElementById('sc-tile-y').addEventListener('change', setTile);
+    document.getElementById('sc-radial').addEventListener('change', setTile);
 
     // ── Shared transforms (set both scenes simultaneously) ─────────────
     this._bindRange('sc-scale', v => {

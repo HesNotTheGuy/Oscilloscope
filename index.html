@@ -331,15 +331,42 @@
         </label>
       </div>
 
-      <!-- IMG-only: TiltX TiltY -->
+      <!-- IMG-only: true 3D rotation axes -->
       <div id="img-tilt-ctrls" style="display:none">
-        <label class="fp-range-label">TiltX
-          <input type="range" id="img-tx" min="-75" max="75" value="0" step="1">
-          <span id="img-tx-val">0°</span>
+        <label class="fp-range-label">Rx3D
+          <input type="range" id="img-rx3d" min="-180" max="180" value="0" step="1">
+          <span id="img-rx3d-val">0°</span>
         </label>
-        <label class="fp-range-label">TiltY
-          <input type="range" id="img-ty" min="-75" max="75" value="0" step="1">
-          <span id="img-ty-val">0°</span>
+        <label class="fp-range-label">Ry3D
+          <input type="range" id="img-ry3d" min="-180" max="180" value="0" step="1">
+          <span id="img-ry3d-val">0°</span>
+        </label>
+      </div>
+
+      <!-- ── Shared: tiling & radial symmetry ── -->
+      <div class="fp-section-divider">GEOMETRY</div>
+      <div class="obj-fx-row">
+        <label class="fp-label-sm">Tile X
+          <select id="sc-tile-x">
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <label class="fp-label-sm">Tile Y
+          <select id="sc-tile-y">
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <label class="fp-label-sm">Sym
+          <select id="sc-radial">
+            <option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option>
+          </select>
         </label>
       </div>
 
