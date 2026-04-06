@@ -154,10 +154,25 @@
         <label class="toggle-lbl"><input type="checkbox" id="show-grid" checked> Grid</label>
         <label class="toggle-lbl"><input type="checkbox" id="crt-curve" checked> CRT</label>
         <label class="toggle-lbl"><input type="checkbox" id="scanlines"> Scan</label>
-        <label class="toggle-lbl"><input type="checkbox" id="smooth"> Smooth</label>
       </div>
+    </div>
+
+    <!-- Signal FX — waveform-only manipulations -->
+    <div class="fp-section fp-sigfx">
+      <div class="fp-title">SIGNAL FX</div>
+      <div class="fx-grid">
+        <label class="fx-lbl"><input type="checkbox" id="smooth"> Smooth</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-x"> Mirror X</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-y"> Mirror Y</label>
+        <label class="fx-lbl"><input type="checkbox" id="fx-rotate"> Rotation</label>
+      </div>
+      <label class="fp-range-label">Rot Spd
+        <input type="range" id="fx-rot-speed" min="0.001" max="0.05" step="0.001" value="0.003">
+        <span id="fx-rs-val">0.003</span>
+      </label>
+      <div class="fp-section-divider">FREQ FILTER</div>
       <div class="filter-row">
-        <label class="toggle-lbl"><input type="checkbox" id="freq-filter"> Filter</label>
+        <label class="toggle-lbl"><input type="checkbox" id="freq-filter"> On</label>
         <label class="fp-label-sm">Lo<input type="number" id="filter-low"  value="200"  min="20" max="20000" step="10"></label>
         <label class="fp-label-sm">Hi<input type="number" id="filter-high" value="3000" min="20" max="20000" step="10"></label>
       </div>
@@ -226,12 +241,9 @@
       </div>
     </div>
 
-    <!-- Visual FX -->
+    <!-- Beam FX — phosphor beam effects, work in all modes -->
     <div class="fp-section fp-fx">
-      <div class="fp-title">VISUAL FX</div>
-
-      <!-- Global beam effects — work in all modes -->
-      <div class="fp-section-divider">BEAM</div>
+      <div class="fp-title">BEAM FX</div>
       <div class="fx-grid">
         <label class="fx-lbl"><input type="checkbox" id="fx-reactive"> Reactive</label>
         <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
@@ -246,18 +258,6 @@
       <label class="fp-range-label">Beat Sens
         <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
         <span id="fx-bs-val">1.50</span>
-      </label>
-
-      <!-- Signal/waveform only effects -->
-      <div class="fp-section-divider">WAVE</div>
-      <div class="fx-grid">
-        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-x"> Mirror X</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-mirror-y"> Mirror Y</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-rotate"> Rotation</label>
-      </div>
-      <label class="fp-range-label">Rot Spd
-        <input type="range" id="fx-rot-speed" min="0.001" max="0.05" step="0.001" value="0.003">
-        <span id="fx-rs-val">0.003</span>
       </label>
     </div>
 

@@ -605,7 +605,8 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .ratio-btn:hover:not(.active) { border-color: #555; color: #888; }
 
 /* ─── Visual FX ─── */
-.fp-fx { min-width: 155px; }
+.fp-fx    { min-width: 155px; }
+.fp-sigfx { min-width: 155px; }
 
 .fx-grid {
   display: grid;
