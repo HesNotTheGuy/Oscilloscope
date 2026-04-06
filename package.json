@@ -19,9 +19,12 @@
     },
     "files": [
       "index.html",
+      "display.html",
       "style.css",
       "app.js",
-      "main.js"
+      "main.js",
+      "preload.js",
+      "preload-display.js"
     ],
     "win": {
       "target": [

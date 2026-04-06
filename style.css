@@ -685,6 +685,8 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   min-width: 0 !important;
   width: auto;
   padding: 6px 8px;
+  align-self: flex-start;  /* don't stretch to row height — just the title */
+  height: auto !important;
 }
 
 /* ── Panel layout lock button ── */

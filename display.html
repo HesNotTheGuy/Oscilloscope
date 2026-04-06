@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DSO-1 — Display</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    #display-canvas {
+      display: block;
+      width: 100%; height: 100%;
+    }
+    #waiting {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a3a1a;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="display-canvas"></canvas>
+  <div id="waiting">WAITING FOR SIGNAL…</div>
+
+  <script>
+    const canvas  = document.getElementById('display-canvas');
+    const ctx     = canvas.getContext('2d');
+    const waiting = document.getElementById('waiting');
+
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Draw incoming frames maintaining aspect ratio
+    const img = new Image();
+    img.onload = () => {
+      waiting.style.display = 'none';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const scale = Math.min(
+        canvas.width  / img.naturalWidth,
+        canvas.height / img.naturalHeight
+      );
+      const w = img.naturalWidth  * scale;
+      const h = img.naturalHeight * scale;
+      ctx.drawImage(img,
+        (canvas.width  - w) / 2,
+        (canvas.height - h) / 2,
+        w, h
+      );
+    };
+
+    window.displayAPI.onFrame(dataURL => { img.src = dataURL; });
+  </script>
+</body>
+</html>
