@@ -2544,6 +2544,58 @@ class UIController {
     this._updateStatus();
     s.start();
     this._setupPanels();
+    this._setupPopOut();
+  }
+
+  _setupPopOut() {
+    // Only available when running inside Electron (preload exposes electronAPI)
+    if (typeof window.electronAPI === 'undefined') return;
+
+    const btn    = document.getElementById('btn-popout');
+    const canvas = this.scope.canvas;
+    btn.style.display = '';   // show button now we know Electron is available
+
+    let _open        = false;
+    let _rafId       = null;
+    let _lastSent    = 0;
+
+    const _streamLoop = () => {
+      if (!_open) return;
+      _rafId = requestAnimationFrame(_streamLoop);
+      const now = performance.now();
+      if (now - _lastSent < 33) return;   // cap ~30 fps
+      _lastSent = now;
+      // WebP compresses oscilloscope frames (mostly black) extremely well
+      window.electronAPI.sendFrame(canvas.toDataURL('image/webp', 0.9));
+    };
+
+    const _open_ = async () => {
+      await window.electronAPI.openDisplay();
+      _open  = true;
+      btn.textContent = '✕ CLOSE DISPLAY';
+      btn.classList.add('accent');
+      _streamLoop();
+    };
+
+    const _close_ = () => {
+      _open = false;
+      if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+      btn.textContent = '⤢ POP OUT';
+      btn.classList.remove('accent');
+      window.electronAPI.closeDisplay();
+    };
+
+    btn.addEventListener('click', () => {
+      if (_open) _close_(); else _open_();
+    });
+
+    // Reset button if user closes the display window directly
+    window.electronAPI.onDisplayClosed(() => {
+      _open = false;
+      if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+      btn.textContent = '⤢ POP OUT';
+      btn.classList.remove('accent');
+    });
   }
 
   _updateStatus() {
