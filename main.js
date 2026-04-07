@@ -15,6 +15,7 @@ function createWindow() {
     backgroundColor: '#080808',
     autoHideMenuBar: true,
     title: 'DSO-1 Oscilloscope',
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -48,6 +49,7 @@ ipcMain.handle('open-display', () => {
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     title: 'DSO-1 — Display',
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

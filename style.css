@@ -820,6 +820,26 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .ratio-btn.active { border-color: var(--p); color: var(--p); background: rgba(0,255,65,0.05); }
 .ratio-btn:hover:not(.active) { border-color: #555; color: #888; }
 
+/* Signal gen shape presets */
+.gen-preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.gen-preset-btn {
+  font-size: 9px;
+  padding: 3px 4px;
+  background: var(--input-bg);
+  color: #555;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.1s;
+  text-align: left;
+}
+.gen-preset-btn:hover { border-color: #555; color: #888; }
+.gen-preset-btn.active { border-color: var(--p); color: var(--p); }
+
 /* ─── Visual FX ─── */
 .fp-fx    { min-width: 155px; }
 .fp-sigfx { min-width: 155px; }

@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oscilloscope</title>
+  <title>DSO-1 Oscilloscope</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -285,6 +287,19 @@
           <button class="ratio-btn" data-ratio="1.6">5:8</button>
         </div>
       </div>
+      <div class="fp-section-divider">SHAPE PRESETS</div>
+      <div class="gen-preset-grid">
+        <button class="gen-preset-btn" data-preset="circle" title="Circle">○ Circle</button>
+        <button class="gen-preset-btn" data-preset="figure8" title="Figure 8">∞ Figure 8</button>
+        <button class="gen-preset-btn" data-preset="heart" title="Heart">♡ Heart</button>
+        <button class="gen-preset-btn" data-preset="star" title="Star">☆ Star</button>
+        <button class="gen-preset-btn" data-preset="spiral" title="Spiral">◎ Spiral</button>
+        <button class="gen-preset-btn" data-preset="diamond" title="Diamond">◇ Diamond</button>
+        <button class="gen-preset-btn" data-preset="web" title="Web">✳ Web</button>
+        <button class="gen-preset-btn" data-preset="chaos" title="Chaos">⚡ Chaos</button>
+        <button class="gen-preset-btn" data-preset="flower" title="Flower">✿ Flower</button>
+        <button class="gen-preset-btn" data-preset="bowtie" title="Bowtie">⋈ Bowtie</button>
+      </div>
       <div class="audio-btns">
         <button class="sys-btn accent" id="btn-gen-start">▶ START</button>
         <button class="sys-btn" id="btn-gen-stop" disabled>■ STOP</button>
@@ -523,6 +538,7 @@
         <label class="toggle-lbl"><input type="checkbox" id="sc-breathe"> Breathe</label>
         <label class="toggle-lbl"><input type="checkbox" id="sc-shake"> Shake</label>
         <label class="toggle-lbl"><input type="checkbox" id="sc-warp"> Warp</label>
+        <label class="toggle-lbl" title="Audio amplitude modulates image trace density"><input type="checkbox" id="sc-audio-sketch"> Sketch</label>
       </div>
       <label class="fp-range-label">Warp
         <input type="range" id="sc-warp-amt" min="0.01" max="0.5" value="0.1" step="0.01">

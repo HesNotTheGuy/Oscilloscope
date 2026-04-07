@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- CRT glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-strong" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Screen gradient -->
+    <radialGradient id="screen-bg" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#0a1a0a"/>
+      <stop offset="100%" stop-color="#050a05"/>
+    </radialGradient>
+    <!-- Bezel gradient -->
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a2a2a"/>
+      <stop offset="50%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </linearGradient>
+    <!-- Phosphor green glow -->
+    <linearGradient id="wave-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00ff41" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#00ff41"/>
+      <stop offset="100%" stop-color="#00ff41" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer bezel -->
+  <rect x="32" y="32" width="448" height="448" rx="40" ry="40" fill="url(#bezel)" stroke="#333" stroke-width="2"/>
+
+  <!-- Inner bezel rim -->
+  <rect x="52" y="52" width="408" height="340" rx="20" ry="20" fill="#111" stroke="#2a2a2a" stroke-width="1.5"/>
+
+  <!-- CRT screen -->
+  <rect x="64" y="64" width="384" height="316" rx="14" ry="14" fill="url(#screen-bg)"/>
+
+  <!-- Grid lines (subtle) -->
+  <g stroke="#1a3a1a" stroke-width="0.5" opacity="0.5">
+    <!-- Vertical -->
+    <line x1="102.4" y1="64" x2="102.4" y2="380"/>
+    <line x1="140.8" y1="64" x2="140.8" y2="380"/>
+    <line x1="179.2" y1="64" x2="179.2" y2="380"/>
+    <line x1="217.6" y1="64" x2="217.6" y2="380"/>
+    <line x1="256"   y1="64" x2="256"   y2="380"/>
+    <line x1="294.4" y1="64" x2="294.4" y2="380"/>
+    <line x1="332.8" y1="64" x2="332.8" y2="380"/>
+    <line x1="371.2" y1="64" x2="371.2" y2="380"/>
+    <line x1="409.6" y1="64" x2="409.6" y2="380"/>
+    <!-- Horizontal -->
+    <line x1="64" y1="103.5" x2="448" y2="103.5"/>
+    <line x1="64" y1="143"   x2="448" y2="143"/>
+    <line x1="64" y1="182.5" x2="448" y2="182.5"/>
+    <line x1="64" y1="222"   x2="448" y2="222"/>
+    <line x1="64" y1="261.5" x2="448" y2="261.5"/>
+    <line x1="64" y1="301"   x2="448" y2="301"/>
+    <line x1="64" y1="340.5" x2="448" y2="340.5"/>
+  </g>
+
+  <!-- Center crosshair -->
+  <line x1="256" y1="64" x2="256" y2="380" stroke="#1a4a1a" stroke-width="1" opacity="0.6"/>
+  <line x1="64" y1="222" x2="448" y2="222" stroke="#1a4a1a" stroke-width="1" opacity="0.6"/>
+
+  <!-- Waveform — glowing sine wave -->
+  <path d="M 80 222
+           C 110 222, 120 120, 150 120
+           S 190 320, 220 320
+           S 260 120, 290 120
+           S 330 320, 350 320
+           S 380 120, 400 120
+           S 420 222, 432 222"
+        fill="none" stroke="url(#wave-grad)" stroke-width="3.5" stroke-linecap="round"
+        filter="url(#glow-strong)"/>
+
+  <!-- Afterglow trail (faded offset wave) -->
+  <path d="M 80 225
+           C 112 225, 122 128, 152 128
+           S 192 325, 222 325
+           S 262 125, 292 125
+           S 332 325, 352 325
+           S 382 125, 402 125
+           S 422 225, 434 225"
+        fill="none" stroke="#00ff41" stroke-width="2" stroke-linecap="round" opacity="0.15"
+        filter="url(#glow)"/>
+
+  <!-- CRT vignette overlay -->
+  <rect x="64" y="64" width="384" height="316" rx="14" ry="14" fill="none" stroke="#000" stroke-width="8" opacity="0.3"/>
+
+  <!-- Bottom panel area -->
+  <rect x="64" y="408" width="384" height="56" rx="6" ry="6" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+
+  <!-- DSO-1 text -->
+  <text x="256" y="445" text-anchor="middle" font-family="'Courier New', monospace" font-weight="bold" font-size="32" fill="#00ff41" filter="url(#glow)" letter-spacing="4">DSO-1</text>
+
+  <!-- Small LED indicator -->
+  <circle cx="88" cy="436" r="4" fill="#00ff41" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Status text -->
+  <text x="104" y="440" font-family="'Courier New', monospace" font-size="10" fill="#555">RUN</text>
+</svg>
