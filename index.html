@@ -19,23 +19,50 @@
       <span class="st-item" id="st-freq">---</span>
       <span class="st-item" id="st-src">No signal</span>
     </div>
+    <div class="rig-picker" id="rig-picker" title="Layout rig">
+      <select id="rig-select" class="rig-select">
+        <option value="classic">Classic</option>
+        <option value="studio">Studio</option>
+        <option value="perform">Perform</option>
+        <option value="minimal">Minimal</option>
+      </select>
+      <button class="rig-btn" id="rig-save-btn" title="Save current layout as custom rig">💾</button>
+      <button class="rig-btn" id="rig-edit-btn" title="Toggle edit mode — drag panels between zones">✎</button>
+    </div>
     <button class="rec-btn" id="btn-record">● REC</button>
     <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
   </div>
 
-  <!-- Oscilloscope screen -->
-  <div class="scope-wrap">
-    <div class="crt-bezel">
-      <div class="crt-screen">
-        <canvas id="scope" width="900" height="500"></canvas>
-        <div class="crt-overlay" id="crt-overlay"></div>
-      </div>
-    </div>
-  </div>
+  <!-- Layout container — 4 drop zones: left, center (scope + under), right, bottom -->
+  <div class="layout-body" id="layout-body">
 
-  <!-- ─── Front panel ─── -->
-  <div class="front-panel">
-    <button id="panel-lock-btn" title="Lock / unlock panel layout">&#x1F513;</button>
+    <!-- LEFT zone -->
+    <div class="panel-zone zone-side" id="zone-left" data-zone="left"></div>
+
+    <!-- CENTER column: scope + under-scope zone -->
+    <div class="scope-column" id="scope-column">
+      <div class="scope-wrap">
+        <div class="crt-bezel">
+          <div class="crt-screen">
+            <canvas id="scope" width="1800" height="1000"></canvas>
+            <div class="crt-overlay" id="crt-overlay"></div>
+          </div>
+        </div>
+      </div>
+      <!-- UNDER zone -->
+      <div class="panel-zone zone-under" id="zone-under" data-zone="under"></div>
+    </div>
+
+    <!-- RIGHT zone -->
+    <div class="panel-zone zone-side" id="zone-right" data-zone="right"></div>
+
+  </div><!-- /layout-body -->
+
+  <!-- BOTTOM zone (full width) -->
+  <div class="panel-zone zone-bottom" id="zone-bottom" data-zone="bottom"></div>
+
+  <!-- ─── Panel sections (distributed into zones by JS) ─── -->
+  <div id="panel-store" style="display:none">
 
     <!-- CH1 -->
     <div class="fp-section" data-panel-id="ch1">
@@ -179,6 +206,13 @@
         <label class="fp-label-sm">Lo<input type="number" id="filter-low"  value="200"  min="20" max="20000" step="10"></label>
         <label class="fp-label-sm">Hi<input type="number" id="filter-high" value="3000" min="20" max="20000" step="10"></label>
       </div>
+      <div class="filter-presets">
+        <button class="filter-preset-btn" data-lo="20"   data-hi="250">Bass</button>
+        <button class="filter-preset-btn" data-lo="250"  data-hi="2000">Mid</button>
+        <button class="filter-preset-btn" data-lo="2000" data-hi="6000">Treble</button>
+        <button class="filter-preset-btn" data-lo="6000" data-hi="20000">Highs</button>
+        <button class="filter-preset-btn" data-lo="20"   data-hi="20000">Full</button>
+      </div>
     </div>
 
     <!-- Audio -->
@@ -206,7 +240,20 @@
 
     <!-- Signal Generator -->
     <div class="fp-section fp-siggen" data-panel-id="siggen">
-      <div class="fp-title">SIGNAL GEN</div>
+      <div class="fp-title">SIGNAL GEN
+        <span class="siggen-help-btn" id="siggen-help-btn" title="How to use">?</span>
+      </div>
+      <div class="siggen-guide" id="siggen-guide" style="display:none">
+        <div class="guide-text">
+          <b>Quick start:</b> Hit START, then adjust:<br>
+          • <b>V/DIV</b> knob (CH1) if signal goes off screen<br>
+          • <b>TIME/DIV</b> knob to see more/fewer cycles<br>
+          • <b>XY mode</b> + different L:R ratios = Lissajous<br>
+          • <b>Phase</b> rotates XY patterns (try 90°)<br>
+          • <b>Amp</b> controls signal strength<br>
+          <em>Tip: press AUTO SET to auto-fit the display</em>
+        </div>
+      </div>
       <label class="fp-select-label">WAVE
         <select id="gen-wave">
           <option value="sine">Sine</option>
@@ -268,16 +315,61 @@
 
       <!-- ── Beam effects ── -->
       <div class="fp-section-divider">EFFECTS</div>
-      <div class="fx-grid">
+
+      <!-- Reactive -->
+      <div class="fx-block">
         <label class="fx-lbl"><input type="checkbox" id="fx-reactive"> Reactive</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-bloom"> Bloom</label>
-        <label class="fx-lbl"><input type="checkbox" id="fx-invert"> Beat Invert</label>
+        <div class="fx-params" id="fx-reactive-params">
+          <label class="fp-range-label">Str
+            <input type="range" id="fx-reactive-str" min="0.1" max="3" step="0.1" value="1">
+            <span id="fx-reactive-str-val">1.0</span>
+          </label>
+        </div>
       </div>
-      <label class="fp-range-label">Beat Sens
-        <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
-        <span id="fx-bs-val">1.50</span>
-      </label>
+
+      <!-- Beat Flash -->
+      <div class="fx-block">
+        <label class="fx-lbl"><input type="checkbox" id="fx-beat"> Beat Flash</label>
+        <div class="fx-params" id="fx-beat-params">
+          <label class="fp-range-label">Str
+            <input type="range" id="fx-beat-str" min="0.05" max="1" step="0.05" value="0.35">
+            <span id="fx-beat-str-val">0.35</span>
+          </label>
+          <label class="fp-range-label">Sens
+            <input type="range" id="fx-beat-sens" min="1.1" max="3" step="0.05" value="1.5">
+            <span id="fx-bs-val">1.50</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Bloom -->
+      <div class="fx-block">
+        <label class="fx-lbl"><input type="checkbox" id="fx-bloom"> Bloom</label>
+        <div class="fx-params" id="fx-bloom-params">
+          <label class="fp-range-label">Str
+            <input type="range" id="fx-bloom-str" min="0.1" max="3" step="0.1" value="1">
+            <span id="fx-bloom-str-val">1.0</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Beat Invert -->
+      <label class="fx-lbl"><input type="checkbox" id="fx-invert"> Beat Invert</label>
+
+      <!-- Afterglow (persistence boost + optional hue trail) -->
+      <div class="fx-block">
+        <label class="fx-lbl"><input type="checkbox" id="fx-afterglow"> Afterglow</label>
+        <div class="fx-params" id="fx-afterglow-params">
+          <label class="fp-range-label">Trail
+            <input type="range" id="fx-afterglow-str" min="0.3" max="0.95" step="0.01" value="0.7">
+            <span id="fx-afterglow-str-val">0.70</span>
+          </label>
+          <label class="fp-range-label">Hue Shift
+            <input type="range" id="fx-afterglow-speed" min="0" max="0.06" step="0.002" value="0">
+            <span id="fx-ag-val">0</span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- OBJ 3D / IMG 2D — unified controls -->
@@ -318,6 +410,12 @@
           <input type="range" id="img-density" min="32" max="256" value="96" step="8">
           <span id="img-den-val">96</span>
         </label>
+      </div>
+
+      <!-- Scene color (independent from beam) -->
+      <div class="scene-color-row">
+        <label class="toggle-lbl"><input type="checkbox" id="scene-color-on"> Color</label>
+        <input type="color" id="scene-color" value="#ff00ff" title="Scene color" class="scene-color-picker" disabled>
       </div>
 
       <!-- ── Shared transforms ── -->
@@ -462,24 +560,23 @@
 
     <!-- Display / Customize -->
     <div class="fp-section fp-display" data-panel-id="display">
-      <div class="fp-title clickable" id="toggle-display">DISPLAY ▸</div>
-      <div id="display-controls" class="display-inner" style="display:none">
-        <label class="fp-range-label">Beam
-          <input type="range" id="beam-width" min="0.5" max="4" step="0.1" value="1.5">
-          <span id="beam-width-val">1.5</span>
-        </label>
-        <label class="fp-range-label">Glow
-          <input type="range" id="glow" min="0" max="40" step="1" value="12">
-          <span id="glow-val">12</span>
-        </label>
-        <label class="fp-range-label">Persist
-          <input type="range" id="persistence" min="0.02" max="0.95" step="0.01" value="0.15">
-          <span id="persistence-val">0.15</span>
-        </label>
-      </div>
+      <div class="fp-title">DISPLAY</div>
+      <label class="fp-range-label">Beam
+        <input type="range" id="beam-width" min="0.5" max="4" step="0.1" value="1.5">
+        <span id="beam-width-val">1.5</span>
+      </label>
+      <label class="fp-range-label">Glow
+        <input type="range" id="glow" min="0" max="40" step="1" value="12">
+        <span id="glow-val">12</span>
+      </label>
+      <label class="fp-range-label">Persist
+        <input type="range" id="persistence" min="0.02" max="0.95" step="0.01" value="0.15">
+        <span id="persistence-val">0.15</span>
+      </label>
     </div>
 
-  </div><!-- /front-panel -->
+  </div><!-- /panel-store -->
+
 </div><!-- /app -->
 <script src="app.js"></script>
 </body>
