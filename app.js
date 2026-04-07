@@ -5,29 +5,38 @@
 // ─────────────────────────────────────────────────────────────
 const TIMEBASE = [
   // ── μs range ──────────────────────────────────────────────
-  { label: '1μs',   s: 1e-6    }, { label: '2μs',   s: 2e-6    },
-  { label: '2.5μs', s: 2.5e-6  }, { label: '5μs',   s: 5e-6    },
-  { label: '7.5μs', s: 7.5e-6  }, { label: '10μs',  s: 10e-6   },
+  { label: '1μs',   s: 1e-6    }, { label: '1.5μs', s: 1.5e-6  },
+  { label: '2μs',   s: 2e-6    }, { label: '2.5μs', s: 2.5e-6  },
+  { label: '3μs',   s: 3e-6    }, { label: '4μs',   s: 4e-6    },
+  { label: '5μs',   s: 5e-6    }, { label: '7.5μs', s: 7.5e-6  },
+  { label: '10μs',  s: 10e-6   }, { label: '15μs',  s: 15e-6   },
   { label: '20μs',  s: 20e-6   }, { label: '25μs',  s: 25e-6   },
+  { label: '30μs',  s: 30e-6   }, { label: '40μs',  s: 40e-6   },
   { label: '50μs',  s: 50e-6   }, { label: '75μs',  s: 75e-6   },
-  { label: '100μs', s: 100e-6  }, { label: '200μs', s: 200e-6  },
-  { label: '250μs', s: 250e-6  }, { label: '500μs', s: 500e-6  },
-  { label: '750μs', s: 750e-6  },
+  { label: '100μs', s: 100e-6  }, { label: '150μs', s: 150e-6  },
+  { label: '200μs', s: 200e-6  }, { label: '250μs', s: 250e-6  },
+  { label: '300μs', s: 300e-6  }, { label: '400μs', s: 400e-6  },
+  { label: '500μs', s: 500e-6  }, { label: '750μs', s: 750e-6  },
   // ── ms range ──────────────────────────────────────────────
-  { label: '1ms',   s: 1e-3    }, { label: '2ms',   s: 2e-3    },
-  { label: '2.5ms', s: 2.5e-3  }, { label: '5ms',   s: 5e-3    },
-  { label: '7.5ms', s: 7.5e-3  }, { label: '10ms',  s: 10e-3   },
+  { label: '1ms',   s: 1e-3    }, { label: '1.5ms', s: 1.5e-3  },
+  { label: '2ms',   s: 2e-3    }, { label: '2.5ms', s: 2.5e-3  },
+  { label: '3ms',   s: 3e-3    }, { label: '4ms',   s: 4e-3    },
+  { label: '5ms',   s: 5e-3    }, { label: '7.5ms', s: 7.5e-3  },
+  { label: '10ms',  s: 10e-3   }, { label: '15ms',  s: 15e-3   },
   { label: '20ms',  s: 20e-3   }, { label: '25ms',  s: 25e-3   },
+  { label: '30ms',  s: 30e-3   }, { label: '40ms',  s: 40e-3   },
   { label: '50ms',  s: 50e-3   }, { label: '75ms',  s: 75e-3   },
-  { label: '100ms', s: 100e-3  }, { label: '200ms', s: 200e-3  },
-  { label: '250ms', s: 250e-3  }, { label: '500ms', s: 500e-3  },
-  { label: '750ms', s: 750e-3  },
+  { label: '100ms', s: 100e-3  }, { label: '150ms', s: 150e-3  },
+  { label: '200ms', s: 200e-3  }, { label: '250ms', s: 250e-3  },
+  { label: '300ms', s: 300e-3  }, { label: '400ms', s: 400e-3  },
+  { label: '500ms', s: 500e-3  }, { label: '750ms', s: 750e-3  },
   // ── s range ───────────────────────────────────────────────
-  { label: '1s',    s: 1       }, { label: '2s',    s: 2       },
-  { label: '2.5s',  s: 2.5     }, { label: '5s',    s: 5       },
-  { label: '10s',   s: 10      },
+  { label: '1s',    s: 1       }, { label: '1.5s',  s: 1.5     },
+  { label: '2s',    s: 2       }, { label: '2.5s',  s: 2.5     },
+  { label: '3s',    s: 3       }, { label: '5s',    s: 5       },
+  { label: '7.5s',  s: 7.5     }, { label: '10s',   s: 10      },
 ];
-const TB_DEFAULT = 15; // 1ms
+const TB_DEFAULT = 24; // 1ms
 
 const VDIV = [
   { label: '50mV',  v: 0.05 }, { label: '100mV', v: 0.1  },
@@ -237,12 +246,21 @@ class VideoRecorder {
       ...this._audioDest.stream.getAudioTracks(),
     ]);
 
-    const mime = ['video/webm;codecs=vp9,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+    // Prefer VP9 for best quality, fallback to VP8
+    const mime = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ].find(m => MediaRecorder.isTypeSupported(m));
     this._chunks   = [];
-    this._recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 8e6 });
+    this._recorder = new MediaRecorder(combined, {
+      mimeType: mime,
+      videoBitsPerSecond: 25e6,   // 25 Mbps — crisp lines & glow at 1080p
+      audioBitsPerSecond: 192000, // 192 kbps audio
+    });
     this._recorder.ondataavailable = e => { if (e.data.size > 0) this._chunks.push(e.data); };
     this._recorder.onstop = () => this._download();
-    this._recorder.start(100);
+    this._recorder.start(50);    // smaller timeslice = smoother muxing
     this.isRecording = true;
   }
 
@@ -584,6 +602,7 @@ class ImageScene {
     this._scrollOffX = 0;
     this._scrollOffY = 0;
     this._lastScrollT = 0;
+    this._lastRotT   = 0;   // for time-based rotation
   }
 
   load(file) {
@@ -691,12 +710,14 @@ class ImageScene {
       if (this.power >= 1) this.power = this.powerLoop ? 0 : 1;
     }
 
-    // Auto-rotate 3D axes
-    if (this.autoRotX3d) this.rotX3d = (this.rotX3d + this.rotSpeedX3d) % 360;
-    if (this.autoRotY3d) this.rotY3d = (this.rotY3d + this.rotSpeedY3d) % 360;
-
-    // Animate Z spin
-    if (this.autoSpin) this.rotZ = (this.rotZ + this.rotSpeed) % 360;
+    // Time-based auto-rotation (independent of frame rate)
+    const _now = performance.now() / 1000;
+    const _dt  = this._lastRotT > 0 ? Math.min(_now - this._lastRotT, 0.05) : 1/60;
+    this._lastRotT = _now;
+    const _dps = _dt * 60;  // normalize: speed values were tuned for ~60fps
+    if (this.autoRotX3d) this.rotX3d = (this.rotX3d + this.rotSpeedX3d * _dps) % 360;
+    if (this.autoRotY3d) this.rotY3d = (this.rotY3d + this.rotSpeedY3d * _dps) % 360;
+    if (this.autoSpin) this.rotZ = (this.rotZ + this.rotSpeed * _dps) % 360;
 
     // Beat pulse
     if (beat && this.beatPulse) this._pulse = 0.3;
@@ -802,18 +823,24 @@ class ImageScene {
         this._scrollOffY = ((this._scrollOffY + this.scrollY * stepY * dt) % stepY + stepY) % stepY;
       }
 
-      // Extra tiles on each scrolling edge so wrapping is seamless
       const extraX = this.scrollX !== 0 ? 1 : 0;
       const extraY = this.scrollY !== 0 ? 1 : 0;
       const totalX = Math.max(this.tileX, 1) + extraX * 2;
       const totalY = Math.max(this.tileY, 1) + extraY * 2;
+      const tileCount = totalX * totalY;
+
+      // Cap total segments to avoid lag — downsample source if needed
+      const MAX_SEGS = 80000;
+      const srcLen = result.length;
+      const stride = Math.max(1, Math.ceil(srcLen * tileCount / MAX_SEGS));
 
       const tiled = [];
       for (let ty = 0; ty < totalY; ty++) {
         for (let tx = 0; tx < totalX; tx++) {
           const offX = (tx - (totalX - 1) / 2) * stepX + this._scrollOffX;
           const offY = (ty - (totalY - 1) / 2) * stepY + this._scrollOffY;
-          for (const [[x0,y0],[x1,y1]] of result) {
+          for (let si = 0; si < srcLen; si += stride) {
+            const [[x0,y0],[x1,y1]] = result[si];
             tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
           }
         }
@@ -883,6 +910,7 @@ class ObjScene {
     this._scrollOffX = 0;
     this._scrollOffY = 0;
     this._lastScrollT = 0;
+    this._lastRotT   = 0;   // for time-based rotation
   }
 
   load(text, name = 'model') {
@@ -939,10 +967,14 @@ class ObjScene {
   getScreenEdges(W, H, rms = 0, beat = false, audioBuf = null) {
     if (!this.loaded) return [];
 
-    // Auto-rotate per axis
-    if (this.autoRotX) this.rotX = (this.rotX + this.rotSpeedX * Math.PI / 180) % (Math.PI * 2);
-    if (this.autoRotY) this.rotY = (this.rotY + this.rotSpeed  * Math.PI / 180) % (Math.PI * 2);
-    if (this.autoRotZ) this.rotZ = (this.rotZ + this.rotSpeedZ * Math.PI / 180) % (Math.PI * 2);
+    // Time-based auto-rotation (independent of frame rate)
+    const _now = performance.now() / 1000;
+    const _dt  = this._lastRotT > 0 ? Math.min(_now - this._lastRotT, 0.05) : 1/60;
+    this._lastRotT = _now;
+    const _dps = _dt * 60;  // normalize: speed values were tuned for ~60fps
+    if (this.autoRotX) this.rotX = (this.rotX + this.rotSpeedX * Math.PI / 180 * _dps) % (Math.PI * 2);
+    if (this.autoRotY) this.rotY = (this.rotY + this.rotSpeed  * Math.PI / 180 * _dps) % (Math.PI * 2);
+    if (this.autoRotZ) this.rotZ = (this.rotZ + this.rotSpeedZ * Math.PI / 180 * _dps) % (Math.PI * 2);
 
     // Beat pulse
     if (beat && this.beatPulse) this._pulse = 0.3;
@@ -1049,13 +1081,20 @@ class ObjScene {
       const extraY = this.scrollY !== 0 ? 1 : 0;
       const totalX = Math.max(this.tileX, 1) + extraX * 2;
       const totalY = Math.max(this.tileY, 1) + extraY * 2;
+      const tileCount = totalX * totalY;
+
+      // Cap total segments to avoid lag
+      const MAX_SEGS = 80000;
+      const srcLen = result.length;
+      const stride = Math.max(1, Math.ceil(srcLen * tileCount / MAX_SEGS));
 
       const tiled = [];
       for (let ty = 0; ty < totalY; ty++) {
         for (let tx = 0; tx < totalX; tx++) {
           const offX = (tx - (totalX - 1) / 2) * stepX + this._scrollOffX;
           const offY = (ty - (totalY - 1) / 2) * stepY + this._scrollOffY;
-          for (const [[x0,y0],[x1,y1]] of result) {
+          for (let si = 0; si < srcLen; si += stride) {
+            const [[x0,y0],[x1,y1]] = result[si];
             tiled.push([[x0+offX, y0+offY], [x1+offX, y1+offY]]);
           }
         }
@@ -1077,7 +1116,7 @@ class WaveGLRenderer {
     this.H = canvas.height;
 
     const gl = canvas.getContext('webgl', {
-      alpha: false, antialias: false, preserveDrawingBuffer: false, powerPreference: 'high-performance'
+      alpha: false, antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance'
     });
     if (!gl) throw new Error('WebGL not available');
     this.gl = gl;
@@ -1091,7 +1130,7 @@ class WaveGLRenderer {
     // 2D overlay canvas for grid / measurements / CRT vignette
     const ov = document.createElement('canvas');
     ov.width = this.W; ov.height = this.H;
-    ov.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
     const parent = canvas.parentElement;
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     canvas.insertAdjacentElement('afterend', ov);
@@ -1155,17 +1194,37 @@ class WaveGLRenderer {
     this._bl_uT = gl.getUniformLocation(this._pBlur, 'uT');
     this._bl_uD = gl.getUniformLocation(this._pBlur, 'uD');
 
-    // 3. Composite: phosphor decay + glow + sharp beam
+    // 3. Composite: phosphor decay + glow + sharp beam + afterglow hue shift
     this._pComp = this._mkProg(
       `attribute vec2 aP; varying vec2 vU;
        void main(){ vU=aP*0.5+0.5; gl_Position=vec4(aP,0.0,1.0); }`,
       `precision mediump float;
        uniform sampler2D uPh, uGl, uBm;
-       uniform float uDk, uGS;
+       uniform float uDk, uGS, uHS;
        uniform vec3 uFl;
        varying vec2 vU;
+       vec3 rgb2hsv(vec3 c){
+         vec4 K=vec4(0.0,-1.0/3.0,2.0/3.0,-1.0);
+         vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g));
+         vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r));
+         float d=q.x-min(q.w,q.y),e=1.0e-10;
+         return vec3(abs(q.z+(q.w-q.y)/(6.0*d+e)),d/(q.x+e),q.x);
+       }
+       vec3 hsv2rgb(vec3 c){
+         vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
+         vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www);
+         return c.z*mix(K.xxx,clamp(p-K.xxx,0.0,1.0),c.y);
+       }
        void main(){
          vec3 ph=texture2D(uPh,vU).rgb*uDk;
+         if(uHS>0.0){
+           vec3 hsv=rgb2hsv(ph);
+           if(hsv.y>0.01 && hsv.z>0.01){
+             hsv.x=fract(hsv.x+uHS);
+             hsv.y=min(hsv.y*1.05,1.0);
+             ph=hsv2rgb(hsv);
+           }
+         }
          vec3 gv=texture2D(uGl,vU).rgb*uGS;
          vec3 bm=texture2D(uBm,vU).rgb;
          gl_FragColor=vec4(clamp(ph+gv+bm+uFl,0.0,1.0),1.0);
@@ -1178,6 +1237,7 @@ class WaveGLRenderer {
     this._c_uDk = gl.getUniformLocation(this._pComp, 'uDk');
     this._c_uGS = gl.getUniformLocation(this._pComp, 'uGS');
     this._c_uFl = gl.getUniformLocation(this._pComp, 'uFl');
+    this._c_uHS = gl.getUniformLocation(this._pComp, 'uHS');
   }
 
   _buildQuadBuffer() {
@@ -1288,7 +1348,8 @@ class WaveGLRenderer {
   // decay:     phosphor persistence (0=instant clear, 1=never)  — maps to 1-persistence
   // glowStr:   glow intensity multiplier
   // flashRGB:  [r,g,b] beat flash or null
-  frame(pointSets, color, glow, beamWidth, decay, glowStr=0.7, flashRGB=null) {
+  // extraGroups: optional [{pts:[[x,y][]],color:'#hex'},...] for multi-color rendering
+  frame(pointSets, color, glow, beamWidth, decay, glowStr=0.7, flashRGB=null, hueShift=0, extraGroups=null) {
     const gl = this.gl;
     const rgba = this._rgba(color, 1.0);
     const hw   = Math.max(0.5, beamWidth * 0.5);
@@ -1300,6 +1361,13 @@ class WaveGLRenderer {
     gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     for (const pts of pointSets) this._addLine(pts, rgba, hw);
+    // Extra color groups (e.g. scene overlay with independent color)
+    if (extraGroups) {
+      for (const g of extraGroups) {
+        const c = this._rgba(g.color, 1.0);
+        for (const pts of g.pts) this._addLine(pts, c, hw);
+      }
+    }
     gl.disable(gl.BLEND);
 
     // 2. Horizontal Gaussian blur: fBeam → fBlurH
@@ -1329,6 +1397,7 @@ class WaveGLRenderer {
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this._tBeam);  gl.uniform1i(this._c_uBm, 2);
     gl.uniform1f(this._c_uDk, 1.0 - decay);
     gl.uniform1f(this._c_uGS, glowStr);
+    gl.uniform1f(this._c_uHS, hueShift);
     const fl = flashRGB || [0,0,0];
     gl.uniform3f(this._c_uFl, fl[0], fl[1], fl[2]);
     this._quad(this._pComp, this._c_aP);
@@ -1405,6 +1474,7 @@ class Oscilloscope {
 
     // Display
     this.color       = '#00ff41';
+    this.sceneColor  = '';         // '' = use main beam color; '#rrggbb' = independent
     this.beamWidth   = 1.5;
     this.glowAmount  = 12;
     this.persistence = 0.15;
@@ -1431,14 +1501,18 @@ class Oscilloscope {
       mirrorY:    false,  // vertical flip copy
       rotation:   false,  // slow rotation
       beatInvert: false,  // invert colors on beat
+      afterglow:  false,  // afterimage color trails — hue-shifts the phosphor trail
 
       rotSpeed:   0.003,  // radians/frame
       beatSens:   1.5,    // beat sensitivity
+      afterglowSpeed: 0,     // hue shift per frame (0–1 wraps full spectrum)
+      afterglowStr:   0.7,   // trail persistence (0.3–0.95)
 
       // Internal animation state
       _angle: 0,
       _flash: 0,
       _rms:   0,
+      _lastRotT: 0,
     };
 
     // Measurements
@@ -1573,9 +1647,12 @@ class Oscilloscope {
     if (beat && fx.beatFlash) fx._flash = 1.0;
     if (fx._flash > 0) fx._flash *= 0.72;
 
-    // Rotation
+    // Rotation (time-based)
     if (fx.rotation) {
-      fx._angle = (fx._angle + fx.rotSpeed) % (Math.PI * 2);
+      const _now = performance.now() / 1000;
+      const _dt  = fx._lastRotT > 0 ? Math.min(_now - fx._lastRotT, 0.05) : 1/60;
+      fx._lastRotT = _now;
+      fx._angle = (fx._angle + fx.rotSpeed * _dt * 60) % (Math.PI * 2);
     }
   }
 
@@ -1864,17 +1941,29 @@ class Oscilloscope {
     }
 
     // ③b OBJ / image overlay
+    let scenePts = [];   // separate list when scene has its own color
+    const hasSceneColor = this.sceneColor && this.sceneColor !== '';
     if (this.objMode && this.obj3dMode) {
-      // 3D OBJ wireframe — edges feed the GL beam directly
       if (this._obj.loaded) {
         const edges = this._obj.getScreenEdges(W, H, this.fx._rms, this._lastBeat || false, rawL);
-        allPts = this._obj.showAudio ? [...allPts, ...edges] : edges;
+        if (this._obj.showAudio) {
+          if (hasSceneColor) scenePts = edges;
+          else allPts = [...allPts, ...edges];
+        } else {
+          if (hasSceneColor) { scenePts = edges; }
+          else allPts = edges;
+        }
       }
     } else if (this.objMode && !this.obj3dMode) {
-      // 2D image — phosphor-trace the image as beam-drawn segments
       if (this._imgScene.loaded) {
         const imgPts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false, rawL);
-        allPts = this._imgScene.showAudio ? [...allPts, ...imgPts] : imgPts;
+        if (this._imgScene.showAudio) {
+          if (hasSceneColor) scenePts = imgPts;
+          else allPts = [...allPts, ...imgPts];
+        } else {
+          if (hasSceneColor) { scenePts = imgPts; }
+          else allPts = imgPts;
+        }
       }
     }
 
@@ -1903,7 +1992,12 @@ class Oscilloscope {
     // ⑤ GL frame: beam → blur → composite → blit
     const glowStr = this.fx.bloom ? 1.4 : 0.7;
     const glowPx  = this.fx.bloom ? glow * 1.5 : glow;
-    glr.frame(allPts, color, glowPx, bWidth, this.persistence, glowStr, flashRGB);
+    const hueShift = this.fx.afterglow ? this.fx.afterglowSpeed : 0;
+    // Afterglow overrides persistence with its own trail value
+    const decay = this.fx.afterglow ? (1 - this.fx.afterglowStr) : this.persistence;
+    const extraGroups = scenePts.length && hasSceneColor
+      ? [{ pts: scenePts, color: this.sceneColor }] : null;
+    glr.frame(allPts, color, glowPx, bWidth, decay, glowStr, flashRGB, hueShift, extraGroups);
 
     // ⑥ Overlay: grid + CRT + measurements
     const octx = glr.octx;
@@ -1926,11 +2020,24 @@ class Oscilloscope {
     const pctx = this._phCtx;
     const W = this.canvas.width, H = this.canvas.height;
 
-    // ① Phosphor decay
-    pctx.globalAlpha = this.persistence;
+    // ① Phosphor decay — afterglow overrides persistence with its own trail value
+    const decay2D = this.fx.afterglow ? (1 - this.fx.afterglowStr) : this.persistence;
+    pctx.globalAlpha = decay2D;
     pctx.fillStyle   = '#000';
     pctx.fillRect(0, 0, W, H);
     pctx.globalAlpha = 1.0;
+
+    if (this.fx.afterglow && this.fx.afterglowSpeed > 0) {
+      // Hue-rotate the phosphor buffer via a composited tint overlay
+      this._afterglowHue2D = ((this._afterglowHue2D || 0) + this.fx.afterglowSpeed * 360) % 360;
+      pctx.save();
+      pctx.globalCompositeOperation = 'hue';
+      pctx.fillStyle = `hsl(${this._afterglowHue2D}, 100%, 50%)`;
+      pctx.globalAlpha = 0.15;
+      pctx.fillRect(0, 0, W, H);
+      pctx.restore();
+      pctx.globalAlpha = 1.0;
+    }
 
     // ② Grid
     if (this.showGrid) this.drawGrid(pctx);
@@ -2003,7 +2110,7 @@ class Oscilloscope {
     if (this.objMode && !this.obj3dMode && this._imgScene.loaded) {
       const tracePts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false, rawL);
       if (tracePts.length) {
-        const color = this._renderColor();
+        const color = (this.sceneColor && this.sceneColor !== '') ? this.sceneColor : this._renderColor();
         const glow  = this._renderGlow() * 0.5;
         this.ctx.save();
         this.ctx.strokeStyle = color;
@@ -2080,6 +2187,7 @@ class PresetManager {
     return {
       // Beam
       color: s.color,
+      sceneColor: s.sceneColor,
       beamWidth: s.beamWidth,
       glowAmount: s.glowAmount,
       persistence: s.persistence,
@@ -2092,8 +2200,11 @@ class PresetManager {
         mirrorY: s.fx.mirrorY,
         rotation: s.fx.rotation,
         beatInvert: s.fx.beatInvert,
+        afterglow: s.fx.afterglow,
         rotSpeed: s.fx.rotSpeed,
         beatSens: s.fx.beatSens,
+        afterglowSpeed: s.fx.afterglowSpeed,
+        afterglowStr: s.fx.afterglowStr,
       },
       // Signal FX
       smooth: s.smooth,
@@ -2141,6 +2252,7 @@ class PresetManager {
 
     // Beam
     s.color = preset.color;
+    s.sceneColor = preset.sceneColor || '';
     s.beamWidth = preset.beamWidth;
     s.glowAmount = preset.glowAmount;
     s.persistence = preset.persistence;
@@ -2154,8 +2266,11 @@ class PresetManager {
       s.fx.mirrorY = preset.fx.mirrorY;
       s.fx.rotation = preset.fx.rotation;
       s.fx.beatInvert = preset.fx.beatInvert;
+      s.fx.afterglow = preset.fx.afterglow || false;
       s.fx.rotSpeed = preset.fx.rotSpeed;
       s.fx.beatSens = preset.fx.beatSens;
+      s.fx.afterglowSpeed = preset.fx.afterglowSpeed || 0;
+      s.fx.afterglowStr = preset.fx.afterglowStr || 0.7;
     }
 
     // Signal FX
@@ -2245,11 +2360,9 @@ class PresetManager {
     setVal('persistence', p.persistence);
     document.getElementById('persistence-val').textContent = p.persistence.toFixed(2);
 
-    // Make sure display controls are visible so user sees the change
-    const dc = document.getElementById('display-controls');
-    if (dc) { dc.style.cssText = 'display:flex;flex-direction:column;gap:6px'; }
-    const tgl = document.getElementById('toggle-display');
-    if (tgl) tgl.textContent = 'DISPLAY \u25BE';
+    // Ensure Display panel is uncollapsed so user sees the change
+    const dispPanel = document.querySelector('[data-panel-id="display"]');
+    if (dispPanel) dispPanel.classList.remove('collapsed');
 
     // FX checkboxes
     if (p.fx) {
@@ -2257,6 +2370,7 @@ class PresetManager {
       setCheck('fx-beat', p.fx.beatFlash);
       setCheck('fx-bloom', p.fx.bloom);
       setCheck('fx-invert', p.fx.beatInvert);
+      setCheck('fx-afterglow', p.fx.afterglow || false);
       setCheck('fx-mirror-x', p.fx.mirrorX);
       setCheck('fx-mirror-y', p.fx.mirrorY);
       setCheck('fx-rotate', p.fx.rotation);
@@ -2264,6 +2378,10 @@ class PresetManager {
       document.getElementById('fx-rs-val').textContent = p.fx.rotSpeed.toFixed(3);
       setVal('fx-beat-sens', p.fx.beatSens);
       document.getElementById('fx-bs-val').textContent = p.fx.beatSens.toFixed(2);
+      setVal('fx-afterglow-speed', p.fx.afterglowSpeed || 0);
+      document.getElementById('fx-ag-val').textContent = (p.fx.afterglowSpeed || 0).toFixed(3);
+      setVal('fx-afterglow-str', p.fx.afterglowStr || 0.7);
+      document.getElementById('fx-afterglow-str-val').textContent = (p.fx.afterglowStr || 0.7).toFixed(2);
     }
 
     // Signal FX
@@ -2273,6 +2391,12 @@ class PresetManager {
     if (flEl) { flEl.value = p.filterLow; flEl.dispatchEvent(new Event('change', { bubbles: true })); }
     const fhEl = document.getElementById('filter-high');
     if (fhEl) { fhEl.value = p.filterHigh; fhEl.dispatchEvent(new Event('change', { bubbles: true })); }
+
+    // Scene color
+    const scOn = !!(p.sceneColor && p.sceneColor !== '');
+    setCheck('scene-color-on', scOn);
+    document.getElementById('scene-color').disabled = !scOn;
+    if (scOn) document.getElementById('scene-color').value = p.sceneColor;
 
     // Scene
     setCheck('obj-mode', p.objMode);
@@ -2601,12 +2725,37 @@ class UIController {
     document.getElementById('freq-filter').addEventListener('change', e => s.filterEnabled = e.target.checked);
     document.getElementById('filter-low').addEventListener('change',  e => s.filterLow  = Math.max(20, +e.target.value));
     document.getElementById('filter-high').addEventListener('change', e => s.filterHigh = Math.min(20000, +e.target.value));
+
+    // Frequency filter presets
+    const filterPresetBtns = document.querySelectorAll('.filter-preset-btn');
+    filterPresetBtns.forEach(btn => btn.addEventListener('click', () => {
+      const lo = +btn.dataset.lo, hi = +btn.dataset.hi;
+      s.filterLow = lo; s.filterHigh = hi;
+      document.getElementById('filter-low').value  = lo;
+      document.getElementById('filter-high').value = hi;
+      document.getElementById('freq-filter').checked = true;
+      s.filterEnabled = true;
+      filterPresetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }));
     document.getElementById('scanlines').addEventListener('change', e => {
       document.getElementById('crt-overlay').classList.toggle('scanlines', e.target.checked);
     });
 
     // ── 3D/2D scene — enable + mode switch ────────────────────────────
     document.getElementById('obj-mode').addEventListener('change', e => s.objMode = e.target.checked);
+
+    // Scene independent color
+    const scColorOn = document.getElementById('scene-color-on');
+    const scColorPk = document.getElementById('scene-color');
+    scColorOn.addEventListener('change', e => {
+      const on = e.target.checked;
+      scColorPk.disabled = !on;
+      s.sceneColor = on ? scColorPk.value : '';
+    });
+    scColorPk.addEventListener('input', e => {
+      if (scColorOn.checked) s.sceneColor = e.target.value;
+    });
 
     const _showMode = is3d => {
       s.obj3dMode = is3d;
@@ -2719,12 +2868,15 @@ class UIController {
     // Per-axis auto-rotate  (X = obj.rotX / img.rotX3d,  Y = obj.rotY / img.rotY3d,  Z = obj.rotZ / img.spinZ)
     document.getElementById('sc-auto-rot-x').addEventListener('change', e => {
       s._obj.autoRotX = e.target.checked; s._imgScene.autoRotX3d = e.target.checked;
+      if (!e.target.checked) { s._obj.rotX = 0; s._imgScene.rotX3d = 0; }
     });
     document.getElementById('sc-auto-rot-y').addEventListener('change', e => {
       s._obj.autoRotY = e.target.checked; s._imgScene.autoRotY3d = e.target.checked;
+      if (!e.target.checked) { s._obj.rotY = 0; s._imgScene.rotY3d = 0; }
     });
     document.getElementById('sc-auto-rot-z').addEventListener('change', e => {
       s._obj.autoRotZ = e.target.checked; s._imgScene.autoSpin = e.target.checked;
+      if (!e.target.checked) { s._obj.rotZ = 0; s._imgScene.rotZ = 0; }
     });
     this._bindRange('sc-rot-spd-x', v => {
       s._obj.rotSpeedX = v; s._imgScene.rotSpeedX3d = v;
@@ -2892,13 +3044,31 @@ class UIController {
       document.getElementById('st-src').textContent = 'No signal';
     });
 
+    // ── Signal Gen help toggle ──────────────────────────────────────────
+    const sgHelpBtn  = document.getElementById('siggen-help-btn');
+    const sgGuide    = document.getElementById('siggen-guide');
+    if (sgHelpBtn && sgGuide) {
+      sgHelpBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation(); // don't trigger panel collapse
+        const vis = sgGuide.style.display === 'none';
+        sgGuide.style.display = vis ? '' : 'none';
+        sgHelpBtn.classList.toggle('active', vis);
+      });
+    }
+
     // ── FX controls ───────────────────────────────────────────────────
     const fxBindCheck = (id, key) => {
-      document.getElementById(id).addEventListener('change', e => { s.fx[key] = e.target.checked; });
+      document.getElementById(id).addEventListener('change', e => {
+        s.fx[key] = e.target.checked;
+        // Toggle fx-active on parent .fx-block for param visibility
+        const block = e.target.closest('.fx-block');
+        if (block) block.classList.toggle('fx-active', e.target.checked);
+      });
     };
     fxBindCheck('fx-reactive',  'reactive');
     fxBindCheck('fx-beat',      'beatFlash');
     fxBindCheck('fx-bloom',     'bloom');
+    fxBindCheck('fx-afterglow', 'afterglow');
     fxBindCheck('fx-mirror-x',  'mirrorX');
     fxBindCheck('fx-mirror-y',  'mirrorY');
     fxBindCheck('fx-rotate',    'rotation');
@@ -2906,6 +3076,8 @@ class UIController {
 
     this._bindRange('fx-rot-speed',   v => { s.fx.rotSpeed   = v; document.getElementById('fx-rs-val').textContent = v.toFixed(3); });
     this._bindRange('fx-beat-sens',   v => { s.fx.beatSens   = v; document.getElementById('fx-bs-val').textContent = v.toFixed(2); });
+    this._bindRange('fx-afterglow-speed', v => { s.fx.afterglowSpeed = v; document.getElementById('fx-ag-val').textContent = v.toFixed(3); });
+    this._bindRange('fx-afterglow-str', v => { s.fx.afterglowStr = v; document.getElementById('fx-afterglow-str-val').textContent = v.toFixed(2); });
 
     // ── Record ────────────────────────────────────────────────────────
     const btnRec = document.getElementById('btn-record');
@@ -2920,14 +3092,6 @@ class UIController {
         btnRec.textContent = '■ STOP';
         btnRec.classList.add('recording');
       }
-    });
-
-    // ── Display customize ─────────────────────────────────────────────
-    document.getElementById('toggle-display').addEventListener('click', () => {
-      const dc   = document.getElementById('display-controls');
-      const open = dc.style.display === 'none';
-      dc.style.cssText = open ? 'display:flex;flex-direction:column;gap:6px' : 'display:none';
-      document.getElementById('toggle-display').textContent = open ? 'DISPLAY ▾' : 'DISPLAY ▸';
     });
 
     // ── Color swatches ────────────────────────────────────────────────
@@ -2973,6 +3137,7 @@ class UIController {
     this._updateStatus();
     s.start();
     this._setupPanels();
+    this._setupLayout();
     this._setupPopOut();
     this._setupKeyboard();
   }
@@ -2996,7 +3161,7 @@ class UIController {
       if (now - _lastSent < 33) return;   // cap ~30 fps
       _lastSent = now;
       // WebP compresses oscilloscope frames (mostly black) extremely well
-      window.electronAPI.sendFrame(canvas.toDataURL('image/webp', 0.9));
+      window.electronAPI.sendFrame(canvas.toDataURL('image/webp', 0.95));
     };
 
     const _open_ = async () => {
@@ -3034,7 +3199,7 @@ class UIController {
       {
         _name: 'Classic',
         color: '#00ff41', beamWidth: 1.5, glowAmount: 12, persistence: 0.15,
-        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, afterglow: false, rotSpeed: 0.003, beatSens: 1.5, afterglowSpeed: 0, afterglowStr: 0.7 },
         smooth: false, filterEnabled: false, filterLow: 200, filterHigh: 3000,
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
@@ -3047,7 +3212,7 @@ class UIController {
       {
         _name: 'Neon Glow',
         color: '#ff00ff', beamWidth: 2.0, glowAmount: 30, persistence: 0.06,
-        fx: { reactive: true, beatFlash: true, bloom: true, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        fx: { reactive: true, beatFlash: true, bloom: true, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, afterglow: true, rotSpeed: 0.003, beatSens: 1.5, afterglowSpeed: 0, afterglowStr: 0.7 },
         smooth: false, filterEnabled: false, filterLow: 200, filterHigh: 3000,
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
@@ -3060,7 +3225,7 @@ class UIController {
       {
         _name: 'Amber Retro',
         color: '#ffb000', beamWidth: 1.8, glowAmount: 18, persistence: 0.55,
-        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, rotSpeed: 0.003, beatSens: 1.5 },
+        fx: { reactive: false, beatFlash: false, bloom: false, mirrorX: false, mirrorY: false, rotation: false, beatInvert: false, afterglow: false, rotSpeed: 0.003, beatSens: 1.5, afterglowSpeed: 0, afterglowStr: 0.7 },
         smooth: true, filterEnabled: false, filterLow: 200, filterHigh: 3000,
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
@@ -3115,14 +3280,38 @@ class UIController {
 
         btn.addEventListener('click', () => {
           if (saveMode) {
-            // Save mode: prompt for name and save
-            const name = prompt('Preset name:', pm.getSlot(i)?._name || `Preset ${i + 1}`);
-            if (name === null) { exitSaveMode(); return; }
-            pm.save(i, name);
-            activeSlot = i;
-            exitSaveMode();
-            renderSlots();
-          } else if (slot) {
+            // Save mode: save current settings into this slot
+            // Use inline input instead of prompt() for Electron compatibility
+            const existingName = pm.getSlot(i)?._name || '';
+            const defaultName = existingName || `Preset ${i + 1}`;
+
+            // Create inline name input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = defaultName;
+            input.className = 'preset-name-input';
+            input.style.cssText = 'width:60px;font-size:9px;padding:1px 3px;background:#222;color:#0f0;border:1px solid #0f0;border-radius:2px;';
+            btn.textContent = '';
+            btn.appendChild(input);
+            input.focus();
+            input.select();
+
+            const doSave = () => {
+              const name = input.value.trim() || defaultName;
+              pm.save(i, name);
+              activeSlot = i;
+              exitSaveMode();
+              renderSlots();
+            };
+            input.addEventListener('keydown', (ev) => {
+              if (ev.key === 'Enter') { ev.preventDefault(); doSave(); }
+              if (ev.key === 'Escape') { ev.preventDefault(); exitSaveMode(); renderSlots(); }
+              ev.stopPropagation();
+            });
+            input.addEventListener('blur', doSave);
+            return;
+          }
+          if (slot) {
             // Load mode
             pm.load(i);
             activeSlot = i;
@@ -3378,110 +3567,234 @@ class UIController {
     this._audioReady = true;
   }
 
+  // ── Modular rig system — panels draggable between 4 zones ──────────
   _setupPanels() {
-    const panel = document.querySelector('.front-panel');
-    if (!panel) return;
+    // No-op — panels now managed by _setupLayout/rig system
+  }
 
-    // ── Restore saved order ──────────────────────────────────────────────
-    const savedOrder = JSON.parse(localStorage.getItem('osc_panelOrder') || 'null');
-    if (savedOrder) {
-      savedOrder.forEach(id => {
-        const sec = panel.querySelector(`[data-panel-id="${id}"]`);
-        if (sec) panel.appendChild(sec);
-      });
-    }
+  _setupLayout() {
+    const app     = document.querySelector('.app');
+    const store   = document.getElementById('panel-store');
+    const zones   = {
+      left:   document.getElementById('zone-left'),
+      under:  document.getElementById('zone-under'),
+      right:  document.getElementById('zone-right'),
+      bottom: document.getElementById('zone-bottom'),
+    };
+    if (!app || !store) return;
 
-    // ── Restore saved collapsed state ────────────────────────────────────
+    // ── All panel section elements ──
+    const allSections = Array.from(store.querySelectorAll('.fp-section[data-panel-id]'));
+    const allIds = allSections.map(s => s.dataset.panelId);
+
+    // ── Built-in rig presets ──
+    const BUILTIN_RIGS = {
+      classic: {
+        left: [],
+        under: [],
+        right: [],
+        bottom: allIds.slice(), // everything at the bottom
+      },
+      studio: {
+        left:   ['ch1', 'ch2', 'horiz', 'trig'],
+        under:  ['audio', 'presets'],
+        right:  ['beamfx', 'sigfx', 'scene', 'display'],
+        bottom: ['ctrl', 'siggen'],
+      },
+      perform: {
+        left:   ['ctrl', 'audio', 'presets'],
+        under:  [],
+        right:  ['beamfx', 'sigfx', 'display'],
+        bottom: ['ch1', 'ch2', 'horiz', 'trig', 'siggen', 'scene'],
+      },
+      minimal: {
+        left:   [],
+        under:  [],
+        right:  allIds.slice(),
+        bottom: [],
+      },
+    };
+
+    // ── State ──
+    let editing = false;
+    let dragSrc = null;
+    const rigSelect  = document.getElementById('rig-select');
+    const editBtn    = document.getElementById('rig-edit-btn');
+    const saveBtn    = document.getElementById('rig-save-btn');
+
+    // ── Collapse state ──
     const savedCollapsed = JSON.parse(localStorage.getItem('osc_panelCollapsed') || '{}');
 
-    const saveState = () => {
-      const order = [];
+    const saveRigState = () => {
+      // Save current zone assignments + order + collapsed state
+      const rig = {};
       const collapsed = {};
-      panel.querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
-        const id = s.dataset.panelId;
-        order.push(id);
-        collapsed[id] = s.classList.contains('collapsed');
+      Object.keys(zones).forEach(zk => {
+        rig[zk] = [];
+        zones[zk].querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
+          rig[zk].push(s.dataset.panelId);
+          collapsed[s.dataset.panelId] = s.classList.contains('collapsed');
+        });
       });
-      localStorage.setItem('osc_panelOrder', JSON.stringify(order));
+      localStorage.setItem('osc_rigCurrent', JSON.stringify(rig));
       localStorage.setItem('osc_panelCollapsed', JSON.stringify(collapsed));
     };
 
-    // ── Layout lock ───────────────────────────────────────────────────────
-    let locked = localStorage.getItem('osc_panelLocked') === 'true';
-    const lockBtn = document.getElementById('panel-lock-btn');
+    const applyRig = (rigDef) => {
+      // Move all sections back to store
+      allSections.forEach(s => store.appendChild(s));
 
-    const applyLock = () => {
-      panel.querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
-        s.setAttribute('draggable', locked ? 'false' : 'true');
+      // Distribute into zones per rig definition
+      Object.keys(zones).forEach(zk => {
+        const ids = rigDef[zk] || [];
+        ids.forEach(id => {
+          const sec = store.querySelector(`[data-panel-id="${id}"]`);
+          if (sec) zones[zk].appendChild(sec);
+        });
       });
-      if (lockBtn) {
-        lockBtn.textContent = locked ? '🔒' : '🔓';
-        lockBtn.classList.toggle('locked', locked);
-        lockBtn.title = locked ? 'Unlock panel layout' : 'Lock panel layout';
-      }
-      localStorage.setItem('osc_panelLocked', locked);
+
+      // Any sections not assigned to a zone? Put them in bottom as fallback
+      store.querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
+        zones.bottom.appendChild(s);
+      });
+
+      saveRigState();
     };
 
-    if (lockBtn) {
-      lockBtn.addEventListener('click', () => {
-        locked = !locked;
-        applyLock();
+    // ── Rig select change ──
+    rigSelect.addEventListener('change', () => {
+      const name = rigSelect.value;
+      if (BUILTIN_RIGS[name]) {
+        applyRig(BUILTIN_RIGS[name]);
+        localStorage.setItem('osc_rigName', name);
+      } else {
+        // Custom rig from localStorage
+        const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+        if (customs[name]) {
+          applyRig(customs[name]);
+          localStorage.setItem('osc_rigName', name);
+        }
+      }
+    });
+
+    // ── Save custom rig ──
+    saveBtn.addEventListener('click', () => {
+      const rig = {};
+      Object.keys(zones).forEach(zk => {
+        rig[zk] = [];
+        zones[zk].querySelectorAll('.fp-section[data-panel-id]').forEach(s => {
+          rig[zk].push(s.dataset.panelId);
+        });
       });
-    }
 
-    let dragSrc = null;
+      // Inline name input
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Rig name…';
+      input.style.cssText = 'width:80px;font-size:10px;padding:2px 4px;background:#222;color:#0f0;border:1px solid #0f0;border-radius:2px;';
+      saveBtn.replaceWith(input);
+      input.focus();
 
-    panel.querySelectorAll('.fp-section[data-panel-id]').forEach(sec => {
+      const doSave = () => {
+        const name = input.value.trim().toLowerCase().replace(/\s+/g, '-') || `rig-${Date.now()}`;
+        const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+        customs[name] = rig;
+        localStorage.setItem('osc_customRigs', JSON.stringify(customs));
+        localStorage.setItem('osc_rigName', name);
+
+        // Add option if not exists
+        if (!rigSelect.querySelector(`option[value="${name}"]`)) {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          rigSelect.appendChild(opt);
+        }
+        rigSelect.value = name;
+
+        // Restore save button
+        input.replaceWith(saveBtn);
+      };
+
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); doSave(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); input.replaceWith(saveBtn); }
+        ev.stopPropagation();
+      });
+      input.addEventListener('blur', doSave);
+    });
+
+    // ── Edit mode toggle ──
+    editBtn.addEventListener('click', () => {
+      editing = !editing;
+      app.classList.toggle('rig-editing', editing);
+      editBtn.classList.toggle('active', editing);
+      editBtn.title = editing ? 'Exit edit mode' : 'Toggle edit mode — drag panels between zones';
+
+      // Update draggable state
+      allSections.forEach(sec => {
+        const t = sec.querySelector('.fp-title');
+        if (t) {
+          t.setAttribute('draggable', editing ? 'true' : 'false');
+          t.style.cursor = editing ? 'grab' : 'pointer';
+        }
+      });
+    });
+
+    // ── Section behaviors: collapse + drag ──
+    allSections.forEach(sec => {
       const id = sec.dataset.panelId;
+      sec.setAttribute('draggable', 'false');
 
-      // Apply saved collapsed state
+      // Restore collapsed
       if (savedCollapsed[id]) sec.classList.add('collapsed');
 
-      // ── Collapse toggle on title click ───────────────────────────────
+      // Collapse on title click
       const title = sec.querySelector('.fp-title');
       if (title) {
+        title.setAttribute('draggable', 'false');
+
         title.addEventListener('click', e => {
-          // Don't collapse when clicking interactive children of title
           if (e.target !== title && e.target.closest('.fp-title') !== title) return;
           sec.classList.toggle('collapsed');
-          saveState();
+          saveRigState();
+        });
+
+        title.addEventListener('dragstart', e => {
+          if (!editing) { e.preventDefault(); return; }
+          dragSrc = sec;
+          sec.classList.add('panel-dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', id);
         });
       }
-
-      // ── Drag to reorder ──────────────────────────────────────────────
-      sec.setAttribute('draggable', 'true');
-
-      sec.addEventListener('dragstart', e => {
-        if (locked) { e.preventDefault(); return; }
-        dragSrc = sec;
-        sec.classList.add('panel-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', id);
-      });
 
       sec.addEventListener('dragend', () => {
         dragSrc = null;
         sec.classList.remove('panel-dragging');
-        panel.querySelectorAll('.fp-section').forEach(s => {
+        document.querySelectorAll('.fp-section').forEach(s => {
           s.classList.remove('panel-drop-before', 'panel-drop-after');
         });
-        saveState();
+        document.querySelectorAll('.panel-zone').forEach(z => z.classList.remove('zone-drag-over'));
+        saveRigState();
       });
 
+      // Drag over another section — show insertion indicator
       sec.addEventListener('dragover', e => {
-        if (locked) return;
+        if (!editing) return;
         e.preventDefault();
+        e.stopPropagation();
         if (!dragSrc || dragSrc === sec) return;
         e.dataTransfer.dropEffect = 'move';
-        const rect = sec.getBoundingClientRect();
-        const mid  = rect.left + rect.width / 2;
-        panel.querySelectorAll('.fp-section').forEach(s => {
+
+        document.querySelectorAll('.fp-section').forEach(s => {
           s.classList.remove('panel-drop-before', 'panel-drop-after');
         });
-        if (e.clientX < mid) {
-          sec.classList.add('panel-drop-before');
+        const rect = sec.getBoundingClientRect();
+        const isVert = sec.parentElement.classList.contains('zone-side');
+        if (isVert) {
+          sec.classList.add(e.clientY < rect.top + rect.height / 2 ? 'panel-drop-before' : 'panel-drop-after');
         } else {
-          sec.classList.add('panel-drop-after');
+          sec.classList.add(e.clientX < rect.left + rect.width / 2 ? 'panel-drop-before' : 'panel-drop-after');
         }
       });
 
@@ -3489,24 +3802,78 @@ class UIController {
         sec.classList.remove('panel-drop-before', 'panel-drop-after');
       });
 
+      // Drop on another section — reorder within same zone or move to this zone
       sec.addEventListener('drop', e => {
-        if (locked) return;
+        if (!editing) return;
         e.preventDefault();
+        e.stopPropagation();
         if (!dragSrc || dragSrc === sec) return;
+
+        const container = sec.parentElement;
         const rect = sec.getBoundingClientRect();
-        const mid  = rect.left + rect.width / 2;
-        if (e.clientX < mid) {
-          panel.insertBefore(dragSrc, sec);
+        const isVert = container.classList.contains('zone-side');
+        const before = isVert
+          ? (e.clientY < rect.top + rect.height / 2)
+          : (e.clientX < rect.left + rect.width / 2);
+        if (before) {
+          container.insertBefore(dragSrc, sec);
         } else {
           sec.after(dragSrc);
         }
         sec.classList.remove('panel-drop-before', 'panel-drop-after');
-        saveState();
+        saveRigState();
       });
     });
 
-    // Apply initial lock state after all sections are set up
-    applyLock();
+    // ── Zone drop targets (for dropping onto empty zones) ──
+    Object.values(zones).forEach(zone => {
+      zone.addEventListener('dragover', e => {
+        if (!editing || !dragSrc) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        zone.classList.add('zone-drag-over');
+      });
+      zone.addEventListener('dragleave', e => {
+        // Only remove if leaving the zone itself (not entering a child)
+        if (e.relatedTarget && zone.contains(e.relatedTarget)) return;
+        zone.classList.remove('zone-drag-over');
+      });
+      zone.addEventListener('drop', e => {
+        if (!editing || !dragSrc) return;
+        e.preventDefault();
+        zone.classList.remove('zone-drag-over');
+        // If dropped on the zone background (not on a section), append to end
+        if (e.target === zone || e.target.closest('.panel-zone') === zone) {
+          zone.appendChild(dragSrc);
+          saveRigState();
+        }
+      });
+    });
+
+    // ── Load custom rigs into select ──
+    const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+    Object.keys(customs).forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      rigSelect.appendChild(opt);
+    });
+
+    // ── Restore saved rig on startup ──
+    const savedName = localStorage.getItem('osc_rigName') || 'classic';
+    const savedRig  = JSON.parse(localStorage.getItem('osc_rigCurrent') || 'null');
+
+    if (savedRig) {
+      // Restore exact last state (user may have rearranged without saving a named rig)
+      applyRig(savedRig);
+      if (rigSelect.querySelector(`option[value="${savedName}"]`)) {
+        rigSelect.value = savedName;
+      }
+    } else {
+      // First launch — apply classic
+      applyRig(BUILTIN_RIGS[savedName] || BUILTIN_RIGS.classic);
+      rigSelect.value = savedName;
+    }
   }
 }
 

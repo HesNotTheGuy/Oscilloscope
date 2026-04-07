@@ -28,8 +28,144 @@ body {
   flex-direction: column;
   gap: 8px;
   width: 100%;
-  max-width: 980px;
+  max-width: 1600px;
 }
+
+/* ─── Rig picker in topbar ─── */
+.rig-picker {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+.rig-select {
+  background: var(--input-bg);
+  border: 1px solid #2a2a2a;
+  color: var(--p);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+  letter-spacing: 0.5px;
+}
+.rig-select:focus { border-color: var(--p); }
+.rig-btn {
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--input-bg);
+  border: 1px solid #2a2a2a;
+  color: #555;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.1s;
+  line-height: 1;
+}
+.rig-btn:hover { border-color: var(--p); color: var(--p); }
+.rig-btn.active {
+  border-color: #ff8800;
+  color: #ff8800;
+  animation: blink-save 0.8s step-start infinite;
+}
+
+/* ─── Layout body — horizontal: left | center-col | right ─── */
+.layout-body {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  min-height: 0;
+}
+
+/* ─── Scope center column ─── */
+.scope-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Panel zones ─── */
+.panel-zone {
+  display: flex;
+  gap: 6px;
+  min-height: 28px;
+  transition: outline-color 0.15s;
+  contain: layout style;
+}
+/* Side zones: vertical scroll */
+.zone-side {
+  flex-direction: column;
+  width: 220px;
+  min-width: 180px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 80px);
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a #0d0d0d;
+  will-change: scroll-position;
+  contain: layout style;
+}
+.zone-side::-webkit-scrollbar { width: 5px; }
+.zone-side::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+.zone-side::-webkit-scrollbar-track { background: #0d0d0d; }
+.zone-side .fp-section {
+  min-width: 0 !important;
+  width: 100%;
+}
+/* Under zone: horizontal wrap below scope */
+.zone-under {
+  flex-wrap: wrap;
+}
+/* Bottom zone: full-width horizontal wrap */
+.zone-bottom {
+  flex-wrap: wrap;
+}
+
+/* Hide empty zones so they don't take space */
+.panel-zone:empty { display: none; }
+
+/* Edit mode: show zone outlines as drop targets */
+.app.rig-editing .panel-zone {
+  display: flex !important;  /* show even empty zones */
+  outline: 1px dashed #2a3a2a;
+  outline-offset: -1px;
+  border-radius: 3px;
+  min-height: 36px;
+  position: relative;
+}
+.app.rig-editing .panel-zone::before {
+  content: attr(data-zone);
+  position: absolute;
+  top: 2px; left: 6px;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #2a4a2a;
+  pointer-events: none;
+  z-index: 1;
+}
+.app.rig-editing .panel-zone.zone-drag-over {
+  outline-color: var(--p);
+  background: rgba(0, 255, 65, 0.03);
+}
+
+/* Scope sizing */
+#scope {
+  display: block;
+  background: #000;
+  cursor: crosshair;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 5;
+  image-rendering: auto;
+  -webkit-image-rendering: auto;
+  will-change: contents;
+}
+.crt-bezel { width: 100%; }
 
 /* ─── Topbar ─── */
 .topbar {
@@ -87,7 +223,7 @@ body {
 }
 
 /* ─── Scope screen ─── */
-.scope-wrap { display: flex; justify-content: center; }
+.scope-wrap { display: flex; justify-content: center; align-items: flex-start; contain: layout; }
 
 .crt-bezel {
   background: var(--bezel);
@@ -104,7 +240,7 @@ body {
   overflow: hidden;
   box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
 }
-#scope { display: block; background: #000; cursor: crosshair; }
+/* (old #scope rule removed — now defined in layout section above) */
 
 .crt-overlay {
   position: absolute; inset: 0;
@@ -121,12 +257,7 @@ body {
   );
 }
 
-/* ─── Front Panel ─── */
-.front-panel {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+/* ─── Front Panel (legacy — panels now live in zones) ─── */
 
 .fp-section {
   background: var(--panel);
@@ -137,6 +268,7 @@ body {
   flex-direction: column;
   gap: 7px;
   min-width: 110px;
+  contain: content;
 }
 
 .fp-title {
@@ -380,6 +512,52 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .filter-row .fp-label-sm { font-size: 10px; }
 .filter-row .fp-label-sm input[type="number"] { width: 46px; }
 
+.filter-presets {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.filter-preset-btn {
+  font-size: 9px;
+  padding: 2px 6px;
+  background: var(--input-bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.filter-preset-btn:hover {
+  border-color: var(--p);
+  color: var(--text);
+}
+.filter-preset-btn.active {
+  border-color: var(--p);
+  color: var(--p);
+}
+
+/* ─── Scene color picker ─── */
+.scene-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.scene-color-picker {
+  width: 40px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--input-bg);
+  cursor: pointer;
+}
+.scene-color-picker:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ─── OBJ 3D / IMG 2D section ─── */
 .fp-obj { min-width: 160px; }
 
@@ -473,11 +651,13 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   background: var(--p);
   opacity: 0.3;
   width: 0%;
+  pointer-events: none;
 }
 .time-lbl {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 9px;
+  pointer-events: none;
   color: var(--p);
   letter-spacing: 1px;
   pointer-events: none;
@@ -557,6 +737,42 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 /* ─── Signal Generator ─── */
 .fp-siggen { min-width: 175px; }
 
+.siggen-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #555;
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: auto;
+  line-height: 1;
+  transition: all 0.1s;
+}
+.siggen-help-btn:hover { color: var(--p); border-color: var(--p); }
+.siggen-help-btn.active { color: var(--p); border-color: var(--p); background: rgba(0,255,65,0.08); }
+
+.siggen-guide {
+  background: #0a1a0a;
+  border: 1px solid #1e3d1e;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+}
+.guide-text {
+  font-size: 9px;
+  line-height: 1.5;
+  color: #6a9a6a;
+  letter-spacing: 0.3px;
+}
+.guide-text b { color: var(--p); }
+.guide-text em { color: #4a7a4a; font-style: normal; }
+
 .gen-freq-row {
   display: flex;
   gap: 6px;
@@ -623,6 +839,18 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   white-space: nowrap;
 }
 .fx-lbl:hover { color: var(--text); }
+
+/* FX blocks — checkbox + collapsible params */
+.fx-block {
+  margin-bottom: 2px;
+}
+.fx-params {
+  display: none;
+  padding: 2px 0 2px 16px;
+}
+.fx-block.fx-active .fx-params {
+  display: block;
+}
 .fx-lbl input[type="checkbox"] { accent-color: var(--p); }
 
 /* ── Color swatch grid ── */
@@ -689,22 +917,7 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   height: auto !important;
 }
 
-/* ── Panel layout lock button ── */
-#panel-lock-btn {
-  align-self: center;
-  flex-shrink: 0;
-  background: transparent;
-  border: 1px solid #333;
-  color: #555;
-  font-size: 13px;
-  line-height: 1;
-  padding: 4px 5px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-#panel-lock-btn:hover { border-color: #555; color: #888; }
-#panel-lock-btn.locked { color: #00ff41; border-color: #00ff41; }
+/* (panel-lock-btn removed — replaced by rig-edit-btn in topbar) */
 
 /* ── Inline speed slider (auto-rotate rows) ── */
 .inline-spd {
@@ -721,11 +934,11 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
   text-align: right;
 }
 
-/* ── Drag-to-reorder ── */
-.fp-section[draggable="true"] {
+/* ── Drag-to-reorder (title bar only) ── */
+.fp-title[draggable="true"] {
   cursor: grab;
 }
-.fp-section[draggable="true"]:active {
+.fp-title[draggable="true"]:active {
   cursor: grabbing;
 }
 .fp-section.panel-dragging {
@@ -736,6 +949,15 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 }
 .fp-section.panel-drop-after {
   border-right: 2px solid #00ff41;
+}
+/* Sidebar zones: use top/bottom borders for vertical reorder */
+.zone-side .fp-section.panel-drop-before {
+  border-left: none;
+  border-top: 2px solid #00ff41;
+}
+.zone-side .fp-section.panel-drop-after {
+  border-right: none;
+  border-bottom: 2px solid #00ff41;
 }
 
 /* ─── Keyboard Shortcuts Help Overlay ─── */
