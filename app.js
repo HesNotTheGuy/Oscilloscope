@@ -577,6 +577,7 @@ class ImageScene {
     this.shake     = false;
     this.warp      = false;
     this.warpAmt   = 0.1;
+    this.audioSketch = false;  // audio amplitude modulates trace density (loud=dense, quiet=sparse)
 
     // Tiling & radial symmetry (shared with ObjScene)
     this.tileX     = 1;   // grid columns (1-5)
@@ -696,7 +697,64 @@ class ImageScene {
       }
     }
 
-    this._traceNorm = pts;
+    // Sort points into a continuous path via greedy nearest-neighbor
+    // This turns scattered pixels into connected lines
+    if (pts.length > 1) {
+      const sorted = [pts[0]];
+      const used = new Uint8Array(pts.length);
+      used[0] = 1;
+      let cur = pts[0];
+
+      // Build spatial grid for fast neighbor lookup
+      const cellSize = 3.0 / Math.sqrt(pts.length);  // adaptive cell size
+      const grid = new Map();
+      const toKey = (x, y) => `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
+      for (let i = 0; i < pts.length; i++) {
+        const key = toKey(pts[i][0], pts[i][1]);
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(i);
+      }
+
+      for (let n = 1; n < pts.length; n++) {
+        const cx = cur[0], cy = cur[1];
+        const gx = Math.floor(cx / cellSize), gy = Math.floor(cy / cellSize);
+        let bestD = Infinity, bestIdx = -1;
+
+        // Search 3x3 neighborhood of grid cells
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const key = `${gx + dx},${gy + dy}`;
+            const cell = grid.get(key);
+            if (!cell) continue;
+            for (const idx of cell) {
+              if (used[idx]) continue;
+              const ddx = pts[idx][0] - cx, ddy = pts[idx][1] - cy;
+              const d = ddx * ddx + ddy * ddy;
+              if (d < bestD) { bestD = d; bestIdx = idx; }
+            }
+          }
+        }
+
+        // Fallback: if no neighbor found in nearby cells, scan all
+        if (bestIdx === -1) {
+          for (let i = 0; i < pts.length; i++) {
+            if (used[i]) continue;
+            const ddx = pts[i][0] - cx, ddy = pts[i][1] - cy;
+            const d = ddx * ddx + ddy * ddy;
+            if (d < bestD) { bestD = d; bestIdx = i; }
+          }
+        }
+
+        if (bestIdx === -1) break;
+        used[bestIdx] = 1;
+        cur = pts[bestIdx];
+        sorted.push(cur);
+      }
+
+      this._traceNorm = sorted;
+    } else {
+      this._traceNorm = pts;
+    }
   }
 
   // Returns [[sx0,sy0],[sx1,sy1]] segments for the GL/2D renderer.
@@ -758,10 +816,8 @@ class ImageScene {
     const bufLen    = audioBuf ? audioBuf.length : 0;
     const drawCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this._traceNorm.length);
 
-    const result = [];
-    for (let i = 0; i < drawCount; i++) {
-      let [nx, ny] = this._traceNorm[i];
-
+    // Transform all visible trace points to screen space
+    const _xform = (nx, ny) => {
       // Warp
       if (this.warp && bufLen > 0) {
         const angle = Math.atan2(ny, nx);
@@ -778,7 +834,7 @@ class ImageScene {
       z3 = -x3 * sinY3 + z3 * cosY3;  x3 = x3r;
       const y3r = y3 * cosX3 - z3 * sinX3;
       z3 = y3 * sinX3 + z3 * cosX3;   y3 = y3r;
-      if (z3 <= -(fov3d - 0.01)) continue;   // behind camera — skip
+      if (z3 <= -(fov3d - 0.01)) return null;   // behind camera
       const persp = fov3d / (fov3d + z3);
       nx = x3 * persp;
       ny = y3 * persp;
@@ -786,9 +842,38 @@ class ImageScene {
       // Scale → spin rotation → screen
       const px = nx * fitX;
       const py = ny * fitY;
-      const rx = px * cosR - py * sinR;
-      const ry = px * sinR + py * cosR;
-      result.push([[cx + rx, cy + ry], [cx + rx + 0.5, cy + ry]]);
+      return [cx + (px * cosR - py * sinR), cy + (px * sinR + py * cosR)];
+    };
+
+    // Build connected line segments between consecutive sorted points
+    // Break the path when the gap between points is too large (separate strokes)
+    const maxGap = Math.min(fitX, fitY) * 0.08;  // max pixel gap before breaking
+    const maxGapSq = maxGap * maxGap;
+
+    // Audio Sketch: use audio waveform to modulate which sections of the trace are drawn
+    // Loud audio → draw that section, quiet → skip it (creates organic reveal effect)
+    const useSketch = this.audioSketch && bufLen > 0;
+
+    const result = [];
+    let prev = null;
+    for (let i = 0; i < drawCount; i++) {
+      // Audio sketch: map trace position to audio buffer, skip if amplitude is low
+      if (useSketch) {
+        const aIdx = Math.floor((i / drawCount) * bufLen) % bufLen;
+        const amp = Math.abs(audioBuf[aIdx]);
+        if (amp < 0.05) { prev = null; continue; }  // skip quiet segments
+      }
+
+      const [nx, ny] = this._traceNorm[i];
+      const pt = _xform(nx, ny);
+      if (!pt) { prev = null; continue; }
+      if (prev) {
+        const dx = pt[0] - prev[0], dy = pt[1] - prev[1];
+        if (dx * dx + dy * dy < maxGapSq) {
+          result.push([prev, pt]);
+        }
+      }
+      prev = pt;
     }
 
     // Radial symmetry — N rotated copies arranged in a ring
@@ -2918,6 +3003,9 @@ class UIController {
       s._obj.warpAmt = v; s._imgScene.warpAmt = v;
       document.getElementById('sc-warp-val').textContent = v.toFixed(2);
     });
+    document.getElementById('sc-audio-sketch').addEventListener('change', e => {
+      s._imgScene.audioSketch = e.target.checked;
+    });
 
     // ── Draw power + ramp ──────────────────────────────────────────────
     this._bindRange('sc-power', v => {
@@ -3012,6 +3100,79 @@ class UIController {
       genFreqR.value = Math.round(sg.freqL * activeRatio);
       sg.setFreqR(sg.freqL * activeRatio);
     };
+
+    // Shape presets — set freq, ratio, phase, waveform for known Lissajous patterns
+    const SHAPE_PRESETS = {
+      circle:   { freqL: 440, ratio: 1,     phase: 90,  wave: 'sine' },
+      figure8:  { freqL: 440, ratio: 2,     phase: 90,  wave: 'sine' },
+      heart:    { freqL: 220, ratio: 2,     phase: 45,  wave: 'sine' },
+      star:     { freqL: 300, ratio: 5/3,   phase: 90,  wave: 'sine' },
+      spiral:   { freqL: 440, ratio: 1.01,  phase: 90,  wave: 'sine' },
+      diamond:  { freqL: 440, ratio: 1,     phase: 90,  wave: 'triangle' },
+      web:      { freqL: 200, ratio: 8/5,   phase: 0,   wave: 'sine' },
+      chaos:    { freqL: 333, ratio: Math.PI/2, phase: 37, wave: 'sawtooth' },
+      flower:   { freqL: 300, ratio: 6/5,   phase: 90,  wave: 'sine' },
+      bowtie:   { freqL: 440, ratio: 2,     phase: 0,   wave: 'sine' },
+    };
+
+    const genPresetBtns = document.querySelectorAll('.gen-preset-btn');
+    const _applyGenPreset = async (name) => {
+      const p = SHAPE_PRESETS[name];
+      if (!p) return;
+
+      // Update UI controls
+      genFreqL.value = p.freqL;
+      genFreqR.value = Math.round(p.freqL * p.ratio);
+      genPhase.value = p.phase;
+      document.getElementById('gen-phase-val').textContent = p.phase + '°';
+      genWave.value = p.wave;
+      activeRatio = p.ratio;
+
+      // Update generator
+      sg.freqL = p.freqL;
+      sg.freqR = p.freqL * p.ratio;
+      sg.phase = p.phase;
+      sg.waveform = p.wave;
+
+      // Clear ratio button highlights (custom ratio)
+      genRatioRow.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+
+      // Highlight preset button
+      genPresetBtns.forEach(b => b.classList.remove('active'));
+      const activeBtn = document.querySelector(`.gen-preset-btn[data-preset="${name}"]`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Auto-start if not already running
+      if (!sg.active) {
+        await this._ensureAudio();
+        sg.init(e.actx);
+        sg.start(e.analyserL, e.analyserR);
+        btnGenStart.disabled = true;
+        btnGenStop.disabled  = false;
+        btnGenStart.classList.remove('accent');
+        btnGenStop.classList.add('active');
+        if (s.mode !== 'XY') {
+          s.mode = 'XY';
+          document.getElementById('btn-xy').classList.add('active');
+          document.getElementById('btn-yt').classList.remove('active');
+          this._resetPhosphor();
+        }
+        document.getElementById('st-src').textContent = 'Signal Gen';
+      } else {
+        // Live update running generator
+        sg.setFreqL(sg.freqL);
+        sg.setFreqR(sg.freqR);
+        sg.setWaveform(sg.waveform);
+        // Restart to apply new phase
+        sg.stop();
+        sg.init(e.actx);
+        sg.start(e.analyserL, e.analyserR);
+      }
+    };
+
+    genPresetBtns.forEach(btn => {
+      btn.addEventListener('click', () => _applyGenPreset(btn.dataset.preset));
+    });
 
     btnGenStart.addEventListener('click', async () => {
       await this._ensureAudio();

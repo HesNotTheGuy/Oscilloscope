@@ -24,8 +24,12 @@
       "app.js",
       "main.js",
       "preload.js",
-      "preload-display.js"
+      "preload-display.js",
+      "logo.svg",
+      "icon.ico",
+      "icon.png"
     ],
+    "icon": "icon.ico",
     "win": {
       "target": [
         { "target": "nsis",     "arch": ["x64"] },
