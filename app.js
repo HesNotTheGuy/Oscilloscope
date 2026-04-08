@@ -1593,6 +1593,10 @@ class Oscilloscope {
       afterglowSpeed: 0,     // hue shift per frame (0–1 wraps full spectrum)
       afterglowStr:   0.7,   // trail persistence (0.3–0.95)
 
+      reactiveStr: 1.0,   // reactive glow/width multiplier
+      beatStr:     0.35,  // beat flash intensity
+      bloomStr:    1.0,   // bloom glow multiplier
+
       // Internal animation state
       _angle: 0,
       _flash: 0,
@@ -1747,13 +1751,13 @@ class Oscilloscope {
 
   _renderGlow() {
     return this.fx.reactive
-      ? this.glowAmount + this.fx._rms * 60
+      ? this.glowAmount + this.fx._rms * 60 * this.fx.reactiveStr
       : this.glowAmount;
   }
 
   _renderBeamWidth() {
     return this.fx.reactive
-      ? this.beamWidth * (1 + this.fx._rms * 1.5)
+      ? this.beamWidth * (1 + this.fx._rms * 1.5 * this.fx.reactiveStr)
       : this.beamWidth;
   }
 
@@ -2070,13 +2074,13 @@ class Oscilloscope {
     let flashRGB = null;
     if (this.fx._flash > 0.01) {
       const rgba = glr._rgba(this.fx.beatInvert ? '#ffffff' : color);
-      const i = this.fx._flash * 0.35;
+      const i = this.fx._flash * this.fx.beatStr;
       flashRGB = [rgba[0]*i, rgba[1]*i, rgba[2]*i];
     }
 
     // ⑤ GL frame: beam → blur → composite → blit
-    const glowStr = this.fx.bloom ? 1.4 : 0.7;
-    const glowPx  = this.fx.bloom ? glow * 1.5 : glow;
+    const glowStr = this.fx.bloom ? 1.4 * this.fx.bloomStr : 0.7;
+    const glowPx  = this.fx.bloom ? glow * 1.5 * this.fx.bloomStr : glow;
     const hueShift = this.fx.afterglow ? this.fx.afterglowSpeed : 0;
     // Afterglow overrides persistence with its own trail value
     const decay = this.fx.afterglow ? (1 - this.fx.afterglowStr) : this.persistence;
@@ -2169,7 +2173,7 @@ class Oscilloscope {
     const fx = this.fx;
     if (fx._flash > 0.01) {
       pctx.save();
-      pctx.globalAlpha = fx._flash * 0.35;
+      pctx.globalAlpha = fx._flash * fx.beatStr;
       pctx.fillStyle   = fx.beatInvert ? '#ffffff' : this._renderColor();
       pctx.fillRect(0, 0, W, H);
       pctx.restore();
@@ -2290,6 +2294,9 @@ class PresetManager {
         beatSens: s.fx.beatSens,
         afterglowSpeed: s.fx.afterglowSpeed,
         afterglowStr: s.fx.afterglowStr,
+        reactiveStr: s.fx.reactiveStr,
+        beatStr: s.fx.beatStr,
+        bloomStr: s.fx.bloomStr,
       },
       // Signal FX
       smooth: s.smooth,
@@ -2356,6 +2363,9 @@ class PresetManager {
       s.fx.beatSens = preset.fx.beatSens;
       s.fx.afterglowSpeed = preset.fx.afterglowSpeed || 0;
       s.fx.afterglowStr = preset.fx.afterglowStr || 0.7;
+      s.fx.reactiveStr = preset.fx.reactiveStr ?? 1.0;
+      s.fx.beatStr     = preset.fx.beatStr     ?? 0.35;
+      s.fx.bloomStr    = preset.fx.bloomStr    ?? 1.0;
     }
 
     // Signal FX
@@ -2467,6 +2477,12 @@ class PresetManager {
       document.getElementById('fx-ag-val').textContent = (p.fx.afterglowSpeed || 0).toFixed(3);
       setVal('fx-afterglow-str', p.fx.afterglowStr || 0.7);
       document.getElementById('fx-afterglow-str-val').textContent = (p.fx.afterglowStr || 0.7).toFixed(2);
+      setVal('fx-reactive-str', p.fx.reactiveStr ?? 1.0);
+      document.getElementById('fx-reactive-str-val').textContent = (p.fx.reactiveStr ?? 1.0).toFixed(1);
+      setVal('fx-beat-str', p.fx.beatStr ?? 0.35);
+      document.getElementById('fx-beat-str-val').textContent = (p.fx.beatStr ?? 0.35).toFixed(2);
+      setVal('fx-bloom-str', p.fx.bloomStr ?? 1.0);
+      document.getElementById('fx-bloom-str-val').textContent = (p.fx.bloomStr ?? 1.0).toFixed(1);
     }
 
     // Signal FX
@@ -3103,16 +3119,27 @@ class UIController {
 
     // Shape presets — set freq, ratio, phase, waveform for known Lissajous patterns
     const SHAPE_PRESETS = {
-      circle:   { freqL: 440, ratio: 1,     phase: 90,  wave: 'sine' },
-      figure8:  { freqL: 440, ratio: 2,     phase: 90,  wave: 'sine' },
-      heart:    { freqL: 220, ratio: 2,     phase: 45,  wave: 'sine' },
-      star:     { freqL: 300, ratio: 5/3,   phase: 90,  wave: 'sine' },
-      spiral:   { freqL: 440, ratio: 1.01,  phase: 90,  wave: 'sine' },
-      diamond:  { freqL: 440, ratio: 1,     phase: 90,  wave: 'triangle' },
-      web:      { freqL: 200, ratio: 8/5,   phase: 0,   wave: 'sine' },
-      chaos:    { freqL: 333, ratio: Math.PI/2, phase: 37, wave: 'sawtooth' },
-      flower:   { freqL: 300, ratio: 6/5,   phase: 90,  wave: 'sine' },
-      bowtie:   { freqL: 440, ratio: 2,     phase: 0,   wave: 'sine' },
+      // ratio = freqR/freqL   (X=freqL on horizontal, Y=freqR on vertical)
+      circle:   { freqL: 200, ratio: 1,          phase: 90,  wave: 'sine'     },
+      // 1:1 at 90° = perfect circle
+      figure8:  { freqL: 200, ratio: 2,          phase: 0,   wave: 'sine'     },
+      // 1:2 at 0° = vertical figure-8 (90° gives a parabola arc, not a figure-8)
+      heart:    { freqL: 200, ratio: 2,          phase: 55,  wave: 'triangle' },
+      // 1:2 triangle wave at 55° phase ≈ asymmetric heart-like curve
+      star:     { freqL: 100, ratio: 2.5,        phase: 90,  wave: 'sine'     },
+      // 2:5 at 90° = 5-lobe symmetric star pattern
+      spiral:   { freqL: 200, ratio: 1.007,      phase: 90,  wave: 'sine'     },
+      // Near-unison: ellipse slowly precesses once per ~0.7s — looks like a rotating orbit/spiral
+      diamond:  { freqL: 200, ratio: 1,          phase: 90,  wave: 'triangle' },
+      // 1:1 triangle at 90°: straight sides connect (0,1)→(1,0)→(0,-1)→(-1,0) = ◇ diamond
+      web:      { freqL: 100, ratio: 1.75,       phase: 0,   wave: 'sine'     },
+      // 4:7 at 0° = 28 crossing nodes — dense mesh/web-like figure
+      chaos:    { freqL: 317, ratio: Math.PI/2,  phase: 37,  wave: 'sawtooth' },
+      // Irrational ratio + sawtooth harmonics: pattern never closes, fills space
+      flower:   { freqL: 100, ratio: 1.5,        phase: 90,  wave: 'sine'     },
+      // 2:3 at 90° = classic trefoil / 3-petal rose curve (shamrock shape)
+      bowtie:   { freqL: 200, ratio: 0.5,        phase: 0,   wave: 'sine'     },
+      // 2:1 at 0° = horizontal figure-8 = bowtie (inverse of figure8 preset)
     };
 
     const genPresetBtns = document.querySelectorAll('.gen-preset-btn');
@@ -3239,6 +3266,9 @@ class UIController {
     this._bindRange('fx-beat-sens',   v => { s.fx.beatSens   = v; document.getElementById('fx-bs-val').textContent = v.toFixed(2); });
     this._bindRange('fx-afterglow-speed', v => { s.fx.afterglowSpeed = v; document.getElementById('fx-ag-val').textContent = v.toFixed(3); });
     this._bindRange('fx-afterglow-str', v => { s.fx.afterglowStr = v; document.getElementById('fx-afterglow-str-val').textContent = v.toFixed(2); });
+    this._bindRange('fx-reactive-str', v => { s.fx.reactiveStr = v; document.getElementById('fx-reactive-str-val').textContent = v.toFixed(1); });
+    this._bindRange('fx-beat-str',     v => { s.fx.beatStr     = v; document.getElementById('fx-beat-str-val').textContent = v.toFixed(2); });
+    this._bindRange('fx-bloom-str',    v => { s.fx.bloomStr    = v; document.getElementById('fx-bloom-str-val').textContent = v.toFixed(1); });
 
     // ── Record ────────────────────────────────────────────────────────
     const btnRec = document.getElementById('btn-record');
