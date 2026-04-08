@@ -22,6 +22,7 @@
       "display.html",
       "style.css",
       "app.js",
+      "src/**/*",
       "main.js",
       "preload.js",
       "preload-display.js",
