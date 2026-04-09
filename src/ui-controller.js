@@ -235,6 +235,8 @@ export class UIController {
     // ── OBJ file loading ───────────────────────────────────────────────
     const objDrop = document.getElementById('obj-drop-zone');
     const objFile = document.getElementById('obj-file');
+
+    // Load from a File object (drag/drop or file picker)
     const loadObj = async file => {
       if (!file || !file.name.toLowerCase().endsWith('.obj')) return;
       document.getElementById('obj-name').textContent = 'Loading…';
@@ -243,12 +245,95 @@ export class UIController {
       document.getElementById('obj-name').textContent =
         ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Parse error';
       objDrop.classList.toggle('loaded', ok);
+      if (ok && file.path) this._lastObjPath = { path: file.path, name: file.name };
+      return ok;
     };
+
+    // Load from a saved file path via Electron readFile bridge
+    const loadObjFromPath = async (filePath, fileName) => {
+      document.getElementById('obj-name').textContent = 'Loading…';
+      try {
+        const text = await window.electronAPI.readFile(filePath);
+        const ok   = s._obj.load(text, fileName);
+        document.getElementById('obj-name').textContent =
+          ok ? (fileName.length > 18 ? fileName.slice(0, 16) + '…' : fileName) : 'Parse error';
+        objDrop.classList.toggle('loaded', ok);
+        return ok;
+      } catch (_) {
+        document.getElementById('obj-name').textContent = 'File not found';
+        objDrop.classList.remove('loaded');
+        return false;
+      }
+    };
+
     objDrop.addEventListener('click',     () => objFile.click());
     objFile.addEventListener('change',    e  => loadObj(e.target.files[0]));
     objDrop.addEventListener('dragover',  e  => { e.preventDefault(); objDrop.classList.add('drag-over'); });
     objDrop.addEventListener('dragleave', () => objDrop.classList.remove('drag-over'));
     objDrop.addEventListener('drop',      e  => { e.preventDefault(); objDrop.classList.remove('drag-over'); loadObj(e.dataTransfer.files[0]); });
+
+    // ── OBJ Library ────────────────────────────────────────────────────
+    const OBJ_LIB_KEY  = 'osc_obj_library';
+    const objLibEl     = document.getElementById('obj-library');
+    const objLibList   = document.getElementById('obj-lib-list');
+    const objLibAddBtn = document.getElementById('obj-lib-add');
+
+    if (window.electronAPI?.readFile) objLibEl.style.display = '';
+
+    const _libLoad = () => {
+      try { return JSON.parse(localStorage.getItem(OBJ_LIB_KEY) || '[]'); }
+      catch (_) { return []; }
+    };
+    const _libSave = items => localStorage.setItem(OBJ_LIB_KEY, JSON.stringify(items));
+
+    let _activeLibIdx = -1;
+
+    const _renderLib = () => {
+      const items = _libLoad();
+      objLibList.innerHTML = '';
+      items.forEach((item, i) => {
+        const row  = document.createElement('div');
+        row.className = 'obj-lib-item' + (i === _activeLibIdx ? ' active' : '');
+
+        const name = document.createElement('span');
+        name.className = 'obj-lib-item-name';
+        name.textContent = item.name;
+        name.title = item.path;
+
+        const del = document.createElement('span');
+        del.className = 'obj-lib-item-del';
+        del.textContent = '×';
+        del.title = 'Remove from library';
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          const lib = _libLoad();
+          lib.splice(i, 1);
+          _libSave(lib);
+          if (_activeLibIdx === i) _activeLibIdx = -1;
+          else if (_activeLibIdx > i) _activeLibIdx--;
+          _renderLib();
+        });
+
+        row.appendChild(name);
+        row.appendChild(del);
+        row.addEventListener('click', async () => {
+          const ok = await loadObjFromPath(item.path, item.name);
+          if (ok) { _activeLibIdx = i; _renderLib(); }
+        });
+        objLibList.appendChild(row);
+      });
+    };
+
+    objLibAddBtn.addEventListener('click', () => {
+      if (!this._lastObjPath) return;
+      const lib = _libLoad();
+      if (lib.some(x => x.path === this._lastObjPath.path)) return;
+      lib.push(this._lastObjPath);
+      _libSave(lib);
+      _renderLib();
+    });
+
+    _renderLib();
 
     // ── OBJ-only: Rx / Ry ──────────────────────────────────────────────
     this._bindRange('obj-rx', v => { s._obj.rotX = v * Math.PI / 180; document.getElementById('obj-rx-val').textContent = Math.round(v) + '°'; });
@@ -382,6 +467,34 @@ export class UIController {
     });
     document.getElementById('sc-audio-sketch').addEventListener('change', e => {
       s._imgScene.audioSketch = e.target.checked;
+    });
+
+    // ── Movement FX ───────────────────────────────────────────────────
+    document.getElementById('sc-float').addEventListener('change', e => {
+      s._obj.float = e.target.checked; s._imgScene.float = e.target.checked;
+    });
+    document.getElementById('sc-ripple').addEventListener('change', e => {
+      s._obj.ripple = e.target.checked; s._imgScene.ripple = e.target.checked;
+    });
+    document.getElementById('sc-twist').addEventListener('change', e => {
+      s._obj.twist = e.target.checked; s._imgScene.twist = e.target.checked;
+    });
+    document.getElementById('sc-explode').addEventListener('change', e => {
+      const on = e.target.checked;
+      s._obj.explode = on; s._imgScene.explode = on;
+      // Reset phase so it starts fresh each time it's enabled
+      if (on) { s._obj._explodeT = 0; s._imgScene._explodeT = 0; }
+    });
+    document.getElementById('sc-explode-loop').addEventListener('change', e => {
+      s._obj.explodeLoop = e.target.checked; s._imgScene.explodeLoop = e.target.checked;
+    });
+    this._bindRange('sc-motion-amt', v => {
+      s._obj.motionAmt = v; s._imgScene.motionAmt = v;
+      document.getElementById('sc-motion-amt-val').textContent = v.toFixed(2);
+    });
+    this._bindRange('sc-motion-speed', v => {
+      s._obj.motionSpeed = v; s._imgScene.motionSpeed = v;
+      document.getElementById('sc-motion-speed-val').textContent = v.toFixed(1);
     });
 
     // ── Draw power + ramp ──────────────────────────────────────────────
@@ -756,6 +869,7 @@ export class UIController {
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
         breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        float: false, ripple: false, twist: false, explode: false, motionAmt: 0.2, motionSpeed: 1.0, explodeLoop: false,
         power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
         autoRotX: false, autoRotY: true, autoRotZ: false,
         rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,
@@ -769,6 +883,7 @@ export class UIController {
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
         breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        float: false, ripple: false, twist: false, explode: false, motionAmt: 0.2, motionSpeed: 1.0, explodeLoop: false,
         power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
         autoRotX: false, autoRotY: true, autoRotZ: false,
         rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,
@@ -782,6 +897,7 @@ export class UIController {
         objMode: false, obj3dMode: true, scale: 0.8, rotZ: 0, posX: 0, posY: 0,
         tileX: 1, tileY: 1, radialN: 1, scrollX: 0, scrollY: 0,
         breathe: false, shake: false, warp: false, warpAmt: 0.1,
+        float: false, ripple: false, twist: false, explode: false, motionAmt: 0.2, motionSpeed: 1.0, explodeLoop: false,
         power: 1, autoPower: false, powerLoop: false, powerSpeed: 0.004,
         autoRotX: false, autoRotY: true, autoRotZ: false,
         rotSpeedX: 0.5, rotSpeedY: 0.5, rotSpeedZ: 0.5,

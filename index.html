@@ -287,19 +287,6 @@
           <button class="ratio-btn" data-ratio="1.6">5:8</button>
         </div>
       </div>
-      <div class="fp-section-divider">SHAPE PRESETS</div>
-      <div class="gen-preset-grid">
-        <button class="gen-preset-btn" data-preset="circle" title="Circle">○ Circle</button>
-        <button class="gen-preset-btn" data-preset="figure8" title="Figure 8">∞ Figure 8</button>
-        <button class="gen-preset-btn" data-preset="heart" title="Heart">♡ Heart</button>
-        <button class="gen-preset-btn" data-preset="star" title="Star">☆ Star</button>
-        <button class="gen-preset-btn" data-preset="spiral" title="Spiral">◎ Spiral</button>
-        <button class="gen-preset-btn" data-preset="diamond" title="Diamond">◇ Diamond</button>
-        <button class="gen-preset-btn" data-preset="web" title="Web">✳ Web</button>
-        <button class="gen-preset-btn" data-preset="chaos" title="Chaos">⚡ Chaos</button>
-        <button class="gen-preset-btn" data-preset="flower" title="Flower">✿ Flower</button>
-        <button class="gen-preset-btn" data-preset="bowtie" title="Bowtie">⋈ Bowtie</button>
-      </div>
       <div class="audio-btns">
         <button class="sys-btn accent" id="btn-gen-start">▶ START</button>
         <button class="sys-btn" id="btn-gen-stop" disabled>■ STOP</button>
@@ -404,6 +391,14 @@
       <div class="file-drop" id="obj-drop-zone">
         <span id="obj-name">Drop .obj / click</span>
         <input type="file" id="obj-file" accept=".obj" hidden>
+      </div>
+
+      <!-- OBJ Library — saved file paths, loaded on demand -->
+      <div id="obj-library" style="display:none">
+        <div class="fp-section-divider" style="margin-top:4px">LIBRARY
+          <button class="sys-btn" id="obj-lib-add" title="Add current file to library" style="float:right;padding:0 5px;font-size:9px;margin-top:-2px">+ ADD</button>
+        </div>
+        <div id="obj-lib-list" class="obj-lib-list"></div>
       </div>
       <div class="file-drop" id="img-drop-zone" style="display:none">
         <span id="img-name">Drop image / click</span>
@@ -544,6 +539,26 @@
         <input type="range" id="sc-warp-amt" min="0.01" max="0.5" value="0.1" step="0.01">
         <span id="sc-warp-val">0.10</span>
       </label>
+
+      <!-- ── Movement FX ── -->
+      <div class="fp-section-divider">MOTION</div>
+      <div class="obj-fx-row">
+        <label class="toggle-lbl" title="Sinusoidal XY drift"><input type="checkbox" id="sc-float"> Float</label>
+        <label class="toggle-lbl" title="Expanding ring wave"><input type="checkbox" id="sc-ripple"> Ripple</label>
+        <label class="toggle-lbl" title="Spiral warp from center"><input type="checkbox" id="sc-twist"> Twist</label>
+        <label class="toggle-lbl" title="Burst outward from center"><input type="checkbox" id="sc-explode"> Explode</label>
+      </div>
+      <label class="fp-range-label">Amt
+        <input type="range" id="sc-motion-amt" min="0.05" max="1" value="0.2" step="0.01">
+        <span id="sc-motion-amt-val">0.20</span>
+      </label>
+      <label class="fp-range-label">Speed
+        <input type="range" id="sc-motion-speed" min="0.1" max="5" value="1" step="0.1">
+        <span id="sc-motion-speed-val">1.0</span>
+      </label>
+      <div class="obj-fx-row">
+        <label class="toggle-lbl" title="Explode cycles continuously"><input type="checkbox" id="sc-explode-loop"> Loop Explode</label>
+      </div>
 
       <!-- ── Draw power ── -->
       <div class="fp-section-divider">DRAW POWER</div>

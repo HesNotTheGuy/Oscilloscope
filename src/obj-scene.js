@@ -50,6 +50,15 @@ export class ObjScene {
     this.powerSpeed = 0.004;
     this.powerLoop  = false;
 
+    // Movement FX (applied post-projection; shared amt/speed controls all active effects)
+    this.float       = false;  // sinusoidal XY drift
+    this.ripple      = false;  // expanding ring wave displaces points radially
+    this.twist       = false;  // rotate points by amount proportional to distance from center
+    this.explode     = false;  // push points outward; loops back to center
+    this.motionAmt   = 0.2;   // shared intensity (0–1)
+    this.motionSpeed = 1.0;   // shared speed multiplier
+    this.explodeLoop = false;  // auto-restart explosion
+
     // Internal FX state
     this._pulse      = 0;
     this._breatheSc  = 1;
@@ -59,6 +68,13 @@ export class ObjScene {
     this._scrollOffY = 0;
     this._lastScrollT = 0;
     this._lastRotT   = 0;   // for time-based rotation
+    // Movement FX phases
+    this._floatPhX   = 0;
+    this._floatPhY   = 1.3;  // offset so X/Y are out of sync
+    this._ripplePh   = 0;
+    this._twistPh    = 0;
+    this._explodeT   = 0;
+    this._lastFxT    = 0;
   }
 
   load(text, name = 'model') {
@@ -206,7 +222,7 @@ export class ObjScene {
           ]);
         }
       }
-      return sym;
+      return this._applyMoveFx(sym, W, H);
     }
 
     // Tiling + infinite scroll
@@ -247,9 +263,103 @@ export class ObjScene {
           }
         }
       }
-      return tiled;
+      return this._applyMoveFx(tiled, W, H);
     }
 
-    return result;
+    return this._applyMoveFx(result, W, H);
+  }
+
+  // ── Movement FX — applied to final screen-space segments ─────────────
+  // All four effects share motionAmt (intensity) and motionSpeed (rate).
+  // Called after tiling/radial so the FX sweep across the full visible field.
+  _applyMoveFx(segs, W, H) {
+    const hasAny = this.float || this.ripple || this.twist || this.explode;
+    if (!hasAny || !segs.length) return segs;
+
+    const now = performance.now() / 1000;
+    const dt  = this._lastFxT > 0 ? Math.min(now - this._lastFxT, 0.05) : 1/60;
+    this._lastFxT = now;
+
+    const cx   = W / 2, cy = H / 2;
+    const half = Math.min(W, H) * 0.45;
+    const amt  = this.motionAmt;
+    const spd  = this.motionSpeed;
+
+    // ── Float: advance dual-phase oscillator ──
+    if (this.float) {
+      this._floatPhX += spd * 0.5  * dt * Math.PI * 2;
+      this._floatPhY += spd * 0.31 * dt * Math.PI * 2;  // ~golden-ratio offset keeps X/Y organic
+    }
+    const floatX = this.float ? Math.sin(this._floatPhX) * amt * 0.3 * half : 0;
+    const floatY = this.float ? Math.sin(this._floatPhY) * amt * 0.3 * half : 0;
+
+    // ── Ripple: expanding ring wave ──
+    if (this.ripple) this._ripplePh += spd * dt;
+
+    // ── Twist: wind/unwind angle ──
+    if (this.twist) this._twistPh += spd * 0.4 * dt;
+
+    // ── Explode: push outward then reset ──
+    let explodeF = 0;
+    if (this.explode) {
+      this._explodeT += spd * 0.3 * dt;
+      if (this._explodeT >= 1) {
+        if (this.explodeLoop) this._explodeT = 0;
+        else this._explodeT = 1;
+      }
+      // Ease in/out — fast burst, slow settle
+      const t = this._explodeT;
+      explodeF = (t < 0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2) * amt * 1.5 * half;
+    }
+
+    // ── Ripple spatial constants ──
+    const rippleWaves = 3;  // concentric ring count (fixed aesthetic)
+
+    return segs.map(([[x0,y0],[x1,y1]]) => {
+      let ax = x0, ay = y0, bx = x1, by = y1;
+
+      // Ripple — radially displace each point based on distance from center
+      if (this.ripple) {
+        const rp = (x, y) => {
+          const dx = x - cx, dy = y - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+          const phase = (dist / half) * rippleWaves * Math.PI * 2 - this._ripplePh * Math.PI * 2;
+          const disp  = Math.sin(phase) * amt * 0.25 * half;
+          return [x + (dx/dist) * disp, y + (dy/dist) * disp];
+        };
+        [ax, ay] = rp(ax, ay);
+        [bx, by] = rp(bx, by);
+      }
+
+      // Twist — rotate each point around center by angle ∝ distance
+      if (this.twist) {
+        const tp = (x, y) => {
+          const dx = x - cx, dy = y - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const angle = (dist / half) * amt * Math.PI * 1.5 + this._twistPh;
+          const cos = Math.cos(angle), sin = Math.sin(angle);
+          return [cx + dx*cos - dy*sin, cy + dx*sin + dy*cos];
+        };
+        [ax, ay] = tp(ax, ay);
+        [bx, by] = tp(bx, by);
+      }
+
+      // Float — global sinusoidal drift
+      ax += floatX; ay += floatY;
+      bx += floatX; by += floatY;
+
+      // Explode — push each point outward from center
+      if (explodeF > 0) {
+        const ep = (x, y) => {
+          const dx = x - cx, dy = y - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+          return [x + (dx/dist) * explodeF, y + (dy/dist) * explodeF];
+        };
+        [ax, ay] = ep(ax, ay);
+        [bx, by] = ep(bx, by);
+      }
+
+      return [[ax, ay], [bx, by]];
+    });
   }
 }

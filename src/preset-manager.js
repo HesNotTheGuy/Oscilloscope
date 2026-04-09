@@ -73,6 +73,13 @@ export class PresetManager {
       shake: obj.shake,
       warp: obj.warp,
       warpAmt: obj.warpAmt,
+      float: obj.float,
+      ripple: obj.ripple,
+      twist: obj.twist,
+      explode: obj.explode,
+      motionAmt: obj.motionAmt,
+      motionSpeed: obj.motionSpeed,
+      explodeLoop: obj.explodeLoop,
       power: obj.power,
       autoPower: obj.autoPower,
       powerLoop: obj.powerLoop,
@@ -147,6 +154,13 @@ export class PresetManager {
     obj.shake = preset.shake; img.shake = preset.shake;
     obj.warp = preset.warp; img.warp = preset.warp;
     obj.warpAmt = preset.warpAmt; img.warpAmt = preset.warpAmt;
+    if (preset.float      !== undefined) { obj.float      = preset.float;      img.float      = preset.float;      }
+    if (preset.ripple     !== undefined) { obj.ripple     = preset.ripple;     img.ripple     = preset.ripple;     }
+    if (preset.twist      !== undefined) { obj.twist      = preset.twist;      img.twist      = preset.twist;      }
+    if (preset.explode    !== undefined) { obj.explode    = preset.explode;    img.explode    = preset.explode;    }
+    if (preset.motionAmt  !== undefined) { obj.motionAmt  = preset.motionAmt;  img.motionAmt  = preset.motionAmt;  }
+    if (preset.motionSpeed!== undefined) { obj.motionSpeed= preset.motionSpeed;img.motionSpeed= preset.motionSpeed;}
+    if (preset.explodeLoop!== undefined) { obj.explodeLoop= preset.explodeLoop;img.explodeLoop= preset.explodeLoop;}
     obj.power = preset.power; img.power = preset.power;
     obj.autoPower = preset.autoPower; img.autoPower = preset.autoPower;
     obj.powerLoop = preset.powerLoop; img.powerLoop = preset.powerLoop;
@@ -303,6 +317,21 @@ export class PresetManager {
     setCheck('sc-warp', p.warp);
     setVal('sc-warp-amt', p.warpAmt);
     document.getElementById('sc-warp-val').textContent = p.warpAmt.toFixed(2);
+
+    // Motion FX
+    if (p.float      !== undefined) setCheck('sc-float',  p.float);
+    if (p.ripple     !== undefined) setCheck('sc-ripple', p.ripple);
+    if (p.twist      !== undefined) setCheck('sc-twist',  p.twist);
+    if (p.explode    !== undefined) setCheck('sc-explode',p.explode);
+    if (p.explodeLoop!== undefined) setCheck('sc-explode-loop', p.explodeLoop);
+    if (p.motionAmt  !== undefined) {
+      setVal('sc-motion-amt', p.motionAmt);
+      document.getElementById('sc-motion-amt-val').textContent = p.motionAmt.toFixed(2);
+    }
+    if (p.motionSpeed !== undefined) {
+      setVal('sc-motion-speed', p.motionSpeed);
+      document.getElementById('sc-motion-speed-val').textContent = p.motionSpeed.toFixed(1);
+    }
 
     // Draw power
     setVal('sc-power', p.power);
