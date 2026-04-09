@@ -27,6 +27,7 @@
 
 ## Table of Contents
 
+- [Why This Exists](#why-this-exists)
 - [What is DSO-1?](#what-is-dso-1)
 - [Quick Start](#quick-start)
 - [The Scope Display](#the-scope-display)
@@ -47,11 +48,17 @@
 
 ---
 
+## Why This Exists
+
+Oscilloscope music has been around for a while. The idea of routing audio through a scope and watching geometry materialize on a phosphor screen is genuinely fascinating, but most tools to do it have a steep setup curve, require patching audio through virtual cables, or just don't have the features I wanted to play with.
+
+I wanted something I could open, drop a song into, and immediately get something that looked cool. I also wanted features I hadn't seen elsewhere: image tracing, generative motion effects, a real signal generator for Lissajous figures, beat-reactive visuals, tiling and radial symmetry. And honestly, I partially just wanted to see if I could build something this polished working with Claude. Turns out you can.
+
 ## What is DSO-1?
 
-DSO-1 is a desktop oscilloscope visualizer that renders audio as real-time phosphor beam graphics. Feed it music, a microphone, or the built-in signal generator and watch it trace waveforms, Lissajous figures, 3D wireframes, and image silhouettes — all with authentic CRT glow and persistence.
+DSO-1 is a desktop oscilloscope visualizer that renders audio as real-time phosphor beam graphics. Feed it music, a microphone, or the built-in signal generator and watch it trace waveforms, Lissajous figures, 3D wireframes, and image silhouettes, all with authentic CRT glow and persistence.
 
-It's a real oscilloscope first. Every control maps to something an actual oscilloscope does: dual channels, adjustable V/DIV, timebase, trigger system, AC/DC coupling, frequency measurements. Then it goes further — GPU shaders, beat detection, 3D models, image tracing, tiling grids, and generative motion effects.
+It's a real oscilloscope first. Every control maps to something an actual oscilloscope does: dual channels, adjustable V/DIV, timebase, trigger system, AC/DC coupling, frequency measurements. Then it goes further with GPU shaders, beat detection, 3D models, image tracing, tiling grids, and generative motion effects.
 
 ---
 
