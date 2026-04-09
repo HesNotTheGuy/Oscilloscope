@@ -39,4 +39,7 @@ import { UIController } from './ui-controller.js';
     document.body.style.cssText = 'background:#111;color:#f66;font:14px monospace;padding:20px';
     document.body.innerHTML = '<b>Init error — open DevTools (Ctrl+Shift+I) for details:</b><br><pre>' + err.stack + '</pre>';
   }
+
+  // Expose internals for screenshot automation (harmless on desktop)
+  window._dso = { engine, scope, sigGen, recorder, ui, ensureAudio };
 })();

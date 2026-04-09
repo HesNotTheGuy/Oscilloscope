@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "screenshots": "electron screenshot.js",
     "dist": "electron-builder --win",
     "dist:installer": "electron-builder --win nsis --x64",
     "dist:portable": "electron-builder --win portable --x64"
