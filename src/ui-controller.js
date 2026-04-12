@@ -727,6 +727,19 @@ export class UIController {
         if (block) block.classList.toggle('fx-active', e.target.checked);
       });
     };
+    fxBindCheck('fx-gradient',  'gradient');
+    document.getElementById('gradient-start').addEventListener('input', e => { s.fx.gradientStart = e.target.value; });
+    document.getElementById('gradient-end').addEventListener('input', e => { s.fx.gradientEnd = e.target.value; });
+    document.getElementById('grad-dir-h').addEventListener('click', () => {
+      s.fx.gradientDir = 'h';
+      document.getElementById('grad-dir-h').classList.add('active');
+      document.getElementById('grad-dir-v').classList.remove('active');
+    });
+    document.getElementById('grad-dir-v').addEventListener('click', () => {
+      s.fx.gradientDir = 'v';
+      document.getElementById('grad-dir-v').classList.add('active');
+      document.getElementById('grad-dir-h').classList.remove('active');
+    });
     fxBindCheck('fx-reactive',  'reactive');
     fxBindCheck('fx-beat',      'beatFlash');
     fxBindCheck('fx-bloom',     'bloom');
@@ -811,13 +824,34 @@ export class UIController {
     // Only available when running inside Electron (preload exposes electronAPI)
     if (typeof window.electronAPI === 'undefined') return;
 
-    const btn    = document.getElementById('btn-popout');
-    const canvas = this.scope.canvas;
-    btn.style.display = '';   // show button now we know Electron is available
+    const btn         = document.getElementById('btn-popout');
+    const fsControls  = document.getElementById('fullscreen-controls');
+    const monSelect   = document.getElementById('monitor-select');
+    const btnFs       = document.getElementById('btn-fullscreen');
+    const canvas      = this.scope.canvas;
+
+    btn.style.display = '';           // show buttons now we know Electron is available
+    fsControls.style.display = '';
 
     let _open        = false;
     let _rafId       = null;
     let _lastSent    = 0;
+
+    // Populate monitor dropdown
+    const _refreshDisplays = async () => {
+      const displays = await window.electronAPI.getDisplays();
+      monSelect.innerHTML = '';
+      displays.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.label + (d.primary ? ' ★' : '');
+        monSelect.appendChild(opt);
+      });
+      // Default to non-primary if available (likely the projector/second monitor)
+      const nonPrimary = displays.find(d => !d.primary);
+      if (nonPrimary) monSelect.value = nonPrimary.id;
+    };
+    _refreshDisplays();
 
     const _streamLoop = () => {
       if (!_open) return;
@@ -825,15 +859,21 @@ export class UIController {
       const now = performance.now();
       if (now - _lastSent < 33) return;   // cap ~30 fps
       _lastSent = now;
-      // WebP compresses oscilloscope frames (mostly black) extremely well
       window.electronAPI.sendFrame(canvas.toDataURL('image/webp', 0.95));
     };
 
-    const _open_ = async () => {
-      await window.electronAPI.openDisplay();
-      _open  = true;
+    const _open_ = async (fullscreen = false) => {
+      const opts = fullscreen
+        ? { fullscreen: true, displayId: parseInt(monSelect.value, 10) }
+        : {};
+      await window.electronAPI.openDisplay(opts);
+      _open = true;
       btn.textContent = '✕ CLOSE DISPLAY';
       btn.classList.add('accent');
+      if (fullscreen) {
+        btnFs.textContent = '✕ EXIT FS';
+        btnFs.classList.add('accent');
+      }
       _streamLoop();
     };
 
@@ -842,20 +882,33 @@ export class UIController {
       if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
       btn.textContent = '⤢ POP OUT';
       btn.classList.remove('accent');
+      btnFs.textContent = '⛶ FULLSCREEN';
+      btnFs.classList.remove('accent');
       window.electronAPI.closeDisplay();
     };
 
-    btn.addEventListener('click', () => {
-      if (_open) _close_(); else _open_();
-    });
-
-    // Reset button if user closes the display window directly
-    window.electronAPI.onDisplayClosed(() => {
+    const _reset = () => {
       _open = false;
       if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
       btn.textContent = '⤢ POP OUT';
       btn.classList.remove('accent');
+      btnFs.textContent = '⛶ FULLSCREEN';
+      btnFs.classList.remove('accent');
+    };
+
+    btn.addEventListener('click', () => {
+      if (_open) _close_(); else _open_(false);
     });
+
+    btnFs.addEventListener('click', () => {
+      if (_open) _close_(); else _open_(true);
+    });
+
+    // Refresh display list when dropdown is focused (user might plug in a monitor)
+    monSelect.addEventListener('focus', _refreshDisplays);
+
+    // Reset buttons if user closes the display window directly (Escape / overlay X)
+    window.electronAPI.onDisplayClosed(_reset);
   }
 
   _setupPresets(s) {
@@ -1258,10 +1311,10 @@ export class UIController {
     // ── Built-in rig presets ──
     const BUILTIN_RIGS = {
       classic: {
-        left: [],
-        under: [],
-        right: [],
-        bottom: allIds.slice(), // everything at the bottom
+        left:   ['ch1', 'ch2', 'horiz', 'trig'],
+        under:  ['audio', 'siggen', 'presets'],
+        right:  ['beamfx', 'display', 'sigfx', 'scene'],
+        bottom: ['ctrl'],
       },
       studio: {
         left:   ['ch1', 'ch2', 'horiz', 'trig'],
@@ -1275,12 +1328,115 @@ export class UIController {
         right:  ['beamfx', 'sigfx', 'display'],
         bottom: ['ch1', 'ch2', 'horiz', 'trig', 'siggen', 'scene'],
       },
-      minimal: {
-        left:   [],
-        under:  [],
-        right:  allIds.slice(),
-        bottom: [],
+      default: {
+        left: [], under: [], bottom: [],
+        right: allIds.slice(),
       },
+    };
+
+    // ── Tab groups for tabbed rig ──
+    const TAB_GROUPS = {
+      scope:  { label: 'Scope',  ids: ['ch1', 'ch2', 'horiz', 'trig', 'ctrl'] },
+      beam:   { label: 'Beam',   ids: ['beamfx', 'display', 'sigfx'] },
+      scene:  { label: 'Scene',  ids: ['scene'] },
+      source: { label: 'Source', ids: ['audio', 'siggen', 'presets'] },
+    };
+
+    // ── Panel search aliases (for search bar) ──
+    const PANEL_ALIASES = {
+      ch1:     ['channel 1', 'voltage', 'v/div', 'vdiv', 'probe', 'input 1', 'coupling', 'ac', 'dc'],
+      ch2:     ['channel 2', 'voltage', 'v/div', 'vdiv', 'probe', 'input 2', 'coupling', 'ac', 'dc'],
+      horiz:   ['horizontal', 'timebase', 'time/div', 'time div', 'sweep', 'speed', 'yt', 'xy', 'lissajous'],
+      trig:    ['trigger', 'edge', 'rising', 'falling', 'slope', 'threshold', 'level'],
+      ctrl:    ['control', 'system', 'grid', 'crt', 'scanlines', 'screenshot', 'fullscreen', 'popout', 'measure', 'auto set'],
+      beamfx:  ['beam fx', 'beam effects', 'color', 'colour', 'phosphor', 'gradient', 'reactive', 'beat flash', 'bloom', 'halation', 'afterglow', 'invert'],
+      sigfx:   ['signal fx', 'signal effects', 'mirror', 'rotation', 'rotate', 'smooth', 'filter', 'frequency', 'freq', 'bass', 'treble', 'mid', 'bandpass'],
+      scene:   ['3d', '2d', 'obj', 'image', 'img', 'model', 'wireframe', 'geometry', 'tile', 'symmetry', 'motion', 'float', 'ripple', 'twist', 'explode', 'warp', 'scroll', 'spin', 'power'],
+      audio:   ['audio', 'input', 'mic', 'microphone', 'file', 'music', 'song', 'play', 'volume', 'mp3', 'wav'],
+      siggen:  ['signal generator', 'generator', 'sine', 'square', 'sawtooth', 'triangle', 'noise', 'waveform', 'oscillator', 'tone', 'frequency'],
+      presets: ['preset', 'save', 'load', 'export', 'import', 'slot'],
+      display: ['display', 'beam width', 'glow', 'persist', 'persistence', 'brightness', 'thickness'],
+    };
+
+    // ── Build tab bar + search bar (created once, toggled by rig) ──
+    const tabBar = document.createElement('div');
+    tabBar.className = 'tab-bar';
+    tabBar.style.display = 'none';
+    Object.keys(TAB_GROUPS).forEach(key => {
+      const btn = document.createElement('button');
+      btn.className = 'tab-bar-btn';
+      btn.dataset.tab = key;
+      btn.textContent = TAB_GROUPS[key].label;
+      tabBar.appendChild(btn);
+    });
+
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'tab-search-wrap';
+    searchWrap.style.display = 'none';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search controls…';
+    searchInput.className = 'tab-search';
+    searchWrap.appendChild(searchInput);
+
+    const zoneRight = zones.right;
+    zoneRight.prepend(searchWrap);
+    zoneRight.prepend(tabBar);
+
+    let activeTab = 'scope';
+    let tabbedMode = false;
+
+    const showTab = (tabKey) => {
+      activeTab = tabKey;
+      searchInput.value = '';
+      tabBar.querySelectorAll('.tab-bar-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabKey));
+      const visibleIds = TAB_GROUPS[tabKey].ids;
+      allSections.forEach(sec => {
+        if (tabbedMode) {
+          sec.classList.toggle('tab-hidden', !visibleIds.includes(sec.dataset.panelId));
+        }
+      });
+    };
+
+    tabBar.addEventListener('click', e => {
+      const btn = e.target.closest('.tab-bar-btn');
+      if (btn) showTab(btn.dataset.tab);
+    });
+
+    // ── Search logic ──
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { showTab(activeTab); return; }
+      // Clear tab highlight when searching
+      tabBar.querySelectorAll('.tab-bar-btn').forEach(b => b.classList.remove('active'));
+      allSections.forEach(sec => {
+        const id = sec.dataset.panelId;
+        const title = (sec.querySelector('.fp-title')?.textContent || '').toLowerCase();
+        const aliases = (PANEL_ALIASES[id] || []).join(' ');
+        const match = title.includes(q) || id.includes(q) || aliases.includes(q);
+        sec.classList.toggle('tab-hidden', !match);
+      });
+    });
+    // Escape clears search
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { searchInput.value = ''; showTab(activeTab); searchInput.blur(); }
+      e.stopPropagation(); // don't trigger app shortcuts
+    });
+
+    const enterTabbedMode = () => {
+      tabbedMode = true;
+      app.classList.add('tabbed-mode');
+      tabBar.style.display = '';
+      searchWrap.style.display = '';
+      showTab(activeTab);
+    };
+
+    const exitTabbedMode = () => {
+      tabbedMode = false;
+      app.classList.remove('tabbed-mode');
+      tabBar.style.display = 'none';
+      searchWrap.style.display = 'none';
+      allSections.forEach(sec => sec.classList.remove('tab-hidden'));
     };
 
     // ── State ──
@@ -1332,11 +1488,17 @@ export class UIController {
     // ── Rig select change ──
     rigSelect.addEventListener('change', () => {
       const name = rigSelect.value;
-      if (BUILTIN_RIGS[name]) {
+      if (name === 'default') {
+        applyRig(BUILTIN_RIGS.default);
+        enterTabbedMode();
+        localStorage.setItem('osc_rigName', name);
+      } else if (BUILTIN_RIGS[name]) {
+        exitTabbedMode();
         applyRig(BUILTIN_RIGS[name]);
         localStorage.setItem('osc_rigName', name);
       } else {
         // Custom rig from localStorage
+        exitTabbedMode();
         const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
         if (customs[name]) {
           applyRig(customs[name]);
@@ -1345,8 +1507,12 @@ export class UIController {
       }
     });
 
-    // ── Save custom rig ──
-    saveBtn.addEventListener('click', () => {
+    // ── Helpers: get current rig state + check if custom ──
+    const updateBtn  = document.getElementById('rig-update-btn');
+    const deleteBtn  = document.getElementById('rig-delete-btn');
+    const BUILTIN_NAMES = Object.keys(BUILTIN_RIGS);
+
+    const getCurrentRig = () => {
       const rig = {};
       Object.keys(zones).forEach(zk => {
         rig[zk] = [];
@@ -1354,8 +1520,25 @@ export class UIController {
           rig[zk].push(s.dataset.panelId);
         });
       });
+      return rig;
+    };
 
-      // Inline name input
+    const isCustomRig = () => !BUILTIN_NAMES.includes(rigSelect.value);
+
+    const refreshCustomButtons = () => {
+      const custom = isCustomRig();
+      updateBtn.style.display = custom ? '' : 'none';
+      deleteBtn.style.display = custom ? '' : 'none';
+    };
+    refreshCustomButtons();
+
+    // Show/hide on rig change
+    rigSelect.addEventListener('change', refreshCustomButtons);
+
+    // ── Save new custom rig ──
+    saveBtn.addEventListener('click', () => {
+      const rig = getCurrentRig();
+
       const input = document.createElement('input');
       input.type = 'text';
       input.placeholder = 'Rig name…';
@@ -1370,7 +1553,6 @@ export class UIController {
         localStorage.setItem('osc_customRigs', JSON.stringify(customs));
         localStorage.setItem('osc_rigName', name);
 
-        // Add option if not exists
         if (!rigSelect.querySelector(`option[value="${name}"]`)) {
           const opt = document.createElement('option');
           opt.value = name;
@@ -1378,9 +1560,8 @@ export class UIController {
           rigSelect.appendChild(opt);
         }
         rigSelect.value = name;
-
-        // Restore save button
         input.replaceWith(saveBtn);
+        refreshCustomButtons();
       };
 
       input.addEventListener('keydown', ev => {
@@ -1389,6 +1570,49 @@ export class UIController {
         ev.stopPropagation();
       });
       input.addEventListener('blur', doSave);
+    });
+
+    // ── Update current custom rig in place ──
+    updateBtn.addEventListener('click', () => {
+      const name = rigSelect.value;
+      if (BUILTIN_NAMES.includes(name)) return;
+      const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+      customs[name] = getCurrentRig();
+      localStorage.setItem('osc_customRigs', JSON.stringify(customs));
+      saveRigState();
+      // Brief flash to confirm
+      updateBtn.style.color = '#0f0';
+      setTimeout(() => { updateBtn.style.color = ''; }, 400);
+    });
+
+    // ── Delete current custom rig ──
+    deleteBtn.addEventListener('click', () => {
+      const name = rigSelect.value;
+      if (BUILTIN_NAMES.includes(name)) return;
+      const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+      delete customs[name];
+      localStorage.setItem('osc_customRigs', JSON.stringify(customs));
+      const opt = rigSelect.querySelector(`option[value="${name}"]`);
+      if (opt) opt.remove();
+      // Fall back to default
+      rigSelect.value = 'default';
+      rigSelect.dispatchEvent(new Event('change'));
+    });
+
+    // ── Layout mode toggle (masonry vs columns) ──
+    const layoutBtn = document.getElementById('rig-layout-btn');
+    let columnsMode = localStorage.getItem('osc_layoutMode') === 'columns';
+    if (columnsMode) app.classList.add('layout-columns');
+    const updateLayoutBtn = () => {
+      layoutBtn.classList.toggle('active', columnsMode);
+      layoutBtn.title = columnsMode ? 'Switch to masonry layout' : 'Switch to columns layout';
+    };
+    updateLayoutBtn();
+    layoutBtn.addEventListener('click', () => {
+      columnsMode = !columnsMode;
+      app.classList.toggle('layout-columns', columnsMode);
+      localStorage.setItem('osc_layoutMode', columnsMode ? 'columns' : 'masonry');
+      updateLayoutBtn();
     });
 
     // ── Edit mode toggle ──
@@ -1528,19 +1752,19 @@ export class UIController {
     });
 
     // ── Restore saved rig on startup ──
-    const savedName = localStorage.getItem('osc_rigName') || 'classic';
+    const savedName = localStorage.getItem('osc_rigName') || 'default';
     const savedRig  = JSON.parse(localStorage.getItem('osc_rigCurrent') || 'null');
 
     if (savedRig) {
-      // Restore exact last state (user may have rearranged without saving a named rig)
       applyRig(savedRig);
       if (rigSelect.querySelector(`option[value="${savedName}"]`)) {
         rigSelect.value = savedName;
       }
+      if (savedName === 'default') enterTabbedMode();
     } else {
-      // First launch — apply classic
-      applyRig(BUILTIN_RIGS[savedName] || BUILTIN_RIGS.classic);
+      applyRig(BUILTIN_RIGS[savedName] || BUILTIN_RIGS.default);
       rigSelect.value = savedName;
+      if (savedName === 'default') enterTabbedMode();
     }
   }
 }

@@ -26,11 +26,39 @@
       letter-spacing: 3px;
       pointer-events: none;
     }
+    #close-overlay {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 20px;
+      line-height: 38px;
+      text-align: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 100;
+      pointer-events: none;
+      font-family: Arial, sans-serif;
+    }
+    #close-overlay:hover {
+      background: rgba(255,60,60,0.6);
+    }
+    body.show-close #close-overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
   <canvas id="display-canvas"></canvas>
   <div id="waiting">WAITING FOR SIGNAL…</div>
+  <div id="close-overlay" title="Close display">✕</div>
 
   <script>
     const canvas  = document.getElementById('display-canvas');
@@ -63,6 +91,23 @@
     };
 
     window.displayAPI.onFrame(dataURL => { img.src = dataURL; });
+
+    // ── Close overlay: show on mouse move, hide after idle ──
+    let _hideTimer = null;
+    document.addEventListener('mousemove', () => {
+      document.body.classList.add('show-close');
+      clearTimeout(_hideTimer);
+      _hideTimer = setTimeout(() => document.body.classList.remove('show-close'), 2500);
+    });
+
+    document.getElementById('close-overlay').addEventListener('click', () => {
+      window.displayAPI.requestClose();
+    });
+
+    // Escape key closes the display window
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.displayAPI.requestClose();
+    });
   </script>
 </body>
 </html>

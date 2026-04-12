@@ -95,6 +95,12 @@ export class Oscilloscope {
       beatStr:     0.35,  // beat flash intensity
       bloomStr:    1.0,   // bloom glow multiplier
 
+      // Gradient beam
+      gradient:      false,
+      gradientStart: '#00ff41',
+      gradientEnd:   '#ff00ff',
+      gradientDir:   'h',   // 'h' = along waveform, 'v' = vertical (by amplitude)
+
       // Internal animation state
       _angle: 0,
       _flash: 0,
@@ -577,14 +583,35 @@ export class Oscilloscope {
     }
 
     // ⑤ GL frame: beam → blur → composite → blit
-    const glowStr = this.fx.bloom ? 1.4 * this.fx.bloomStr : 0.7;
-    const glowPx  = this.fx.bloom ? glow * 1.5 * this.fx.bloomStr : glow;
+    const glowStr = 0.7;
+    const glowPx  = glow;
+    const haloStr = this.fx.bloom ? 0.35 * this.fx.bloomStr : 0;
     const hueShift = this.fx.afterglow ? this.fx.afterglowSpeed : 0;
     // Afterglow overrides persistence with its own trail value
     const decay = this.fx.afterglow ? (1 - this.fx.afterglowStr) : this.persistence;
     const extraGroups = scenePts.length && hasSceneColor
       ? [{ pts: scenePts, color: this.sceneColor }] : null;
-    glr.frame(allPts, color, glowPx, bWidth, decay, glowStr, flashRGB, hueShift, extraGroups);
+
+    // Gradient beam — build per-point color arrays for each pointSet
+    let gradientColors = null;
+    if (this.fx.gradient && allPts.length) {
+      const _s0 = glr._rgba(this.fx.gradientStart, 1.0);
+      const r0=_s0[0],g0=_s0[1],b0=_s0[2];
+      const _s1 = glr._rgba(this.fx.gradientEnd, 1.0);
+      const r1=_s1[0],g1=_s1[1],b1=_s1[2];
+      const vertical = this.fx.gradientDir === 'v';
+      gradientColors = allPts.map(pts => {
+        const n = pts.length;
+        const colors = new Array(n);
+        for (let i = 0; i < n; i++) {
+          const t = vertical ? (pts[i][1] / H) : (n > 1 ? i / (n - 1) : 0);
+          colors[i] = [r0+(r1-r0)*t, g0+(g1-g0)*t, b0+(b1-b0)*t, 1.0];
+        }
+        return colors;
+      });
+    }
+
+    glr.frame(allPts, color, glowPx, bWidth, decay, glowStr, flashRGB, hueShift, extraGroups, gradientColors, haloStr);
 
     // ⑥ Overlay: grid + CRT + measurements
     const octx = glr.octx;

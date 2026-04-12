@@ -92,8 +92,8 @@ body {
   display: flex;
   gap: 6px;
   min-height: 28px;
+  align-items: flex-start;
   transition: outline-color 0.15s;
-  contain: layout style;
 }
 /* Side zones: vertical scroll */
 .zone-side {
@@ -116,26 +116,122 @@ body {
   min-width: 0 !important;
   width: 100%;
 }
-/* Under zone: horizontal wrap below scope */
+/* Under zone: masonry columns below scope */
 .zone-under {
-  flex-wrap: wrap;
+  display: block;
+  column-count: 2;
+  column-gap: 6px;
 }
-/* Bottom zone: full-width horizontal wrap */
+.zone-under > .fp-section {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+/* Bottom zone: masonry columns full width */
 .zone-bottom {
+  display: block;
+  column-count: 4;
+  column-gap: 6px;
+}
+.zone-bottom > .fp-section {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+
+/* Columns mode — override masonry back to flex-wrap with stretch */
+.app.layout-columns .zone-under,
+.app.layout-columns .zone-bottom {
+  display: flex;
+  column-count: unset;
   flex-wrap: wrap;
+  align-items: stretch;
+}
+.app.layout-columns .zone-under > .fp-section,
+.app.layout-columns .zone-bottom > .fp-section {
+  break-inside: unset;
+  margin-bottom: 0;
 }
 
 /* Hide empty zones so they don't take space */
 .panel-zone:empty { display: none; }
 
+/* ─── Tabbed rig mode ─── */
+.app.tabbed-mode #zone-left,
+.app.tabbed-mode #zone-under,
+.app.tabbed-mode #zone-bottom { display: none !important; }
+
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--panel-bg, #111);
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  flex-shrink: 0;
+}
+.tab-bar-btn {
+  flex: 1;
+  padding: 5px 2px;
+  font-size: 9px;
+  font-family: inherit;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--dim, #666);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.tab-bar-btn:hover { color: #aaa; background: rgba(255,255,255,0.04); }
+.tab-bar-btn.active {
+  color: var(--p, #0f0);
+  border-color: var(--border, #2a2a2a);
+  background: rgba(0,255,65,0.06);
+}
+.app.tabbed-mode .fp-section.tab-hidden { display: none !important; }
+
+.tab-search-wrap {
+  padding: 4px;
+  flex-shrink: 0;
+}
+.tab-search {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  letter-spacing: 0.5px;
+  background: var(--input-bg, #1a1a1a);
+  color: var(--fg, #ccc);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  outline: none;
+}
+.tab-search:focus {
+  border-color: var(--p, #0f0);
+}
+.tab-search::placeholder {
+  color: var(--dim, #555);
+}
+
 /* Edit mode: show zone outlines as drop targets */
 .app.rig-editing .panel-zone {
-  display: flex !important;  /* show even empty zones */
   outline: 1px dashed #2a3a2a;
   outline-offset: -1px;
   border-radius: 3px;
   min-height: 36px;
   position: relative;
+}
+/* Side zones need flex to show when empty */
+.app.rig-editing .panel-zone.zone-side {
+  display: flex !important;
+}
+/* Bottom/under: show when empty but preserve masonry */
+.app.rig-editing .zone-bottom:empty,
+.app.rig-editing .zone-under:empty {
+  display: block !important;
+}
+/* In columns mode, edit forces flex for all */
+.app.layout-columns.rig-editing .panel-zone {
+  display: flex !important;
 }
 .app.rig-editing .panel-zone::before {
   content: attr(data-zone);
@@ -501,6 +597,26 @@ body {
 }
 .toggle-lbl:hover { color: var(--text); }
 input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
+
+/* ─── Fullscreen display controls ─── */
+#fullscreen-controls {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  align-items: center;
+}
+.sys-select {
+  background: #111;
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: inherit;
+  padding: 3px 4px;
+  flex: 1;
+  min-width: 0;
+}
+.sys-select:focus { border-color: var(--p); outline: none; }
 
 .filter-row {
   display: flex;
@@ -898,6 +1014,27 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .color-swatch.active {
   border: 2px solid #fff;
   box-shadow: 0 0 4px rgba(255,255,255,0.5);
+}
+.grad-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+.grad-color-lbl {
+  font-size: 10px;
+  color: var(--dim);
+  width: 30px;
+}
+.grad-swatch {
+  width: 32px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 .color-custom-picker {
   width: 100%;
