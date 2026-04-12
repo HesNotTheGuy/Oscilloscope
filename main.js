@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 
 let win;
@@ -36,31 +36,60 @@ function createWindow() {
 
 // ── Display window IPC ────────────────────────────────────────────────────────
 
-ipcMain.handle('open-display', () => {
+ipcMain.handle('get-displays', () => {
+  return screen.getAllDisplays().map((d, i) => ({
+    id: d.id,
+    label: `Display ${i + 1} (${d.size.width}×${d.size.height})`,
+    bounds: d.bounds,
+    primary: d.id === screen.getPrimaryDisplay().id,
+  }));
+});
+
+ipcMain.handle('open-display', (_event, opts = {}) => {
   if (displayWin && !displayWin.isDestroyed()) {
     displayWin.focus();
     return;
   }
-  displayWin = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 640,
-    minHeight: 400,
+
+  const fullscreen = opts.fullscreen || false;
+  const displayId  = opts.displayId  || null;
+
+  let targetBounds = null;
+  if (fullscreen && displayId) {
+    const target = screen.getAllDisplays().find(d => d.id === displayId);
+    if (target) targetBounds = target.bounds;
+  }
+
+  const winOpts = {
+    width: targetBounds ? targetBounds.width : 1280,
+    height: targetBounds ? targetBounds.height : 800,
+    minWidth: fullscreen ? undefined : 640,
+    minHeight: fullscreen ? undefined : 400,
+    x: targetBounds ? targetBounds.x : undefined,
+    y: targetBounds ? targetBounds.y : undefined,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     title: 'DSO-1 — Display',
     icon: path.join(__dirname, 'icon.ico'),
+    frame: !fullscreen,
+    fullscreen: fullscreen,
+    alwaysOnTop: fullscreen,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload-display.js'),
     },
-  });
+  };
+
+  displayWin = new BrowserWindow(winOpts);
   displayWin.loadFile('display.html');
+
+  if (fullscreen) {
+    displayWin.setMenuBarVisibility(false);
+  }
 
   displayWin.on('closed', () => {
     displayWin = null;
-    // Notify the controls window so the button resets
     if (win && !win.isDestroyed()) {
       win.webContents.send('display-closed');
     }
@@ -68,6 +97,11 @@ ipcMain.handle('open-display', () => {
 });
 
 ipcMain.on('close-display', () => {
+  if (displayWin && !displayWin.isDestroyed()) displayWin.close();
+});
+
+// Display window can request its own close (Escape key / overlay X)
+ipcMain.on('display-request-close', () => {
   if (displayWin && !displayWin.isDestroyed()) displayWin.close();
 });
 

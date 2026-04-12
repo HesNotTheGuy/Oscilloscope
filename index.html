@@ -23,13 +23,16 @@
     </div>
     <div class="rig-picker" id="rig-picker" title="Layout rig">
       <select id="rig-select" class="rig-select">
+        <option value="default">Default</option>
         <option value="classic">Classic</option>
         <option value="studio">Studio</option>
         <option value="perform">Perform</option>
-        <option value="minimal">Minimal</option>
       </select>
       <button class="rig-btn" id="rig-save-btn" title="Save current layout as custom rig">💾</button>
+      <button class="rig-btn" id="rig-update-btn" title="Update current custom layout" style="display:none">↻</button>
+      <button class="rig-btn" id="rig-delete-btn" title="Delete current custom layout" style="display:none">✕</button>
       <button class="rig-btn" id="rig-edit-btn" title="Toggle edit mode — drag panels between zones">✎</button>
+      <button class="rig-btn" id="rig-layout-btn" title="Toggle masonry / columns layout">▦</button>
     </div>
     <button class="rec-btn" id="btn-record">● REC</button>
     <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
@@ -187,6 +190,10 @@
       </div>
       <button class="sys-btn" id="btn-screenshot">📷 SCREENSHOT</button>
       <button class="sys-btn" id="btn-popout" title="Pop display out to a second window" style="display:none">⤢ POP OUT</button>
+      <div id="fullscreen-controls" style="display:none">
+        <select id="monitor-select" class="sys-select" title="Choose display monitor"></select>
+        <button class="sys-btn" id="btn-fullscreen" title="Fullscreen on selected monitor">⛶ FULLSCREEN</button>
+      </div>
     </div>
 
     <!-- Signal FX — waveform-only manipulations -->
@@ -314,6 +321,25 @@
         <button class="color-swatch" data-color="#e0e0e0" style="background:#e0e0e0" title="White"></button>
       </div>
       <input type="color" id="phosphor-color" value="#00ff41" title="Custom color" class="color-custom-picker">
+
+      <!-- ── Gradient beam ── -->
+      <div class="fx-block">
+        <label class="fx-lbl"><input type="checkbox" id="fx-gradient"> Gradient Beam</label>
+        <div class="fx-params" id="fx-gradient-params">
+          <div style="display:flex;gap:6px;margin-bottom:4px">
+            <button class="obj-mode-btn active" id="grad-dir-h">Horiz</button>
+            <button class="obj-mode-btn" id="grad-dir-v">Vert</button>
+          </div>
+          <div class="grad-color-row">
+            <span class="grad-color-lbl">Start</span>
+            <input type="color" id="gradient-start" value="#00ff41" class="grad-swatch">
+          </div>
+          <div class="grad-color-row">
+            <span class="grad-color-lbl">End</span>
+            <input type="color" id="gradient-end" value="#ff00ff" class="grad-swatch">
+          </div>
+        </div>
+      </div>
 
       <!-- ── Beam effects ── -->
       <div class="fp-section-divider">EFFECTS</div>
