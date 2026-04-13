@@ -10,8 +10,9 @@ const path  = require('path');
 const fs    = require('fs');
 
 // ─── Asset paths ──────────────────────────────────────────────────────────────
-const AUDIO_FILE = 'C:\\Users\\USER\\Downloads\\Bread Beatz - Love Game.mp3';
-const IMAGE_FILE = 'C:\\Users\\USER\\Dropbox\\Assets\\1 - Uranium Corp\\Photos\\Emotes\\theguy.png';
+// Set these to your own local files for screenshot automation
+const AUDIO_FILE = '';  // e.g. 'C:\\path\\to\\song.mp3'
+const IMAGE_FILE = '';  // e.g. 'C:\\path\\to\\image.png'
 
 const OUT_DIR = path.join(__dirname, 'docs', 'screenshots');
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
