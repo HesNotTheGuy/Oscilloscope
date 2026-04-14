@@ -8,7 +8,9 @@
     "screenshots": "electron screenshot.js",
     "dist": "electron-builder --win",
     "dist:installer": "electron-builder --win nsis --x64",
-    "dist:portable": "electron-builder --win portable --x64"
+    "dist:portable": "electron-builder --win portable --x64",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "build": {
     "appId": "com.dso1.oscilloscope",
@@ -34,8 +36,18 @@
     "icon": "icon.ico",
     "win": {
       "target": [
-        { "target": "nsis",     "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "signAndEditExecutable": false
     },
@@ -52,6 +64,7 @@
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "vitest": "^4.1.4"
   }
 }
