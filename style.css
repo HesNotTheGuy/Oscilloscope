@@ -19,9 +19,23 @@ body {
   font-size: 11px;
   min-height: 100vh;
   display: flex;
-  justify-content: center;
-  padding: 14px 14px 24px;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a #0a0a0a;
 }
+
+/* Global dark scrollbar (Chromium / Electron) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 4px;
+  border: 1px solid #0a0a0a;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+::-webkit-scrollbar-corner { background: #0a0a0a; }
 
 .app {
   display: flex;
@@ -29,6 +43,8 @@ body {
   gap: 8px;
   width: 100%;
   max-width: 1600px;
+  padding: 14px 14px 0;
+  box-sizing: border-box;
 }
 
 /* ─── Rig picker in topbar ─── */
@@ -312,10 +328,22 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+  padding: 6px 152px 6px 16px; /* right padding reserves space for native window controls */
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-app-region: drag;
+}
+/* Make all interactive children of topbar non-draggable so clicks register */
+.topbar button,
+.topbar select,
+.topbar input,
+.topbar .rig-menu,
+.topbar .rec-menu,
+.topbar .rec-split,
+.topbar .rig-menu-wrap {
+  -webkit-app-region: no-drag;
 }
 .brand {
   font-size: 14px;
@@ -326,10 +354,18 @@ body {
   white-space: nowrap;
 }
 .topbar-status {
+  flex: 1;
+}
+/* Scope status strip — sits directly under the CRT screen */
+.scope-status {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  flex: 1;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  margin-top: 4px;
 }
 .st-item {
   font-size: 10px;

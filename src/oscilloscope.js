@@ -5,6 +5,7 @@ import { FXPipeline } from './fx-pipeline.js';
 import { ObjScene } from './obj-scene.js';
 import { ImageScene } from './image-scene.js';
 import { TIMEBASE, TB_DEFAULT, VDIV, VD_DEFAULT } from './constants.js';
+import { SnakeGame } from './snake-game.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -448,6 +449,35 @@ export class Oscilloscope {
     const W = this.canvas.width, H = this.canvas.height;
     const glr = this._glr;
 
+    // Snake easter egg short-circuit
+    if (this._snakeActive && this._snake) {
+      this._snake.update(performance.now());
+      const sets = this._snake.buildPointSets();
+      const color = this._snake.alive ? '#00ff41' : '#ff3333';
+      // Reuse fx pipeline values for a glowy beam
+      glr.frame(sets, color, 18, 3, 0.85, 0.7, null, 0, null, null, 0);
+      // Score overlay on the 2D overlay canvas
+      const octx = glr.octx;
+      octx.clearRect(0, 0, W, H);
+      octx.font = 'bold 32px Courier New';
+      octx.fillStyle = '#00ff41';
+      octx.shadowColor = '#00ff41';
+      octx.shadowBlur = 8;
+      octx.fillText(`SCORE ${this._snake.score}`, 24, 44);
+      if (!this._snake.alive) {
+        octx.font = 'bold 64px Courier New';
+        octx.fillStyle = '#ff3333';
+        octx.shadowColor = '#ff3333';
+        octx.textAlign = 'center';
+        octx.fillText('GAME OVER', W / 2, H / 2);
+        octx.font = 'bold 20px Courier New';
+        octx.fillText('press SPACE to restart · ESC to exit', W / 2, H / 2 + 40);
+        octx.textAlign = 'start';
+      }
+      octx.shadowBlur = 0;
+      return;
+    }
+
     // ① Get + process data
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
     let dataL, dataR;
@@ -715,6 +745,17 @@ export class Oscilloscope {
     }
     this.ch1.pos = 0; this.hPos = 0; this.trigLevel = 0;
     if (this._store) this.syncToStore();
+  }
+
+  // ── Snake easter egg ─────────────────────────────────────────
+  setSnakeMode(on) {
+    if (on) {
+      if (!this._snake) this._snake = new SnakeGame(this.canvas.width, this.canvas.height);
+      this._snake.reset();
+      this._snakeActive = true;
+    } else {
+      this._snakeActive = false;
+    }
   }
 
   // ── Transparent export mode ──────────────────────────────────

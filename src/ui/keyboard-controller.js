@@ -1,5 +1,7 @@
 'use strict';
 
+import { makeKonamiDetector } from '../snake-game.js';
+
 // ─────────────────────────────────────────────────────────────
 //  KeyboardController — registers actions with InputMapper
 //  and provides help overlay. All keyboard shortcuts route
@@ -67,6 +69,46 @@ export class KeyboardController {
     if (!mapper) {
       this._initLegacyKeyboard(s);
     }
+
+    // ── Snake easter egg ──
+    this._initSnake(s);
+  }
+
+  _initSnake(s) {
+    if (!s.setSnakeMode) return;
+
+    const enterSnake = () => {
+      s.setSnakeMode(true);
+    };
+    const exitSnake = () => {
+      s.setSnakeMode(false);
+      // Clear overlay
+      if (s._glr && s._glr.octx) {
+        s._glr.octx.clearRect(0, 0, s.canvas.width, s.canvas.height);
+      }
+    };
+
+    // Konami detector — global listener, sequence-only
+    const konami = makeKonamiDetector(enterSnake);
+    window.addEventListener('keydown', konami);
+
+    // Snake controls — only act when snake mode is active
+    window.addEventListener('keydown', ev => {
+      if (!s._snakeActive) return;
+      const tag = ev.target.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+      switch (ev.key) {
+        case 'ArrowUp':    ev.preventDefault(); s._snake.setDir(0, -1); break;
+        case 'ArrowDown':  ev.preventDefault(); s._snake.setDir(0,  1); break;
+        case 'ArrowLeft':  ev.preventDefault(); s._snake.setDir(-1, 0); break;
+        case 'ArrowRight': ev.preventDefault(); s._snake.setDir( 1, 0); break;
+        case 'Escape':     ev.preventDefault(); exitSnake(); break;
+        case ' ':
+          if (!s._snake.alive) { ev.preventDefault(); s._snake.reset(); }
+          break;
+      }
+    });
   }
 
   _initLegacyKeyboard(s) {

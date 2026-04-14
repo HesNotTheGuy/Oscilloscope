@@ -9,18 +9,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
 
-  <!-- Top status bar -->
+  <!-- Top status bar (full-width, doubles as window drag area) -->
   <div class="topbar">
     <span class="brand">DSO&#8209;1</span>
-    <div class="topbar-status">
-      <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
-      <span class="st-item" id="st-tb">1ms/div</span>
-      <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
-      <span class="st-item" id="st-freq">---</span>
-      <span class="st-item" id="st-src">No signal</span>
-    </div>
+    <div class="topbar-status"></div>
     <div class="rig-picker" id="rig-picker" title="Layout rig">
       <select id="rig-select" class="rig-select">
         <option value="default">Default</option>
@@ -56,6 +49,8 @@
     <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
   </div>
 
+<div class="app">
+
   <!-- Layout container — 4 drop zones: left, center (scope + under), right, bottom -->
   <div class="layout-body" id="layout-body">
 
@@ -71,6 +66,14 @@
             <div class="crt-overlay" id="crt-overlay"></div>
           </div>
         </div>
+      </div>
+      <!-- Scope status strip -->
+      <div class="scope-status">
+        <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
+        <span class="st-item" id="st-tb">1ms/div</span>
+        <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
+        <span class="st-item" id="st-freq">---</span>
+        <span class="st-item" id="st-src">No signal</span>
       </div>
       <!-- UNDER zone -->
       <div class="panel-zone zone-under" id="zone-under" data-zone="under"></div>
