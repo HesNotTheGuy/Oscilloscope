@@ -63,20 +63,66 @@ export class AudioController {
       if (e.isPlaying) e.play();
     });
 
-    // ── Record ──
-    const btnRec = document.getElementById('btn-record');
+    // ── Record (split button: main click + mode dropdown) ──
+    const btnRec     = document.getElementById('btn-record');
+    const btnMode    = document.getElementById('btn-record-mode');
+    const recMenu    = document.getElementById('rec-menu');
+
+    // Persisted mode: 'standard' | 'alpha'
+    let recMode = localStorage.getItem('osc_recMode') || 'standard';
+
+    const labelFor = m => m === 'alpha' ? '● REC α' : '● REC';
+    const syncMenu = () => {
+      if (!recMenu) return;
+      recMenu.querySelectorAll('.rec-menu-item').forEach(el => {
+        const sel = el.dataset.mode === recMode;
+        el.classList.toggle('selected', sel);
+        const check = el.querySelector('.rec-check');
+        if (check) check.textContent = sel ? '●' : '○';
+      });
+    };
+    const setIdleLabel = () => {
+      if (!rec.isRecording) btnRec.textContent = labelFor(recMode);
+    };
+    syncMenu();
+    setIdleLabel();
+
     btnRec.addEventListener('click', async () => {
       if (rec.isRecording) {
         rec.stop();
-        btnRec.textContent = '● REC';
+        if (recMode === 'alpha') this.scope.setTransparentMode(false);
         btnRec.classList.remove('recording');
+        setIdleLabel();
       } else {
         await this.ensureAudio();
-        rec.start(e.actx, e.gainNode);
+        const transparent = recMode === 'alpha';
+        if (transparent) this.scope.setTransparentMode(true);
+        rec.start(e.actx, e.gainNode, { transparent });
         btnRec.textContent = '■ STOP';
         btnRec.classList.add('recording');
       }
     });
+
+    if (btnMode && recMenu) {
+      btnMode.addEventListener('click', ev => {
+        ev.stopPropagation();
+        recMenu.hidden = !recMenu.hidden;
+      });
+      recMenu.addEventListener('click', ev => {
+        const item = ev.target.closest('.rec-menu-item');
+        if (!item) return;
+        recMode = item.dataset.mode;
+        localStorage.setItem('osc_recMode', recMode);
+        syncMenu();
+        setIdleLabel();
+        recMenu.hidden = true;
+      });
+      // Click-outside closes the menu
+      document.addEventListener('click', ev => {
+        if (recMenu.hidden) return;
+        if (!recMenu.contains(ev.target) && ev.target !== btnMode) recMenu.hidden = true;
+      });
+    }
 
     // ── Progress & status polling ──
     setInterval(() => {

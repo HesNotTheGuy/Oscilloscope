@@ -717,6 +717,16 @@ export class Oscilloscope {
     if (this._store) this.syncToStore();
   }
 
+  // ── Transparent export mode ──────────────────────────────────
+  //  Flips the GL renderer into alpha = luminance output so
+  //  captureStream() produces beam + glow on a fully transparent
+  //  background (webm-alpha / AE / Premiere). All FX and overlay
+  //  state is left alone — user chooses what to keep in frame.
+  setTransparentMode(on) {
+    this._transparentMode = !!on;
+    if (this._glr && this._glr.setAlphaMode) this._glr.setAlphaMode(on);
+  }
+
   // ── State Store bridge ───────────────────────────────────────
   //  Bidirectional sync between Oscilloscope properties and the
   //  centralised StateStore. Legacy code still mutates properties

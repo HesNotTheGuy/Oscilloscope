@@ -309,6 +309,66 @@ export class LayoutController {
       updateLayoutBtn();
     });
 
+    // ── Workspace ⋯ menu (folds the 5 hidden rig buttons) ──
+    const menuBtn = document.getElementById('rig-menu-btn');
+    const menu    = document.getElementById('rig-menu');
+    if (menuBtn && menu) {
+      const items = menu.querySelectorAll('.rig-menu-item');
+      const refreshMenuItems = () => {
+        const builtin = BUILTIN_NAMES.includes(rigSelect.value);
+        items.forEach(it => {
+          const action = it.dataset.action;
+          if (action === 'update' || action === 'delete') {
+            it.classList.toggle('disabled', builtin);
+          }
+        });
+      };
+      refreshMenuItems();
+      rigSelect.addEventListener('change', refreshMenuItems);
+
+      menuBtn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        refreshMenuItems();
+        menu.hidden = !menu.hidden;
+      });
+      menu.addEventListener('click', ev => {
+        const item = ev.target.closest('.rig-menu-item');
+        if (!item || item.classList.contains('disabled')) return;
+        const action = item.dataset.action;
+        menu.hidden = true;
+        switch (action) {
+          case 'save': {
+            const name = (window.prompt('Save current layout as…', '') || '').trim();
+            if (!name) return;
+            const slug = name.toLowerCase().replace(/\s+/g, '-');
+            const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+            customs[slug] = getCurrentRig();
+            localStorage.setItem('osc_customRigs', JSON.stringify(customs));
+            localStorage.setItem('osc_rigName', slug);
+            if (!rigSelect.querySelector(`option[value="${slug}"]`)) {
+              const opt = document.createElement('option');
+              opt.value = slug; opt.textContent = name;
+              rigSelect.appendChild(opt);
+            }
+            rigSelect.value = slug;
+            refreshCustomButtons();
+            refreshMenuItems();
+            break;
+          }
+          case 'update': updateBtn.click(); break;
+          case 'delete':
+            if (window.confirm(`Delete rig "${rigSelect.value}"?`)) deleteBtn.click();
+            break;
+          case 'edit': editBtn.click(); break;
+          case 'toggle-layout': layoutBtn.click(); break;
+        }
+      });
+      document.addEventListener('click', ev => {
+        if (menu.hidden) return;
+        if (!menu.contains(ev.target) && ev.target !== menuBtn) menu.hidden = true;
+      });
+    }
+
     // ── Edit mode toggle ──
     editBtn.addEventListener('click', () => {
       editing = !editing;

@@ -28,13 +28,31 @@
         <option value="studio">Studio</option>
         <option value="perform">Perform</option>
       </select>
-      <button class="rig-btn" id="rig-save-btn" title="Save current layout as custom rig">💾</button>
-      <button class="rig-btn" id="rig-update-btn" title="Update current custom layout" style="display:none">↻</button>
-      <button class="rig-btn" id="rig-delete-btn" title="Delete current custom layout" style="display:none">✕</button>
-      <button class="rig-btn" id="rig-edit-btn" title="Toggle edit mode — drag panels between zones">✎</button>
-      <button class="rig-btn" id="rig-layout-btn" title="Toggle masonry / columns layout">▦</button>
+      <button class="rig-btn" id="rig-save-btn" hidden>💾</button>
+      <button class="rig-btn" id="rig-update-btn" hidden>↻</button>
+      <button class="rig-btn" id="rig-delete-btn" hidden>✕</button>
+      <button class="rig-btn" id="rig-edit-btn" hidden>✎</button>
+      <button class="rig-btn" id="rig-layout-btn" hidden>▦</button>
+      <div class="rig-menu-wrap">
+        <button class="rig-btn" id="rig-menu-btn" title="Workspace options" aria-haspopup="true">⋯</button>
+        <div class="rig-menu" id="rig-menu" hidden>
+          <div class="rig-menu-item" data-action="save">Save as new rig…</div>
+          <div class="rig-menu-item" data-action="update">Update current rig</div>
+          <div class="rig-menu-item" data-action="delete">Delete current rig</div>
+          <div class="rig-menu-sep"></div>
+          <div class="rig-menu-item" data-action="edit">Edit layout (drag panels)</div>
+          <div class="rig-menu-item" data-action="toggle-layout">Toggle masonry / columns</div>
+        </div>
+      </div>
     </div>
-    <button class="rec-btn" id="btn-record">● REC</button>
+    <div class="rec-split" id="rec-split">
+      <button class="rec-btn rec-main" id="btn-record">● REC</button>
+      <button class="rec-btn rec-chevron" id="btn-record-mode" title="Recording options" aria-haspopup="true">▾</button>
+      <div class="rec-menu" id="rec-menu" hidden>
+        <div class="rec-menu-item" data-mode="standard"><span class="rec-check">●</span> Standard</div>
+        <div class="rec-menu-item" data-mode="alpha"><span class="rec-check">○</span> Transparent (alpha)</div>
+      </div>
+    </div>
     <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
   </div>
 

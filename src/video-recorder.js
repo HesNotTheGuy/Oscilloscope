@@ -12,7 +12,10 @@ export class VideoRecorder {
     this._audioDest  = null;
   }
 
-  start(actx, gainNode) {
+  start(actx, gainNode, opts = {}) {
+    const { transparent = false } = opts;
+    this._transparent = transparent;
+
     const videoStream = this.canvas.captureStream(60);
 
     // Capture audio via a MediaStreamDestination
@@ -24,12 +27,12 @@ export class VideoRecorder {
       ...this._audioDest.stream.getAudioTracks(),
     ]);
 
-    // Prefer VP9 for best quality, fallback to VP8
-    const mime = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm'
-    ].find(m => MediaRecorder.isTypeSupported(m));
+    // Transparent mode: VP8 is the codec with reliable alpha in WebM.
+    // Opaque mode: prefer VP9 for best quality.
+    const mime = (transparent
+      ? ['video/webm;codecs=vp8,opus', 'video/webm']
+      : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    ).find(m => MediaRecorder.isTypeSupported(m));
     this._chunks   = [];
     this._recorder = new MediaRecorder(combined, {
       mimeType: mime,
@@ -53,7 +56,8 @@ export class VideoRecorder {
   _download() {
     const blob = new Blob(this._chunks, { type: 'video/webm' });
     const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), { href: url, download: `osc_${Date.now()}.webm` });
+    const suffix = this._transparent ? '_alpha' : '';
+    const a    = Object.assign(document.createElement('a'), { href: url, download: `osc_${Date.now()}${suffix}.webm` });
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -10,7 +10,7 @@ export class WaveGLRenderer {
     this.H = canvas.height;
 
     const gl = canvas.getContext('webgl', {
-      alpha: false, antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance'
+      alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance'
     });
     if (!gl) throw new Error('WebGL not available');
     this.gl = gl;
@@ -97,7 +97,7 @@ export class WaveGLRenderer {
        void main(){ vU=aP*0.5+0.5; gl_Position=vec4(aP,0.0,1.0); }`,
       `precision mediump float;
        uniform sampler2D uPh, uGl, uBm, uHl;
-       uniform float uDk, uGS, uHS, uHlS;
+       uniform float uDk, uGS, uHS, uHlS, uAlphaMode;
        uniform vec3 uFl;
        varying vec2 vU;
        vec3 rgb2hsv(vec3 c){
@@ -125,7 +125,11 @@ export class WaveGLRenderer {
          vec3 gv=texture2D(uGl,vU).rgb*uGS;
          vec3 bm=texture2D(uBm,vU).rgb;
          vec3 hl=texture2D(uHl,vU).rgb*uHlS;
-         gl_FragColor=vec4(clamp(ph+gv+bm+hl+uFl,0.0,1.0),1.0);
+         vec3 rgb=clamp(ph+gv+bm+hl+uFl,0.0,1.0);
+         // Transparent mode: alpha = perceived luminance, so bright beam/glow
+         // is opaque and dark background is transparent.
+         float a = mix(1.0, clamp(max(max(rgb.r,rgb.g),rgb.b), 0.0, 1.0), uAlphaMode);
+         gl_FragColor=vec4(rgb,a);
        }`
     );
     this._c_aP  = gl.getAttribLocation(this._pComp,  'aP');
@@ -138,7 +142,11 @@ export class WaveGLRenderer {
     this._c_uHS  = gl.getUniformLocation(this._pComp, 'uHS');
     this._c_uHl  = gl.getUniformLocation(this._pComp, 'uHl');
     this._c_uHlS = gl.getUniformLocation(this._pComp, 'uHlS');
+    this._c_uAlphaMode = gl.getUniformLocation(this._pComp, 'uAlphaMode');
   }
+
+  // Transparent export mode: final frame alpha = luminance
+  setAlphaMode(on) { this.alphaMode = !!on; }
 
   _buildQuadBuffer() {
     const gl = this.gl;
@@ -363,6 +371,7 @@ export class WaveGLRenderer {
     gl.uniform1f(this._c_uGS, glowStr);
     gl.uniform1f(this._c_uHS, hueShift);
     gl.uniform1f(this._c_uHlS, haloStr);
+    gl.uniform1f(this._c_uAlphaMode, this.alphaMode ? 1.0 : 0.0);
     const fl = flashRGB || [0,0,0];
     gl.uniform3f(this._c_uFl, fl[0], fl[1], fl[2]);
     this._quad(this._pComp, this._c_aP);

@@ -69,6 +69,50 @@ body {
   color: #ff8800;
   animation: blink-save 0.8s step-start infinite;
 }
+.rig-btn[hidden] { display: none !important; }
+
+/* ─── Workspace ⋯ menu ─── */
+.rig-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+.rig-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 1000;
+  padding: 3px 0;
+}
+.rig-menu[hidden] { display: none; }
+.rig-menu-item {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+.rig-menu-item:hover {
+  background: #151515;
+  color: var(--p);
+}
+.rig-menu-item.disabled {
+  color: #444;
+  cursor: not-allowed;
+}
+.rig-menu-item.disabled:hover {
+  background: transparent;
+  color: #444;
+}
+.rig-menu-sep {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 3px 0;
+}
 
 /* ─── Layout body — horizontal: left | center-col | right ─── */
 .layout-body {
@@ -848,6 +892,66 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 }
 @keyframes blink-rec {
   50% { opacity: 0.5; }
+}
+
+/* ─── Record split button ─── */
+.rec-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+.rec-split .rec-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+.rec-split .rec-chevron {
+  padding: 5px 6px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.rec-split .rec-chevron:hover {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+.rec-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: #0a0a0a;
+  border: 1px solid #3a1a1a;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 1000;
+  padding: 3px 0;
+}
+.rec-menu[hidden] { display: none; }
+.rec-menu-item {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #aa6666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.rec-menu-item:hover {
+  background: #1a0a0a;
+  color: #ff4444;
+}
+.rec-menu-item .rec-check {
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+  text-align: center;
+  color: #664444;
+}
+.rec-menu-item.selected .rec-check {
+  color: #ff4444;
 }
 
 /* ─── Signal Generator ─── */
