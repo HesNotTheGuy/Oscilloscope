@@ -5,6 +5,8 @@ import { Oscilloscope } from './oscilloscope.js';
 import { SignalGenerator } from './signal-generator.js';
 import { VideoRecorder } from './video-recorder.js';
 import { UIController } from './ui-controller.js';
+import { StateStore, STATE_SCHEMA } from './state-store.js';
+import { InputMapper } from './input-mapper.js';
 
 //  Bootstrap
 // ─────────────────────────────────────────────────────────────
@@ -14,6 +16,14 @@ import { UIController } from './ui-controller.js';
   const scope    = new Oscilloscope(canvas, engine);
   const sigGen   = new SignalGenerator();
   const recorder = new VideoRecorder(canvas);
+  const store    = new StateStore(STATE_SCHEMA);
+  const inputMap = new InputMapper(store);
+
+  // Connect store ↔ oscilloscope (bidirectional sync)
+  scope.connectStore(store);
+
+  // Install default key bindings (no-op if custom mappings exist)
+  inputMap.installDefaults();
 
   let audioReady = false;
   async function ensureAudio() {
@@ -29,7 +39,7 @@ import { UIController } from './ui-controller.js';
   engine.startMic  = async () => { await ensureAudio(); return origMic(); };
   document.addEventListener('click', ensureAudio, { once: true });
 
-  const ui = new UIController(engine, scope, sigGen, recorder);
+  const ui = new UIController(engine, scope, sigGen, recorder, store, inputMap);
   ui._audioReady = false;
   ui._ensureAudio = ensureAudio;
   try {
@@ -41,5 +51,5 @@ import { UIController } from './ui-controller.js';
   }
 
   // Expose internals for screenshot automation (harmless on desktop)
-  window._dso = { engine, scope, sigGen, recorder, ui, ensureAudio };
+  window._dso = { engine, scope, sigGen, recorder, ui, store, inputMap, ensureAudio };
 })();

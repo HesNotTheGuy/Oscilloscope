@@ -16,6 +16,14 @@ function createWindow() {
     autoHideMenuBar: true,
     title: 'DSO-1 Oscilloscope',
     icon: path.join(__dirname, 'icon.ico'),
+    // Native min/max/close controls remain, but the bar background and
+    // button colors are themed to match the dark UI.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0a0a0a',
+      symbolColor: '#00ff41',
+      height: 32,
+    },
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

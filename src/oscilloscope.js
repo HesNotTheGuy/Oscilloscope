@@ -1,10 +1,11 @@
 'use strict';
 
 import { WaveGLRenderer } from './wave-gl-renderer.js';
-import { BeatDetector } from './beat-detector.js';
+import { FXPipeline } from './fx-pipeline.js';
 import { ObjScene } from './obj-scene.js';
 import { ImageScene } from './image-scene.js';
 import { TIMEBASE, TB_DEFAULT, VDIV, VD_DEFAULT } from './constants.js';
+import { SnakeGame } from './snake-game.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -113,7 +114,7 @@ export class Oscilloscope {
     this._freqTimer = 0;
     this.measFreq = 0;
 
-    this._beatDet = new BeatDetector();
+    this._fxPipe = new FXPipeline();
 
     // Phosphor buffer (2D fallback only — WebGL handles this internally)
     if (!this._glr) {
@@ -222,31 +223,10 @@ export class Oscilloscope {
   }
   getVoltScale(ch) { return 1 / (4 * ch.vdiv.v); }
 
-  // ── FX: compute runtime color + glow ─────────────────────────────────
+  // ── FX: delegated to FXPipeline ──────────────────────────────────────
   _updateFX(data) {
-    const fx  = this.fx;
-    const len = data.length;
-
-    // RMS — computed once, shared with beat detector
-    let sumSq = 0;
-    for (let i = 0; i < len; i++) sumSq += data[i] * data[i];
-    fx._rms = Math.sqrt(sumSq / len);
-
-    // Beat detection — pass pre-computed RMS (avoids recomputing over 8192 samples)
-    this._beatDet.sensitivity = fx.beatSens;
-    const { beat } = this._beatDet.detect(fx._rms);
-    this._lastBeat = beat;
-
-    if (beat && fx.beatFlash) fx._flash = 1.0;
-    if (fx._flash > 0) fx._flash *= 0.72;
-
-    // Rotation (time-based)
-    if (fx.rotation) {
-      const _now = performance.now() / 1000;
-      const _dt  = fx._lastRotT > 0 ? Math.min(_now - fx._lastRotT, 0.05) : 1/60;
-      fx._lastRotT = _now;
-      fx._angle = (fx._angle + fx.rotSpeed * _dt * 60) % (Math.PI * 2);
-    }
+    this._fxPipe.update(data, this.fx);
+    this._lastBeat = this._fxPipe.lastBeat;
   }
 
   _renderColor() {
@@ -254,15 +234,11 @@ export class Oscilloscope {
   }
 
   _renderGlow() {
-    return this.fx.reactive
-      ? this.glowAmount + this.fx._rms * 60 * this.fx.reactiveStr
-      : this.glowAmount;
+    return this._fxPipe.computeGlow(this.glowAmount, this.fx);
   }
 
   _renderBeamWidth() {
-    return this.fx.reactive
-      ? this.beamWidth * (1 + this.fx._rms * 1.5 * this.fx.reactiveStr)
-      : this.beamWidth;
+    return this._fxPipe.computeBeamWidth(this.beamWidth, this.fx);
   }
 
   // ── Grid ─────────────────────────────────────────────────────────────
@@ -473,6 +449,35 @@ export class Oscilloscope {
     const W = this.canvas.width, H = this.canvas.height;
     const glr = this._glr;
 
+    // Snake easter egg short-circuit
+    if (this._snakeActive && this._snake) {
+      this._snake.update(performance.now());
+      const sets = this._snake.buildPointSets();
+      const color = this._snake.alive ? '#00ff41' : '#ff3333';
+      // Reuse fx pipeline values for a glowy beam
+      glr.frame(sets, color, 18, 3, 0.85, 0.7, null, 0, null, null, 0);
+      // Score overlay on the 2D overlay canvas
+      const octx = glr.octx;
+      octx.clearRect(0, 0, W, H);
+      octx.font = 'bold 32px Courier New';
+      octx.fillStyle = '#00ff41';
+      octx.shadowColor = '#00ff41';
+      octx.shadowBlur = 8;
+      octx.fillText(`SCORE ${this._snake.score}`, 24, 44);
+      if (!this._snake.alive) {
+        octx.font = 'bold 64px Courier New';
+        octx.fillStyle = '#ff3333';
+        octx.shadowColor = '#ff3333';
+        octx.textAlign = 'center';
+        octx.fillText('GAME OVER', W / 2, H / 2);
+        octx.font = 'bold 20px Courier New';
+        octx.fillText('press SPACE to restart · ESC to exit', W / 2, H / 2 + 40);
+        octx.textAlign = 'start';
+      }
+      octx.shadowBlur = 0;
+      return;
+    }
+
     // ① Get + process data
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
     let dataL, dataR;
@@ -574,44 +579,18 @@ export class Oscilloscope {
       this.engine.stopDrawSound();
     }
 
-    // ④ Beat flash
-    let flashRGB = null;
-    if (this.fx._flash > 0.01) {
-      const rgba = glr._rgba(this.fx.beatInvert ? '#ffffff' : color);
-      const i = this.fx._flash * this.fx.beatStr;
-      flashRGB = [rgba[0]*i, rgba[1]*i, rgba[2]*i];
-    }
-
-    // ⑤ GL frame: beam → blur → composite → blit
-    const glowStr = 0.7;
-    const glowPx  = glow;
-    const haloStr = this.fx.bloom ? 0.35 * this.fx.bloomStr : 0;
-    const hueShift = this.fx.afterglow ? this.fx.afterglowSpeed : 0;
-    // Afterglow overrides persistence with its own trail value
-    const decay = this.fx.afterglow ? (1 - this.fx.afterglowStr) : this.persistence;
+    // ④ FX pipeline computations
+    const pipe     = this._fxPipe;
+    const flashRGB = pipe.computeFlashRGB(this.fx, color, glr._rgba.bind(glr));
+    const decay    = pipe.computeDecay(this.persistence, this.fx);
+    const haloStr  = pipe.computeHaloStr(this.fx);
+    const hueShift = pipe.computeHueShift(this.fx);
+    const gradientColors = pipe.computeGradient(allPts, this.fx, H, glr._rgba.bind(glr));
     const extraGroups = scenePts.length && hasSceneColor
       ? [{ pts: scenePts, color: this.sceneColor }] : null;
 
-    // Gradient beam — build per-point color arrays for each pointSet
-    let gradientColors = null;
-    if (this.fx.gradient && allPts.length) {
-      const _s0 = glr._rgba(this.fx.gradientStart, 1.0);
-      const r0=_s0[0],g0=_s0[1],b0=_s0[2];
-      const _s1 = glr._rgba(this.fx.gradientEnd, 1.0);
-      const r1=_s1[0],g1=_s1[1],b1=_s1[2];
-      const vertical = this.fx.gradientDir === 'v';
-      gradientColors = allPts.map(pts => {
-        const n = pts.length;
-        const colors = new Array(n);
-        for (let i = 0; i < n; i++) {
-          const t = vertical ? (pts[i][1] / H) : (n > 1 ? i / (n - 1) : 0);
-          colors[i] = [r0+(r1-r0)*t, g0+(g1-g0)*t, b0+(b1-b0)*t, 1.0];
-        }
-        return colors;
-      });
-    }
-
-    glr.frame(allPts, color, glowPx, bWidth, decay, glowStr, flashRGB, hueShift, extraGroups, gradientColors, haloStr);
+    // ⑤ GL frame: beam → blur → composite → blit
+    glr.frame(allPts, color, glow, bWidth, decay, 0.7, flashRGB, hueShift, extraGroups, gradientColors, haloStr);
 
     // ⑥ Overlay: grid + CRT + measurements
     const octx = glr.octx;
@@ -765,5 +744,240 @@ export class Oscilloscope {
       this.ch1.vdiv = VDIV[best]; this.ch1.vdivIdx = best;
     }
     this.ch1.pos = 0; this.hPos = 0; this.trigLevel = 0;
+    if (this._store) this.syncToStore();
+  }
+
+  // ── Snake easter egg ─────────────────────────────────────────
+  setSnakeMode(on) {
+    if (on) {
+      if (!this._snake) this._snake = new SnakeGame(this.canvas.width, this.canvas.height);
+      this._snake.reset();
+      this._snakeActive = true;
+    } else {
+      this._snakeActive = false;
+    }
+  }
+
+  // ── Transparent export mode ──────────────────────────────────
+  //  Flips the GL renderer into alpha = luminance output so
+  //  captureStream() produces beam + glow on a fully transparent
+  //  background (webm-alpha / AE / Premiere). All FX and overlay
+  //  state is left alone — user chooses what to keep in frame.
+  setTransparentMode(on) {
+    this._transparentMode = !!on;
+    if (this._glr && this._glr.setAlphaMode) this._glr.setAlphaMode(on);
+  }
+
+  // ── State Store bridge ───────────────────────────────────────
+  //  Bidirectional sync between Oscilloscope properties and the
+  //  centralised StateStore. Legacy code still mutates properties
+  //  directly; syncToStore() pushes current state out.
+  //  Store listeners update scope properties when external code
+  //  (UI, presets, scenes) writes through the store.
+
+  connectStore(store) {
+    this._store = store;
+
+    // Push current scope state → store (initial sync)
+    this.syncToStore();
+
+    // Store → scope: subscribe to each group
+    // Map of store path → scope setter
+    const bindings = {
+      // Scope operational
+      'scope.running':  v => { this.isRunning = v; },
+      'scope.mode':     v => { this.mode = v; },
+
+      // Channel 1
+      'ch1.coupling':   v => { this.ch1.coupling = v; },
+      'ch1.vdivIdx':    v => { this.ch1.vdivIdx = v; this.ch1.vdiv = VDIV[v]; },
+      'ch1.pos':        v => { this.ch1.pos = v; },
+
+      // Channel 2
+      'ch2.coupling':   v => { this.ch2.coupling = v; },
+      'ch2.vdivIdx':    v => { this.ch2.vdivIdx = v; this.ch2.vdiv = VDIV[v]; },
+      'ch2.pos':        v => { this.ch2.pos = v; },
+
+      // Horizontal
+      'horiz.tbIdx':    v => { this.tbIdx = v; this.tb = TIMEBASE[v]; },
+      'horiz.hPos':     v => { this.hPos = v; },
+
+      // Trigger
+      'trigger.source': v => { this.trigSource = v; },
+      'trigger.edge':   v => { this.trigEdge = v; },
+      'trigger.mode':   v => { this.trigMode = v; },
+      'trigger.level':  v => { this.trigLevel = v; },
+
+      // Display
+      'display.color':       v => { this.color = v; },
+      'display.sceneColor':  v => { this.sceneColor = v; },
+      'display.beamWidth':   v => { this.beamWidth = v; },
+      'display.glow':        v => { this.glowAmount = v; },
+      'display.persistence': v => { this.persistence = v; },
+      'display.showGrid':    v => { this.showGrid = v; },
+      'display.crtCurve':    v => { this.crtCurve = v; },
+      'display.showMeasure': v => { this.showMeasure = v; },
+
+      // Signal processing
+      'signal.smooth':        v => { this.smooth = v; },
+      'signal.filterEnabled': v => { this.filterEnabled = v; },
+      'signal.filterLow':     v => { this.filterLow = v; },
+      'signal.filterHigh':    v => { this.filterHigh = v; },
+
+      // Scene
+      'scene.enabled': v => { this.objMode = v; },
+      'scene.mode3d':  v => { this.obj3dMode = v; },
+    };
+
+    // FX — map store paths to fx sub-properties
+    const fxKeys = [
+      'reactive', 'beatFlash', 'bloom', 'mirrorX', 'mirrorY',
+      'rotation', 'beatInvert', 'afterglow', 'gradient',
+      'rotSpeed', 'beatSens', 'afterglowSpeed', 'afterglowStr',
+      'reactiveStr', 'beatStr', 'bloomStr',
+      'gradientStart', 'gradientEnd', 'gradientDir',
+    ];
+    for (const k of fxKeys) {
+      bindings[`fx.${k}`] = v => { this.fx[k] = v; };
+    }
+
+    // Scene transform — apply to both obj and img scenes
+    const sceneKeys = [
+      'scale', 'posX', 'posY', 'tileX', 'tileY', 'radialN',
+      'scrollX', 'scrollY', 'breathe', 'shake', 'warp', 'warpAmt',
+      'float', 'ripple', 'twist', 'explode', 'explodeLoop',
+      'motionAmt', 'motionSpeed', 'power', 'autoPower', 'powerSpeed', 'powerLoop',
+      'beatPulse', 'showAudio',
+    ];
+    for (const k of sceneKeys) {
+      bindings[`scene.${k}`] = v => {
+        const obj = this._obj, img = this._imgScene;
+        if (k === 'scale') { obj.scale = v; img.scale = v; }
+        else { obj[k] = v; img[k] = v; }
+      };
+    }
+    // Scene rotation — different property names across obj/img
+    bindings['scene.rotZ'] = v => {
+      this._obj.rotZ = v * Math.PI / 180;
+      this._imgScene.rotZ = v;
+    };
+    bindings['scene.autoRotX'] = v => { this._obj.autoRotX = v; this._imgScene.autoRotX3d = v; };
+    bindings['scene.autoRotY'] = v => { this._obj.autoRotY = v; this._imgScene.autoRotY3d = v; };
+    bindings['scene.autoRotZ'] = v => { this._obj.autoRotZ = v; this._imgScene.autoSpin = v; };
+    bindings['scene.rotSpeedX'] = v => { this._obj.rotSpeedX = v; this._imgScene.rotSpeedX3d = v; };
+    bindings['scene.rotSpeedY'] = v => { this._obj.rotSpeed = v; this._imgScene.rotSpeedY3d = v; };
+    bindings['scene.rotSpeedZ'] = v => { this._obj.rotSpeedZ = v; this._imgScene.rotSpeed = v; };
+
+    // Subscribe to all bound paths
+    this._storeUnsubs = [];
+    for (const [path, setter] of Object.entries(bindings)) {
+      this._storeUnsubs.push(store.on(path, setter));
+    }
+  }
+
+  /**
+   * Push current oscilloscope state → store.
+   * Called after direct property mutations (legacy code, autoSet, presets).
+   */
+  syncToStore() {
+    const s = this._store;
+    if (!s) return;
+    s.batch({
+      'scope.running':  this.isRunning,
+      'scope.mode':     this.mode,
+
+      'ch1.coupling':   this.ch1.coupling,
+      'ch1.vdivIdx':    this.ch1.vdivIdx,
+      'ch1.pos':        this.ch1.pos,
+
+      'ch2.coupling':   this.ch2.coupling,
+      'ch2.vdivIdx':    this.ch2.vdivIdx,
+      'ch2.pos':        this.ch2.pos,
+
+      'horiz.tbIdx':    this.tbIdx,
+      'horiz.hPos':     this.hPos,
+
+      'trigger.source': this.trigSource,
+      'trigger.edge':   this.trigEdge,
+      'trigger.mode':   this.trigMode,
+      'trigger.level':  this.trigLevel,
+
+      'display.color':       this.color,
+      'display.sceneColor':  this.sceneColor,
+      'display.beamWidth':   this.beamWidth,
+      'display.glow':        this.glowAmount,
+      'display.persistence': this.persistence,
+      'display.showGrid':    this.showGrid,
+      'display.crtCurve':    this.crtCurve,
+      'display.showMeasure': this.showMeasure,
+
+      'signal.smooth':        this.smooth,
+      'signal.filterEnabled': this.filterEnabled,
+      'signal.filterLow':     this.filterLow,
+      'signal.filterHigh':    this.filterHigh,
+
+      'fx.reactive':      this.fx.reactive,
+      'fx.beatFlash':     this.fx.beatFlash,
+      'fx.bloom':         this.fx.bloom,
+      'fx.mirrorX':       this.fx.mirrorX,
+      'fx.mirrorY':       this.fx.mirrorY,
+      'fx.rotation':      this.fx.rotation,
+      'fx.beatInvert':    this.fx.beatInvert,
+      'fx.afterglow':     this.fx.afterglow,
+      'fx.gradient':      this.fx.gradient,
+      'fx.rotSpeed':      this.fx.rotSpeed,
+      'fx.beatSens':      this.fx.beatSens,
+      'fx.afterglowSpeed': this.fx.afterglowSpeed,
+      'fx.afterglowStr':  this.fx.afterglowStr,
+      'fx.reactiveStr':   this.fx.reactiveStr,
+      'fx.beatStr':       this.fx.beatStr,
+      'fx.bloomStr':      this.fx.bloomStr,
+      'fx.gradientStart': this.fx.gradientStart,
+      'fx.gradientEnd':   this.fx.gradientEnd,
+      'fx.gradientDir':   this.fx.gradientDir,
+
+      'scene.enabled':    this.objMode,
+      'scene.mode3d':     this.obj3dMode,
+      'scene.scale':      this._obj.scale,
+      'scene.rotZ':       this.obj3dMode ? (this._obj.rotZ * 180 / Math.PI) : this._imgScene.rotZ,
+      'scene.posX':       this._obj.posX,
+      'scene.posY':       this._obj.posY,
+      'scene.tileX':      this._obj.tileX,
+      'scene.tileY':      this._obj.tileY,
+      'scene.radialN':    this._obj.radialN,
+      'scene.scrollX':    this._obj.scrollX,
+      'scene.scrollY':    this._obj.scrollY,
+      'scene.autoRotX':   this._obj.autoRotX,
+      'scene.autoRotY':   this._obj.autoRotY,
+      'scene.autoRotZ':   this._obj.autoRotZ,
+      'scene.rotSpeedX':  this._obj.rotSpeedX,
+      'scene.rotSpeedY':  this._obj.rotSpeed,
+      'scene.rotSpeedZ':  this._obj.rotSpeedZ,
+      'scene.beatPulse':  this._obj.beatPulse,
+      'scene.showAudio':  this._obj.showAudio,
+      'scene.breathe':    this._obj.breathe,
+      'scene.shake':      this._obj.shake,
+      'scene.warp':       this._obj.warp,
+      'scene.warpAmt':    this._obj.warpAmt,
+      'scene.float':      this._obj.float,
+      'scene.ripple':     this._obj.ripple,
+      'scene.twist':      this._obj.twist,
+      'scene.explode':    this._obj.explode,
+      'scene.explodeLoop': this._obj.explodeLoop,
+      'scene.motionAmt':  this._obj.motionAmt,
+      'scene.motionSpeed': this._obj.motionSpeed,
+      'scene.power':      this._obj.power,
+      'scene.autoPower':  this._obj.autoPower,
+      'scene.powerSpeed': this._obj.powerSpeed,
+      'scene.powerLoop':  this._obj.powerLoop,
+    });
+  }
+
+  disconnectStore() {
+    if (this._storeUnsubs) {
+      this._storeUnsubs.forEach(fn => fn());
+      this._storeUnsubs = null;
+    }
+    this._store = null;
   }
 }

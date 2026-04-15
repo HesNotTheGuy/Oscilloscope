@@ -19,9 +19,23 @@ body {
   font-size: 11px;
   min-height: 100vh;
   display: flex;
-  justify-content: center;
-  padding: 14px 14px 24px;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a #0a0a0a;
 }
+
+/* Global dark scrollbar (Chromium / Electron) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 4px;
+  border: 1px solid #0a0a0a;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+::-webkit-scrollbar-corner { background: #0a0a0a; }
 
 .app {
   display: flex;
@@ -29,6 +43,8 @@ body {
   gap: 8px;
   width: 100%;
   max-width: 1600px;
+  padding: 14px 14px 0;
+  box-sizing: border-box;
 }
 
 /* ─── Rig picker in topbar ─── */
@@ -68,6 +84,50 @@ body {
   border-color: #ff8800;
   color: #ff8800;
   animation: blink-save 0.8s step-start infinite;
+}
+.rig-btn[hidden] { display: none !important; }
+
+/* ─── Workspace ⋯ menu ─── */
+.rig-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+.rig-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 1000;
+  padding: 3px 0;
+}
+.rig-menu[hidden] { display: none; }
+.rig-menu-item {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+.rig-menu-item:hover {
+  background: #151515;
+  color: var(--p);
+}
+.rig-menu-item.disabled {
+  color: #444;
+  cursor: not-allowed;
+}
+.rig-menu-item.disabled:hover {
+  background: transparent;
+  color: #444;
+}
+.rig-menu-sep {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 3px 0;
 }
 
 /* ─── Layout body — horizontal: left | center-col | right ─── */
@@ -268,10 +328,22 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+  padding: 6px 152px 6px 16px; /* right padding reserves space for native window controls */
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-app-region: drag;
+}
+/* Make all interactive children of topbar non-draggable so clicks register */
+.topbar button,
+.topbar select,
+.topbar input,
+.topbar .rig-menu,
+.topbar .rec-menu,
+.topbar .rec-split,
+.topbar .rig-menu-wrap {
+  -webkit-app-region: no-drag;
 }
 .brand {
   font-size: 14px;
@@ -282,10 +354,18 @@ body {
   white-space: nowrap;
 }
 .topbar-status {
+  flex: 1;
+}
+/* Scope status strip — sits directly under the CRT screen */
+.scope-status {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  flex: 1;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  margin-top: 4px;
 }
 .st-item {
   font-size: 10px;
@@ -848,6 +928,66 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 }
 @keyframes blink-rec {
   50% { opacity: 0.5; }
+}
+
+/* ─── Record split button ─── */
+.rec-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+.rec-split .rec-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+.rec-split .rec-chevron {
+  padding: 5px 6px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.rec-split .rec-chevron:hover {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+.rec-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: #0a0a0a;
+  border: 1px solid #3a1a1a;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 1000;
+  padding: 3px 0;
+}
+.rec-menu[hidden] { display: none; }
+.rec-menu-item {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #aa6666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.rec-menu-item:hover {
+  background: #1a0a0a;
+  color: #ff4444;
+}
+.rec-menu-item .rec-check {
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+  text-align: center;
+  color: #664444;
+}
+.rec-menu-item.selected .rec-check {
+  color: #ff4444;
 }
 
 /* ─── Signal Generator ─── */

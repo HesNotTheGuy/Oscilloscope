@@ -9,18 +9,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
 
-  <!-- Top status bar -->
+  <!-- Top status bar (full-width, doubles as window drag area) -->
   <div class="topbar">
     <span class="brand">DSO&#8209;1</span>
-    <div class="topbar-status">
-      <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
-      <span class="st-item" id="st-tb">1ms/div</span>
-      <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
-      <span class="st-item" id="st-freq">---</span>
-      <span class="st-item" id="st-src">No signal</span>
-    </div>
+    <div class="topbar-status"></div>
     <div class="rig-picker" id="rig-picker" title="Layout rig">
       <select id="rig-select" class="rig-select">
         <option value="default">Default</option>
@@ -28,15 +21,35 @@
         <option value="studio">Studio</option>
         <option value="perform">Perform</option>
       </select>
-      <button class="rig-btn" id="rig-save-btn" title="Save current layout as custom rig">💾</button>
-      <button class="rig-btn" id="rig-update-btn" title="Update current custom layout" style="display:none">↻</button>
-      <button class="rig-btn" id="rig-delete-btn" title="Delete current custom layout" style="display:none">✕</button>
-      <button class="rig-btn" id="rig-edit-btn" title="Toggle edit mode — drag panels between zones">✎</button>
-      <button class="rig-btn" id="rig-layout-btn" title="Toggle masonry / columns layout">▦</button>
+      <button class="rig-btn" id="rig-save-btn" hidden>💾</button>
+      <button class="rig-btn" id="rig-update-btn" hidden>↻</button>
+      <button class="rig-btn" id="rig-delete-btn" hidden>✕</button>
+      <button class="rig-btn" id="rig-edit-btn" hidden>✎</button>
+      <button class="rig-btn" id="rig-layout-btn" hidden>▦</button>
+      <div class="rig-menu-wrap">
+        <button class="rig-btn" id="rig-menu-btn" title="Workspace options" aria-haspopup="true">⋯</button>
+        <div class="rig-menu" id="rig-menu" hidden>
+          <div class="rig-menu-item" data-action="save">Save as new rig…</div>
+          <div class="rig-menu-item" data-action="update">Update current rig</div>
+          <div class="rig-menu-item" data-action="delete">Delete current rig</div>
+          <div class="rig-menu-sep"></div>
+          <div class="rig-menu-item" data-action="edit">Edit layout (drag panels)</div>
+          <div class="rig-menu-item" data-action="toggle-layout">Toggle masonry / columns</div>
+        </div>
+      </div>
     </div>
-    <button class="rec-btn" id="btn-record">● REC</button>
+    <div class="rec-split" id="rec-split">
+      <button class="rec-btn rec-main" id="btn-record">● REC</button>
+      <button class="rec-btn rec-chevron" id="btn-record-mode" title="Recording options" aria-haspopup="true">▾</button>
+      <div class="rec-menu" id="rec-menu" hidden>
+        <div class="rec-menu-item" data-mode="standard"><span class="rec-check">●</span> Standard</div>
+        <div class="rec-menu-item" data-mode="alpha"><span class="rec-check">○</span> Transparent (alpha)</div>
+      </div>
+    </div>
     <button class="run-stop-btn running" id="btn-run-stop">RUN</button>
   </div>
+
+<div class="app">
 
   <!-- Layout container — 4 drop zones: left, center (scope + under), right, bottom -->
   <div class="layout-body" id="layout-body">
@@ -53,6 +66,14 @@
             <div class="crt-overlay" id="crt-overlay"></div>
           </div>
         </div>
+      </div>
+      <!-- Scope status strip -->
+      <div class="scope-status">
+        <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
+        <span class="st-item" id="st-tb">1ms/div</span>
+        <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
+        <span class="st-item" id="st-freq">---</span>
+        <span class="st-item" id="st-src">No signal</span>
       </div>
       <!-- UNDER zone -->
       <div class="panel-zone zone-under" id="zone-under" data-zone="under"></div>
