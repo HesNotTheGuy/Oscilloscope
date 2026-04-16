@@ -1,6 +1,7 @@
 'use strict';
 
 import { bindRange } from './ui-utils.js';
+import { hexToRgb } from '../themes.js';
 
 // ─────────────────────────────────────────────────────────────
 //  DisplayController — color, beam, grid, CRT, filters
@@ -45,6 +46,7 @@ export class DisplayController {
       s.color = hex;
       document.getElementById('phosphor-color').value = hex;
       document.documentElement.style.setProperty('--p', hex);
+      document.documentElement.style.setProperty('--p-rgb', hexToRgb(hex));
       document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
       const match = document.querySelector(`.color-swatch[data-color="${hex}"]`);
       if (match) match.classList.add('active');
@@ -55,6 +57,7 @@ export class DisplayController {
     document.getElementById('phosphor-color').addEventListener('input', ev => {
       s.color = ev.target.value;
       document.documentElement.style.setProperty('--p', ev.target.value);
+      document.documentElement.style.setProperty('--p-rgb', hexToRgb(ev.target.value));
       document.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
     });
 
