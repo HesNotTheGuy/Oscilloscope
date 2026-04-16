@@ -6,14 +6,14 @@
 
 <p align="center">
   <b>Real-time audio visualizer built as a fully functional digital oscilloscope</b><br>
-  WebGL-accelerated phosphor simulation &bull; Lissajous patterns &bull; 3D/2D scene rendering &bull; Music-reactive effects
+  WebGL-accelerated phosphor simulation &bull; Lissajous patterns &bull; 3D/2D scene rendering &bull; Music-reactive effects &bull; 10 visual themes
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
   <img src="https://img.shields.io/badge/electron-33-brightgreen?style=flat-square" alt="Electron 33">
   <img src="https://img.shields.io/badge/renderer-WebGL-orange?style=flat-square" alt="WebGL">
-  <img src="https://img.shields.io/badge/version-1.1.0-informational?style=flat-square" alt="v1.1.0">
+  <img src="https://img.shields.io/badge/version-1.3.0-informational?style=flat-square" alt="v1.3.0">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
 </p>
 
@@ -41,8 +41,10 @@
 - [CRT Emulation](#crt-emulation)
 - [Presets](#presets)
 - [Layout Rigs](#layout-rigs)
+- [Themes](#themes)
 - [Recording & Output](#recording--output)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Easter Eggs](#easter-eggs)
 - [Installation](#installation)
 - [Tech Stack](#tech-stack)
 
@@ -482,7 +484,30 @@ Panels can be dragged between four drop zones and collapsed or expanded. Four bu
 | **Perform** | Minimal controls, effects prominent, scope maximized |
 | **Minimal** | Everything collapsed to a narrow right sidebar |
 
-Save custom arrangements with the **SAVE RIG** button. All layout state (panel positions, collapsed state, active rig) persists in localStorage.
+Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown exposes: Save, Update, Delete, Edit Mode, and Toggle Layout. Built-in rigs cannot be updated or deleted — those actions are only available for custom rigs you save. All layout state (panel positions, collapsed state, active rig) persists in localStorage.
+
+---
+
+## Themes
+
+<p align="center">
+  <img src="docs/screenshots/theme-synthwave.png" alt="Synthwave theme" width="860">
+</p>
+
+10 built-in visual themes, each with a distinct aesthetic personality. Select via the theme picker dropdown in the topbar — the choice persists in localStorage.
+
+| Theme | Character |
+|-------|-----------|
+| **Classic Lab** | Default green phosphor on dark panels |
+| **Tektronix Blue** | 80s bench equipment aesthetic — chunky beveled panels, scanline overlay |
+| **Analog Amber** | Vintage CRT terminal, brushed metal, serif typography |
+| **MIL-SPEC** | Military equipment styling — monospace stencil font, zero border-radius, cross-hatch texture |
+| **Modern Minimal** | Light theme — white panels, pill buttons, hairline borders |
+| **Synthwave** | Neon glow borders, perspective grid, chrome knobs |
+| **Wooden Rack** | Studio rack aesthetic — wood grain texture, brass knobs, serif font |
+| **OLED Dark** | True black background, white trace, minimal UI chrome |
+| **Nixie Tube** | Warm orange glow, glass-tube bezel, vignette |
+| **Frosted Glass** | Glassmorphism — translucent panels with backdrop blur |
 
 ---
 
@@ -490,7 +515,11 @@ Save custom arrangements with the **SAVE RIG** button. All layout state (panel p
 
 ### Video Recording
 
-Records the oscilloscope output directly to **MP4** (VP9 codec, 25 Mbps). Click the record button to start, click again to stop and save. The file is written to your downloads folder with a timestamp filename.
+The record button is a split-button with a dropdown to select the recording mode — the choice persists in localStorage.
+
+**Standard** — records to **WebM** (VP8 codec). Click to start, click again to stop and save. Files go to your downloads folder with a timestamp filename.
+
+**Transparent (α)** — records WebM with VP8 and a real alpha channel. The composite shader outputs luminance as alpha, so the phosphor beam is transparent against black. Files get an `_alpha.webm` suffix. Ready for compositing in After Effects or Premiere without any chroma keying.
 
 ### Screenshots
 
@@ -520,6 +549,18 @@ Click **⤢ POP OUT** to open a second window containing only the scope display 
 | `S` | Single trigger |
 | `A` | Auto Set (auto-fit V/DIV + timebase) |
 | `?` | Show shortcut help overlay |
+
+Keyboard shortcuts can be remapped to MIDI input via the InputMapper.
+
+---
+
+## Easter Eggs
+
+<p align="center">
+  <img src="docs/screenshots/32-snake-game.png" alt="Snake game easter egg" width="860">
+</p>
+
+Enter the **Konami code** (↑ ↑ ↓ ↓ ← → ← → B A) to launch a Snake game rendered through the WaveGL beam pipeline — the snake and food are drawn as phosphor geometry on the scope display. Arrow keys to steer, Space to restart, Esc to exit.
 
 ---
 
@@ -556,11 +597,13 @@ Outputs go to the `dist/` folder.
 | Rendering | WebGL — GPU Gaussian blur, phosphor persistence, GLSL shaders |
 | Fallback | Canvas 2D with composite blend modes |
 | Audio | Web Audio API — AnalyserNode, real-time FFT, biquad filter chain |
-| Recording | MediaRecorder API — VP9/WebP encoding |
+| Recording | MediaRecorder API — VP8/WebM encoding, real-alpha transparent capture |
 | 3D | Custom Wavefront `.obj` parser, Euler rotation, perspective projection |
 | Image Trace | Sobel edge detection, greedy nearest-neighbor path sort, alpha boundary |
 | Layout | HTML5 Drag and Drop API, localStorage persistence |
-| Architecture | ES Modules — 13 source files under `src/` |
+| Architecture | Modular ES modules — domain controllers under `src/ui/` |
+| Testing | Vitest — 134 unit tests |
+| Themes | 10 built-in CSS themes with scope parameter presets |
 
 ---
 

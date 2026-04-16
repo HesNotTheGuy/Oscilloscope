@@ -70,9 +70,18 @@ async function waitForDso(win, ms = 15000) {
 }
 
 async function shot(win, file, desc) {
-  const img = await win.webContents.capturePage();
-  fs.writeFileSync(path.join(OUT_DIR, file), img.toPNG());
-  console.log(`  ✓  ${file.padEnd(36)} ${desc}`);
+  // Retry up to 3 times — capturePage can return empty if frame not ready
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const img = await win.webContents.capturePage();
+    const buf = img.toPNG();
+    if (buf.length > 100) {
+      fs.writeFileSync(path.join(OUT_DIR, file), buf);
+      console.log(`  ✓  ${file.padEnd(36)} ${desc}`);
+      return;
+    }
+    await sleep(500);
+  }
+  console.warn(`  ✗  ${file.padEnd(36)} EMPTY — capturePage failed`);
 }
 
 // ─── Renderer-side JS blocks ───────────────────────────────────────────────────
@@ -285,265 +294,129 @@ async function runShots(win, port) {
     return shot(win, f, d);
   };
 
-  // ── Signal-gen / Lissajous shots ─────────────────────────────────────────
+  // ── v1.3.0 Feature screenshots only ───────────────────────────────────────
 
-  // 01 Overview — idle signal gives a nice organic waveform
+  // Set up a nice baseline signal so the scope looks alive
   await go(RESET_FX); await go(YT_MODE);
   await go(`(() => { const { engine: e } = window._dso; e.startIdleSignal?.(); return 'idle'; })()`);
   await go(SET(`s.glowAmount=14; s.beamWidth=1.6; s.persistence=0.25;`));
+  await wait(1500);
+
+  // Close all menus — both use the hidden attribute, not CSS classes
+  const closeMenus = async () => {
+    await go(`(() => {
+      const rm = document.getElementById('rec-menu');
+      const wm = document.getElementById('rig-menu');
+      if (rm) rm.hidden = true;
+      if (wm) wm.hidden = true;
+      return 'menus-closed';
+    })()`);
+    await wait(100);
+  };
+
+  await closeMenus();
+
+  // 30 Record split-button menu open
+  await go(`(() => { const rm = document.getElementById('rec-menu'); if(rm) rm.hidden = false; return 'rec-menu'; })()`);
+  await wait(400);
+  await snap('30-record-menu.png', 'Record split-button with mode dropdown');
+  await closeMenus();
+
+  // 31 Workspace menu open
+  await closeMenus();
+  await go(`(() => { const wm = document.getElementById('rig-menu'); if(wm) wm.hidden = false; return 'rig-menu'; })()`);
+  await wait(400);
+  await snap('31-workspace-menu.png', 'Workspace menu');
+  await closeMenus();
+
+  // 32 Snake game — display only (capture just the scope canvas area)
+  await go(`(() => { window._dso.scope.setSnakeMode(true); return 'snake'; })()`);
+  await wait(600);
+  await go(`(() => { const s = window._dso.scope._snake; s.setDir(1,0); return 'r'; })()`);
+  await wait(400);
+  await go(`(() => { const s = window._dso.scope._snake; s.setDir(0,1); return 'd'; })()`);
+  await wait(400);
+  await go(`(() => { const s = window._dso.scope._snake; s.setDir(-1,0); return 'l'; })()`);
+  await wait(400);
+  await go(`(() => { const s = window._dso.scope._snake; s.setDir(0,-1); return 'u'; })()`);
+  await wait(600);
+  // Capture only the scope display area
+  const scopeRect = await go(`(() => {
+    const el = document.querySelector('.crt-bezel');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+  })()`);
+  if (scopeRect) {
+    const img = await win.webContents.capturePage({
+      x: scopeRect.x, y: scopeRect.y,
+      width: scopeRect.w, height: scopeRect.h,
+    });
+    fs.writeFileSync(path.join(OUT_DIR, '32-snake-game.png'), img.toPNG());
+    console.log('  ✓  32-snake-game.png                    Snake easter egg — display only');
+  }
+  await go(`(() => { window._dso.scope.setSnakeMode(false); return 'exit'; })()`);
+  await wait(300);
+
+  // ── Theme gallery (Classic rig so panels are visible) ────────────────────
+  console.log('\n  Switching to Classic rig for theme shots...');
+  await closeMenus();
+
+  // Use the rig selector to apply Classic layout properly
+  await go(`(() => {
+    const sel = document.getElementById('rig-select');
+    if (sel) { sel.value = 'classic'; sel.dispatchEvent(new Event('change')); }
+    // Expand all collapsed panels so they're visible
+    setTimeout(() => {
+      document.querySelectorAll('.fp-section.collapsed').forEach(s => s.classList.remove('collapsed'));
+      window.dispatchEvent(new Event('resize'));
+    }, 300);
+    return 'classic-rig';
+  })()`);
   await wait(2000);
-  await snap('01-overview.png', 'Full app overview — YT mode');
 
-  // 02 YT classic green
   await go(RESET_FX); await go(YT_MODE);
   await go(`(() => { const { engine: e } = window._dso; e.startIdleSignal?.(); return 'idle'; })()`);
-  await go(SET(`s.color='#00ff41'; s.glowAmount=16; s.beamWidth=1.6; s.persistence=0.25;`));
-  await wait(1800);
-  await snap('02-yt-mode.png', 'YT waveform — classic green');
+  await go(SET(`s.glowAmount=14; s.beamWidth=1.6; s.persistence=0.25;`));
 
-  // 02b YT bloom
-  await flush();
-  await go(RESET_FX); await go(YT_MODE);
-  await go(`(() => { const { engine: e } = window._dso; e.startIdleSignal?.(); return 'idle'; })()`);
-  await go(SET(`s.color='#00ff41'; s.glowAmount=20; s.beamWidth=1.8; s.persistence=0.2; s.fx.bloom=true; s.fx.bloomStr=0.9;`));
-  await wait(1800);
-  await snap('02b-yt-bloom.png', 'YT mode — bloom glow');
+  const themes = [
+    'classic-lab', 'tektronix-blue', 'analog-amber', 'mil-spec',
+    'modern-minimal', 'synthwave', 'wooden-rack', 'oled-dark',
+    'nixie-tube', 'frosted-glass',
+  ];
 
-  // 03 Hero Lissajous — 2:3 sine at 45° gives a classic three-node pretzel figure
-  await flush();
-  await go(RESET_FX); await go(START_GEN(200, 300, 45, 'sine'));
-  await go(SET(`s.color='#ff3366'; s.glowAmount=18; s.beamWidth=1.8; s.persistence=0.75;`));
-  await wait(2500);
-  await snap('03-xy-lissajous.png', 'XY Lissajous — 2:3 pretzel');
-
-  // 03b–03i Lissajous variety — flush between each so trails don't bleed
-  for (const [file, desc, fL, fR, ph, wave, color, persist] of [
-    ['03b-circle.png',  'circle',   200, 200,  90, 'sine',     '#00ff41', 0.7],
-    ['03c-figure8.png', 'figure 8', 200, 400,   0, 'sine',     '#00ffff', 0.7],
-    ['03d-star.png',    'star',     100, 250,  90, 'sine',     '#ffff00', 0.7],
-    ['03e-flower.png',  'flower',   100, 150,  90, 'sine',     '#ff00ff', 0.7],
-    ['03f-diamond.png', 'diamond',  200, 200,  90, 'triangle', '#00ffff', 0.7],
-    ['03g-web.png',     'web',      100, 175,   0, 'sine',     '#aaffaa', 0.6],
-    ['03h-chaos.png',   'chaos',    317, 498,  37, 'sawtooth', '#ff6600', 0.08],
-    ['03i-bowtie.png',  'bowtie',   200, 100,   0, 'sine',     '#ff3300', 0.7],
-  ]) {
+  for (const theme of themes) {
     await flush();
-    await go(RESET_FX); await go(START_GEN(fL, fR, ph, wave));
-    await go(SET(`s.color='${color}'; s.glowAmount=22; s.beamWidth=1.8; s.persistence=${persist};`));
-    await wait(2000);
-    await snap(file, `Lissajous — ${desc}`);
+    // Apply theme
+    await go(`(() => {
+      const rm = document.getElementById('rec-menu');
+      const wm = document.getElementById('rig-menu');
+      if (rm) rm.hidden = true;
+      if (wm) wm.hidden = true;
+      const mgr = window._dso.ui?._themeMgr;
+      if (mgr) {
+        const defaults = mgr.apply('${theme}');
+        const s = window._dso.scope;
+        if (defaults?.traceColor) s.color = defaults.traceColor;
+        if (defaults?.glowAmount !== undefined) s.glowAmount = defaults.glowAmount;
+        if (defaults?.beamWidth !== undefined) s.beamWidth = defaults.beamWidth;
+        if (defaults?.persistence !== undefined) s.persistence = defaults.persistence;
+        document.getElementById('theme-select').value = '${theme}';
+      }
+      return '${theme}';
+    })()`);
+    await wait(1800);
+    await closeMenus();
+    await snap(`theme-${theme}.png`, `Theme: ${theme}`);
   }
 
-  // 03j Rotating ring — 200 vs 201 Hz beat = 1Hz rotation, high persistence builds glowing trail
-  await flush();
-  await go(RESET_FX); await go(START_GEN(200, 201, 90, 'sine'));
-  await go(SET(`s.color='#00ff99'; s.persistence=0.92; s.glowAmount=9; s.beamWidth=1.3;`));
-  await wait(3000);
-  await snap('03j-spiral.png', 'Lissajous — slow-rotating ring');
-
-  // 04 Signal gen panel
-  await go(RESET_FX); await go(START_GEN(100, 250, 90, 'sine'));
-  await go(SET(`s.color='#ffff00'; s.glowAmount=16;`));
-  await go(SHOW_PANEL('siggen'));
-  await wait(1500);
-  await snap('04-signal-generator.png', 'Signal generator panel');
-
-  // 05 Channels panel
-  await go(RESET_FX); await go(YT_MODE);
-  await go(SHOW_PANEL('ch1')); await go(SHOW_PANEL('horiz')); await go(SHOW_PANEL('trig'));
-  await wait(1300);
-  await snap('05-channels-panel.png', 'Channels / timebase / trigger');
-
-  // 06 Bloom + reactive
-  await flush();
-  await go(RESET_FX); await go(START_GEN(200, 300, 90, 'sine'));
-  await go(SET(`s.color='#ff00ff'; s.glowAmount=16; s.beamWidth=1.8; s.persistence=0.6; s.fx.bloom=true; s.fx.bloomStr=0.9; s.fx.reactive=true; s.fx.reactiveStr=1.0;`));
-  await wait(1800);
-  await snap('06-beam-effects.png', 'Bloom + reactive — magenta');
-
-  // 06b Bloom cyan
-  await flush();
-  await go(RESET_FX); await go(START_GEN(150, 225, 45, 'sine'));
-  await go(SET(`s.color='#00ffff'; s.glowAmount=18; s.beamWidth=1.9; s.persistence=0.55; s.fx.bloom=true; s.fx.bloomStr=1.0;`));
-  await wait(1800);
-  await snap('06b-bloom-cyan.png', 'Bloom — cyan');
-
-  // 06c Reactive amber YT
-  await go(RESET_FX); await go(YT_MODE);
-  await go(`(() => { const { engine: e } = window._dso; e.startIdleSignal?.(); return 'idle'; })()`);
-  await go(SET(`s.color='#ffb000'; s.glowAmount=16; s.beamWidth=1.8; s.persistence=0.3; s.fx.reactive=true; s.fx.reactiveStr=1.2;`));
-  await wait(1600);
-  await snap('06c-reactive-amber.png', 'Reactive — amber');
-
-  // 07 Afterglow rainbow (long wait to build trail)
-  await flush();
-  await go(RESET_FX); await go(START_GEN(200, 201, 90, 'sine'));
-  await go(SET(`s.color='#00ffff'; s.glowAmount=22; s.beamWidth=1.8; s.persistence=0.06; s.fx.afterglow=true; s.fx.afterglowSpeed=0.005; s.fx.afterglowStr=0.85;`));
-  await wait(4000);
-  await snap('07-afterglow.png', 'Afterglow — rainbow trails');
-
-  // 08 Mirror + rotation
-  await go(RESET_FX); await go(START_GEN(150, 250, 45, 'sine'));
-  await go(SET(`s.color='#00ff41'; s.glowAmount=18; s.beamWidth=1.6; s.fx.mirrorX=true; s.fx.mirrorY=true; s.fx.rotation=true; s.fx.rotSpeed=0.006; s.fx._angle=0.5;`));
-  await wait(1600);
-  await snap('08-mirror-rotation.png', 'Mirror X+Y + rotation');
-
-  // 08b Mirror Lissajous
-  await go(RESET_FX); await go(START_GEN(150, 225, 90, 'sine'));
-  await go(SET(`s.color='#7700ff'; s.glowAmount=20; s.beamWidth=1.8; s.fx.mirrorX=true; s.fx.mirrorY=true;`));
-  await wait(1600);
-  await snap('08b-mirror-lissajous.png', 'Mirror X+Y on Lissajous');
-
-  // ── Audio file shots ─────────────────────────────────────────────────────
-  console.log('\n  Loading audio file...');
-  await go(RESET_FX); await go(YT_MODE);
-  const playResult = await go(LOAD_AND_PLAY_AUDIO(port));
-  console.log('  ', playResult);
-  await wait(2000);  // let audio settle
-
-  // 02c YT with real audio — more organic waveform
-  await go(SET(`s.color='#00ff41'; s.glowAmount=16; s.beamWidth=1.6;`));
-  await wait(800);
-  await snap('02c-yt-audio.png', 'YT mode — real audio');
-
-  // 06c-audio Reactive with real audio
-  await go(SET(`s.color='#ffb000'; s.glowAmount=22; s.beamWidth=2.0; s.fx.reactive=true; s.fx.reactiveStr=1.4; s.persistence=0.25;`));
-  await wait(1200);
-  await snap('06d-reactive-audio.png', 'Reactive — amber with audio');
-
-  // 21 Frequency filter — bass, real audio
-  await go(SET(`s.filterEnabled=true; s.filterLow=20; s.filterHigh=250; s.color='#ffb000'; s.glowAmount=16; s.persistence=0.3;`));
-  await go(SHOW_PANEL('sigfx'));
-  await wait(1400);
-  await snap('21-frequency-filter.png', 'Frequency filter — bass band');
-
-  // 27 Measurements with audio
-  await go(SET(`s.filterEnabled=false; s.color='#00ff41'; s.glowAmount=16; s.persistence=0.15; s.showMeasure=true; s.fx.reactive=false;`));
-  await wait(1400);
-  await snap('27-measurements.png', 'Measurement bar — real audio');
-
-  // 28 Beat flash (beat flash + bloom = dramatic)
-  await go(SET(`s.color='#ff00ff'; s.glowAmount=25; s.beamWidth=2.0; s.fx.bloom=true; s.fx.bloomStr=1.3; s.fx.beatFlash=true; s.fx.beatStr=0.5; s.fx.beatSens=1.2;`));
-  await wait(3000);  // wait for a beat to fire
-  await snap('28-beat-flash.png', 'Beat flash triggered');
-
-  // Stop audio for scene shots
-  await go(`(() => { window._dso.engine.stop(); return 'stopped'; })()`);
-
-  // ── Image scene shots ─────────────────────────────────────────────────────
-  console.log('\n  Loading image...');
-  await go(RESET_FX);
-  const imgResult = await go(LOAD_IMAGE(port));
-  console.log('  ', imgResult);
-  await wait(1500);
-
-  // 10 Edges mode
-  await go(IMG_MODE('edges', 40));
-  await go(SET(`s.color='#00ff41'; s.glowAmount=14; s.beamWidth=1.4;`));
-  await wait(1200);
-  await snap('10-image-edges.png', 'Image trace — Edges (Sobel)');
-
-  // 11 Lum mode
-  await go(IMG_MODE('lum', 60));
-  await go(SET(`s.color='#00ffff'; s.glowAmount=12;`));
-  await wait(1200);
-  await snap('11-image-lum.png', 'Image trace — Luminance');
-
-  // 12 Outline mode
-  await go(IMG_MODE('outline', 20));
-  await go(SET(`s.color='#ff00ff'; s.glowAmount=14;`));
-  await wait(1200);
-  await snap('12-image-outline.png', 'Image trace — Outline');
-
-  // 22 Independent scene color
-  await go(IMG_MODE('edges', 40));
-  await go(SET(`s.color='#00ff41'; s.sceneColor='#ff00ff'; s.glowAmount=14;`));
-  await wait(1200);
-  await snap('22-scene-color.png', 'Scene color independent — magenta on green');
-
-  // 13 Tiling 3x3
-  await go(IMG_MODE('edges', 40));
-  await go(SET(`s.color='#00ff41'; s.sceneColor=''; s.glowAmount=12;`));
-  await go(MOTION(`obj.tileX=3; obj.tileY=3; img.tileX=3; img.tileY=3;`));
-  await wait(1400);
-  await snap('13-tiling.png', 'Tiling — 3×3 grid');
-
-  // 14 Radial symmetry
-  await go(MOTION(`obj.tileX=1; obj.tileY=1; img.tileX=1; img.tileY=1; img.radialN=6; obj.radialN=6;`));
-  await wait(1400);
-  await snap('14-radial.png', 'Radial symmetry — 6 copies');
-
-  // 15 Infinite scroll
-  await go(MOTION(`img.radialN=1; obj.radialN=1; img.tileX=3; img.tileY=1; img.scrollX=0.8; obj.tileX=3; obj.scrollX=0.8;`));
-  await wait(2500);
-  await snap('15-scroll.png', 'Infinite scroll — tiled field moving');
-
-  // 16 Float + Ripple
-  await go(MOTION(`img.scrollX=0; img.tileX=1; img.tileY=1; obj.scrollX=0; obj.tileX=1; obj.tileY=1;`));
-  await go(MOTION(`img.float=true; img.ripple=true; img.motionAmt=0.35; img.motionSpeed=1.2;`));
-  await wait(2000);
-  await snap('16-float-ripple.png', 'Motion — Float + Ripple');
-
-  // 17 Twist
-  await go(MOTION(`img.float=false; img.ripple=false; img.twist=true; img.motionAmt=0.5; img.motionSpeed=0.8;`));
-  await wait(2000);
-  await snap('17-twist.png', 'Motion — Twist');
-
-  // 18 Explode mid-burst
-  await go(MOTION(`img.twist=false; img.explode=true; img.explodeLoop=true; img.motionAmt=0.6; img.motionSpeed=1.5;`));
-  await wait(1500);
-  await snap('18-explode.png', 'Motion — Explode burst');
-
-  // 19 Breathe + Warp with audio
-  await go(MOTION(`img.explode=false;`));
-  console.log('\n  Reloading audio for Breathe+Warp...');
-  const playAgain = await go(LOAD_AND_PLAY_AUDIO(port));
-  console.log('  ', playAgain);
-  await go(`
-  (() => {
-    const { scope: s } = window._dso;
-    s._imgScene.breathe = true;
-    s._imgScene.warp    = true;
-    s._imgScene.warpAmt = 0.15;
-    s._imgScene.showAudio = false;
-    return 'breathe-warp';
-  })()
-  `);
-  await wait(2500);
-  await snap('19-breathe-warp.png', 'Breathe + Warp — music reactive');
-
-  // 20 Draw power mid-ramp
-  await go(`
-  (() => {
-    const { scope: s } = window._dso;
-    s._imgScene.breathe   = false;
-    s._imgScene.warp      = false;
-    s._imgScene.power     = 0;
-    s._imgScene.autoPower = true;
-    s._imgScene.powerSpeed= 0.006;
-    s._imgScene.powerLoop = false;
-    window._dso.engine.stop();
-    return 'power-ramp';
-  })()
-  `);
-  await wait(2200);  // let it draw to ~40%
-  await snap('20-draw-power.png', 'Draw Power — auto-ramp mid-animation');
-  await go(`(() => { window._dso.scope._imgScene.autoPower=false; })()`);
-
-  // ── Misc remaining ────────────────────────────────────────────────────────
-
-  // 21 freq filter already done above — skip
-
-  // 23 Presets panel
-  await go(RESET_FX); await go(STOP_GEN);
-  await go(SHOW_PANEL('presets'));
-  await wait(900);
-  await snap('23-presets-panel.png', 'Presets panel');
-
-  // 24 Layout rig selector
-  await go(SHOW_PANEL('ctrl'));
-  await wait(900);
-  await snap('24-layout-rigs.png', 'Layout rig selector');
+  // Restore default theme
+  await go(`(() => {
+    const mgr = window._dso.ui?._themeMgr;
+    if (mgr) mgr.apply('classic-lab');
+    document.getElementById('theme-select').value = 'classic-lab';
+    return 'restored';
+  })()`);
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
@@ -561,6 +434,7 @@ app.whenReady().then(async () => {
   });
 
   win.setMenuBarVisibility(false);
+  win.show();   // Ensure window is visible — capturePage returns empty if hidden
   win.webContents.on('console-message', (_e, lvl, msg) => {
     if (lvl >= 2) console.warn('  [renderer]', msg.slice(0, 120));
   });
@@ -575,6 +449,7 @@ app.whenReady().then(async () => {
   }
   console.log('_dso ready!');
 
+  win.focus();
   await exec(win, APPLY_STUDIO_RIG);
   console.log('Studio rig applied.');
 
