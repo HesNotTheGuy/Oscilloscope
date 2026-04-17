@@ -7,7 +7,9 @@ let win;
 let displayWin = null;
 
 function createWindow() {
-  win = new BrowserWindow({
+  const isMac = process.platform === 'darwin';
+
+  const winOpts = {
     width: 1280,
     height: 960,
     minWidth: 800,
@@ -15,21 +17,26 @@ function createWindow() {
     backgroundColor: '#080808',
     autoHideMenuBar: true,
     title: 'DSO-1 Oscilloscope',
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: path.join(__dirname, isMac ? 'icon.png' : 'icon.ico'),
     // Native min/max/close controls remain, but the bar background and
-    // button colors are themed to match the dark UI.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0a0a0a',
-      symbolColor: '#00ff41',
-      height: 32,
-    },
+    // button colors are themed to match the dark UI (win/linux only).
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-  });
+  };
+
+  if (!isMac) {
+    winOpts.titleBarOverlay = {
+      color: '#0a0a0a',
+      symbolColor: '#00ff41',
+      height: 32,
+    };
+  }
+
+  win = new BrowserWindow(winOpts);
 
   // Grant microphone + media permissions automatically
   win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
@@ -78,7 +85,7 @@ ipcMain.handle('open-display', (_event, opts = {}) => {
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     title: 'DSO-1 — Display',
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: path.join(__dirname, process.platform === 'darwin' ? 'icon.png' : 'icon.ico'),
     frame: !fullscreen,
     fullscreen: fullscreen,
     alwaysOnTop: fullscreen,
