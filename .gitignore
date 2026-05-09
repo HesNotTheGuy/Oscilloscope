@@ -4,3 +4,5 @@ build-assets/
 *.log
 .DS_Store
 Thumbs.db
+.claude/
+docs/social/

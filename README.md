@@ -13,8 +13,8 @@
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
   <img src="https://img.shields.io/badge/electron-33-brightgreen?style=flat-square" alt="Electron 33">
   <img src="https://img.shields.io/badge/renderer-WebGL-orange?style=flat-square" alt="WebGL">
-  <img src="https://img.shields.io/badge/version-1.3.0-informational?style=flat-square" alt="v1.3.0">
-  <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
+  <img src="https://img.shields.io/badge/version-1.4.0-informational?style=flat-square" alt="v1.4.0">
+  <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey?style=flat-square" alt="CC BY-NC 4.0">
 </p>
 
 ---
@@ -43,6 +43,7 @@
 - [Layout Rigs](#layout-rigs)
 - [Themes](#themes)
 - [Recording & Output](#recording--output)
+- [Keyboard Synth](#keyboard-synth)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Easter Eggs](#easter-eggs)
 - [Installation](#installation)
@@ -91,6 +92,7 @@ The main display renders at full WebGL resolution with a multi-pass phosphor pip
 |------|-------------|
 | **YT** | Voltage vs. time — the standard waveform view |
 | **XY** | CH1 drives X, CH2 drives Y — Lissajous and phase figures |
+| **VS** | Vectorscope — L/R correlation in polar form. Mono = vertical line, out-of-phase = horizontal |
 
 ### Channels
 
@@ -467,6 +469,12 @@ Save complete oscilloscope snapshots — channels, timebase, trigger, beam effec
 - **Import** presets from JSON to share setups between machines
 - Click a slot to recall it instantly; click during SAVE mode to overwrite it
 
+### Visual Preset Packs
+
+Curated one-click looks for the wave display — they only affect the beam (color, glow, FX, mode, signal generator), so you can mix-and-match with any UI theme.
+
+`Synthwave` · `Vintage CRT` · `Lissajous` · `Beat Drop` · `Trails` · `Minimal` · `Glitch` · `Wireframe`
+
 ---
 
 ## Layout Rigs
@@ -517,7 +525,7 @@ Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown
 
 The record button is a split-button with a dropdown to select the recording mode — the choice persists in localStorage.
 
-**Standard** — records to **WebM** (VP8 codec). Click to start, click again to stop and save. Files go to your downloads folder with a timestamp filename.
+**Standard** — records to **WebM** (VP8/Opus). Click to start, click again to stop and save. Files go to your downloads folder with a timestamp filename. Audio is captured along with the video, so file playback, mic, and signal generator output are all included in the recording.
 
 **Transparent (α)** — records WebM with VP8 and a real alpha channel. The composite shader outputs luminance as alpha, so the phosphor beam is transparent against black. Files get an `_alpha.webm` suffix. Ready for compositing in After Effects or Premiere without any chroma keying.
 
@@ -528,6 +536,41 @@ The camera button saves the current frame as a timestamped **PNG** to your downl
 ### Pop-Out Display
 
 Click **⤢ POP OUT** to open a second window containing only the scope display — no controls, no panels. Resize it independently, drag it to a second monitor, and run the controls from the main window. The pop-out renders its own isolated canvas at whatever resolution you set.
+
+---
+
+## Keyboard Synth
+
+Press `K` (or click the 🎹 button in the topbar) to turn your computer keyboard into a polyphonic synth that drives the scope. The scope auto-switches to XY mode so harmonic intervals draw as Lissajous figures — chords appear as layered geometry.
+
+### Layout
+
+FL Studio-style. Z-row is white keys, A/S-row is black keys.
+
+```
+S D _ G H J _ L ;
+Z X C V B N M , . /
+```
+
+C major scale starts on `Z`. Press `=` and `-` to shift octaves up/down. Hold multiple keys for chords — each held note runs its own oscillator pair, so a triad shows three Lissajous figures simultaneously.
+
+### Intervals = Shapes
+
+The synth has an L:R interval ratio that controls the ratio between left and right oscillators. In XY mode, the ratio determines the Lissajous shape. Pick a ratio from the synth panel:
+
+| Ratio | Interval | Shape |
+|---|---|---|
+| 1:1 | unison | line / circle |
+| 3:2 | perfect fifth | pretzel (3 lobes) |
+| 4:3 | perfect fourth | 3-loop figure |
+| 5:4 | major third | 4-loop figure |
+| 2:1 | octave | figure-8 |
+
+So you literally play music as visual geometry.
+
+Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. Each voice is amplitude-limited so a 6-note chord doesn't clip.
+
+`Esc` exits synth mode; previous scope state is restored.
 
 ---
 
@@ -544,11 +587,15 @@ Click **⤢ POP OUT** to open a second window containing only the scope display 
 | `1` | YT mode |
 | `2` | XY mode |
 | `3` | Toggle scene mode on/off |
+| `4` | Vectorscope mode |
 | `Tab` | Switch OBJ / Image scene |
 | `R` | Run / Stop scope |
 | `S` | Single trigger |
 | `A` | Auto Set (auto-fit V/DIV + timebase) |
+| `K` | Toggle keyboard synth mode |
 | `?` | Show shortcut help overlay |
+
+Hover any knob, slider, or button for an inline tooltip showing its current value and what it does.
 
 Keyboard shortcuts can be remapped to MIDI input via the InputMapper.
 
@@ -617,7 +664,7 @@ Outputs go to the `dist/` folder.
 
 ## License
 
-MIT
+[CC BY-NC 4.0](LICENSE) — free for personal, educational, and non-commercial use. Attribution required. Commercial use requires permission.
 
 ---
 
