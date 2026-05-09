@@ -23,6 +23,10 @@ export class AudioEngine {
 
   async init() {
     this.actx = new (window.AudioContext || window.webkitAudioContext)();
+    // Some browsers (and iframes) start the context suspended; resume on init.
+    if (this.actx.state === 'suspended') {
+      try { await this.actx.resume(); } catch (_) {}
+    }
     this.gainNode = this.actx.createGain();
     this.gainNode.connect(this.actx.destination);
 
@@ -178,10 +182,34 @@ export class AudioEngine {
   setVolume(v) { if (this.gainNode) this.gainNode.gain.value = v; }
   get sampleRate() { return this.actx ? this.actx.sampleRate : 44100; }
 
+  // ── Recording stream — tap the master gainNode into a MediaStream ──────────
+  // Lazy init: node is created once per AudioContext lifecycle and reused.
+  getRecordingStream() {
+    if (!this.actx || !this.gainNode) return null;
+    if (!this._recDest) {
+      this._recDest = this.actx.createMediaStreamDestination();
+      this.gainNode.connect(this._recDest);
+    }
+    return this._recDest.stream;
+  }
+
   // ── Draw sound — oscilloscope CRT hum that ramps with draw power ──────
   // Connects to speakers only (not the visualiser analysers)
   startDrawSound() {
-    if (!this.actx || this._drawActive) return;
+    if (!this.actx) return;
+    // Mid-fade restart: cancel pending teardown and ramp gain back up.
+    if (this._drawActive && this._drawFading) {
+      clearTimeout(this._drawFadeTimer);
+      this._drawFadeTimer = null;
+      this._drawFading = false;
+      if (this._drawGain) {
+        const now = this.actx.currentTime;
+        this._drawGain.gain.cancelScheduledValues(now);
+        this._drawGain.gain.setTargetAtTime(0.55, now, 0.04);
+      }
+      return;
+    }
+    if (this._drawActive) return;
 
     // Sawtooth oscillator — sweeps from ~40 Hz (idle buzz) to ~600 Hz (full scan)
     this._drawOsc = this.actx.createOscillator();
@@ -239,13 +267,17 @@ export class AudioEngine {
     if (!this._drawActive) return;
     const now = this.actx.currentTime;
     this._drawGain.gain.setTargetAtTime(0, now, 0.15);
-    setTimeout(() => {
+    // Mark as fading so updateDrawSound/startDrawSound can detect mid-fade
+    this._drawFading = true;
+    this._drawFadeTimer = setTimeout(() => {
       try { this._drawOsc.stop();   } catch (_) {}
       try { this._drawNoise.stop(); } catch (_) {}
       try { this._drawGain.disconnect(); } catch (_) {}
       this._drawOsc = this._drawNoise = this._drawFilter = null;
       this._drawOscGain = this._drawNoiseGain = this._drawGain = null;
       this._drawActive = false;
+      this._drawFading = false;
+      this._drawFadeTimer = null;
     }, 400);
   }
 }

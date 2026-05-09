@@ -42,6 +42,7 @@ export class KeyboardController {
 
         'scope.modeYT':  () => document.getElementById('btn-yt').click(),
         'scope.modeXY':  () => document.getElementById('btn-xy').click(),
+        'scope.modeVS':  () => document.getElementById('btn-vs').click(),
         'scope.runStop':  () => document.getElementById('btn-run-stop').click(),
         'scope.single':   () => document.getElementById('btn-single').click(),
 
@@ -127,6 +128,7 @@ export class KeyboardController {
       if (key === 'f' || key === 'F' || key === 'F11') { ev.preventDefault(); if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); return; }
       if (key === '1') { ev.preventDefault(); document.getElementById('btn-yt').click(); return; }
       if (key === '2') { ev.preventDefault(); document.getElementById('btn-xy').click(); return; }
+      if (key === '4') { ev.preventDefault(); document.getElementById('btn-vs').click(); return; }
       if (key === 'r' || key === 'R') { ev.preventDefault(); document.getElementById('btn-run-stop').click(); return; }
       if (key === 's' || key === 'S') { ev.preventDefault(); document.getElementById('btn-single').click(); return; }
       if (key === '3') { ev.preventDefault(); const cb = document.getElementById('obj-mode'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); return; }

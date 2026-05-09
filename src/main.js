@@ -16,6 +16,7 @@ import { InputMapper } from './input-mapper.js';
   const scope    = new Oscilloscope(canvas, engine);
   const sigGen   = new SignalGenerator();
   const recorder = new VideoRecorder(canvas);
+  recorder.setAudioEngine(engine);
   const store    = new StateStore(STATE_SCHEMA);
   const inputMap = new InputMapper(store);
 

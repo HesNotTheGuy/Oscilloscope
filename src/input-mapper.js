@@ -258,6 +258,7 @@ export class InputMapper {
       'f11': 'display.toggleFullscreen',
       '1':   'scope.modeYT',
       '2':   'scope.modeXY',
+      '4':   'scope.modeVS',
       'r':   'scope.runStop',
       's':   'scope.single',
       '3':   'scene.toggle',

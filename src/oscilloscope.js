@@ -6,6 +6,7 @@ import { ObjScene } from './obj-scene.js';
 import { ImageScene } from './image-scene.js';
 import { TIMEBASE, TB_DEFAULT, VDIV, VD_DEFAULT } from './constants.js';
 import { SnakeGame } from './snake-game.js';
+import { computeVectorscopePoints } from './vectorscope.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -130,7 +131,10 @@ export class Oscilloscope {
   // ── Coupling ─────────────────────────────────────────────────────────
   applyCoupling(data, coupling) {
     if (coupling === 'GND') return new Float32Array(data.length);
-    if (coupling === 'DC')  return data;
+    // DC: return a copy. The input `data` is the engine's reusable buffer
+    // which gets overwritten next frame by getFloatTimeDomainData. Without
+    // a copy, single-trigger "frozen" data would silently track live audio.
+    if (coupling === 'DC')  return data.slice();
     let sum = 0;
     for (let i = 0; i < data.length; i++) sum += data[i];
     const mean = sum / data.length;
@@ -156,24 +160,48 @@ export class Oscilloscope {
     };
   }
 
-  _runBiquad(data, c) {
+  // Run a biquad with persistent state (passed in via `state`, which is
+  // mutated). state = [x1, x2, y1, y2]. Persisting state across frames
+  // prevents transient ringing at the start of each buffer that would
+  // otherwise create severe visual artifacts in XY mode.
+  _runBiquad(data, c, state) {
     const out = new Float32Array(data.length);
-    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    let x1 = state[0], x2 = state[1], y1 = state[2], y2 = state[3];
     for (let i = 0; i < data.length; i++) {
       const x0 = data[i];
       const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2;
       out[i] = y0;
       x2 = x1; x1 = x0; y2 = y1; y1 = y0;
     }
+    state[0] = x1; state[1] = x2; state[2] = y1; state[3] = y2;
     return out;
   }
 
-  applyFilter(data) {
+  // Get or create filter state for a channel. Resets state whenever
+  // filter parameters change (lo, hi, or sample rate) so the filter
+  // re-stabilizes cleanly without using stale coefficients' history.
+  _getFilterState(channel, lo, hi, sr) {
+    if (!this._filterStates) this._filterStates = {};
+    const key = channel;
+    let st = this._filterStates[key];
+    const paramKey = `${lo}|${hi}|${sr}`;
+    if (!st || st.paramKey !== paramKey) {
+      st = this._filterStates[key] = {
+        hp: new Float32Array(4),  // [x1, x2, y1, y2] for high-pass
+        lp: new Float32Array(4),  // [x1, x2, y1, y2] for low-pass
+        paramKey,
+      };
+    }
+    return st;
+  }
+
+  applyFilter(data, channel = 'L') {
     const sr  = this.engine.sampleRate;
     const lo  = Math.min(this.filterLow,  this.filterHigh - 1);
     const hi  = Math.max(this.filterHigh, lo + 1);
-    const hp  = this._runBiquad(data, this._biquadCoeffs('hp', lo, sr));
-    return this._runBiquad(hp, this._biquadCoeffs('lp', hi, sr));
+    const st  = this._getFilterState(channel, lo, hi, sr);
+    const hp  = this._runBiquad(data, this._biquadCoeffs('hp', lo, sr), st.hp);
+    return this._runBiquad(hp, this._biquadCoeffs('lp', hi, sr), st.lp);
   }
 
   // ── Trigger ──────────────────────────────────────────────────────────
@@ -370,6 +398,24 @@ export class Oscilloscope {
     this._drawBeamPath(ctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
   }
 
+  // ── Draw VS / Vectorscope (2D fallback) ──────────────────────────────
+  drawVS(ctx, dataL, dataR) {
+    const W = this.canvas.width, H = this.canvas.height;
+    const scale  = this.getVoltScale(this.ch1) * 4;
+    const pts    = computeVectorscopePoints(dataL, dataR, W, H, scale);
+    const color  = this._renderColor();
+    const glow   = this._renderGlow();
+    const bWidth = this._renderBeamWidth();
+
+    if (this.fx.bloom) {
+      this._drawBeamPath(ctx, pts, color, 0, bWidth * 12, 0.025);
+      this._drawBeamPath(ctx, pts, color, 0, bWidth * 6,  0.06);
+      this._drawBeamPath(ctx, pts, color, glow * 0.5, bWidth * 3, 0.12);
+    }
+    this._drawBeamPath(ctx, pts, color, glow * 2, bWidth + 1.5, 0.22);
+    this._drawBeamPath(ctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
+  }
+
   // ── Mirror passes ────────────────────────────────────────────────────
   _drawMirrored(ctx, drawFn) {
     const W = this.canvas.width, H = this.canvas.height;
@@ -484,7 +530,7 @@ export class Oscilloscope {
     if (this.isRunning) {
       dataL = this.applyCoupling(rawL, this.ch1.coupling);
       dataR = this.applyCoupling(rawR, this.ch2.coupling);
-      if (this.filterEnabled) { dataL = this.applyFilter(dataL); dataR = this.applyFilter(dataR); }
+      if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
       if (this._singleArmed) {
         this.frozenData = { L: dataL, R: dataR };
         this._singleArmed = false; this.isRunning = false;
@@ -524,7 +570,7 @@ export class Oscilloscope {
         if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
         if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
       }
-    } else {
+    } else if (this.mode === 'XY') {
       // XY / Lissajous
       const sx = (W/2) * this.getVoltScale(this.ch1) * 4;
       const sy = (H/2) * this.getVoltScale(this.ch2) * 4;
@@ -532,6 +578,14 @@ export class Oscilloscope {
       const n  = Math.min(dataL.length, dataR.length);
       const pts = [];
       for (let i = 0; i < n; i++) pts.push([cx + dataL[i]*sx, cy - dataR[i]*sy]);
+      allPts.push(pts);
+      if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
+      if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
+      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+    } else {
+      // VS / Vectorscope
+      const scale = this.getVoltScale(this.ch1) * 4;
+      const pts = computeVectorscopePoints(dataL, dataR, W, H, scale);
       allPts.push(pts);
       if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
       if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
@@ -641,7 +695,7 @@ export class Oscilloscope {
     if (this.isRunning) {
       dataL = this.applyCoupling(rawL, this.ch1.coupling);
       dataR = this.applyCoupling(rawR, this.ch2.coupling);
-      if (this.filterEnabled) { dataL = this.applyFilter(dataL); dataR = this.applyFilter(dataR); }
+      if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
       if (this._singleArmed) {
         this.frozenData = { L: dataL, R: dataR };
         this._singleArmed = false; this.isRunning = false;
@@ -667,9 +721,13 @@ export class Oscilloscope {
       const res = this.drawYT(pctx, dataL, this.ch1, 0);
       if (res) measResult = res;
       this._drawMirrored(pctx, ctx => this.drawYT(ctx, dataL, this.ch1, 0));
-    } else {
+    } else if (this.mode === 'XY') {
       this.drawXY(pctx, dataL, dataR);
       this._drawMirrored(pctx, ctx => this.drawXY(ctx, dataL, dataR));
+    } else {
+      // VS / Vectorscope — render using 2D beam path
+      this.drawVS(pctx, dataL, dataR);
+      this._drawMirrored(pctx, ctx => this.drawVS(ctx, dataL, dataR));
     }
     if (rotActive) pctx.restore();
 

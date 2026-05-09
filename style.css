@@ -3605,3 +3605,324 @@ body[data-theme="frosted-glass"] {
     inset 0 1px 0 rgba(255,255,255,0.08),
     0 0 20px rgba(170,204,238,0.04);
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Visual Preset Packs
+   ───────────────────────────────────────────────────────────── */
+
+.preset-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.preset-pack-btn {
+  position: relative;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 3px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 22px;
+  line-height: 1.2;
+}
+
+.preset-pack-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.06);
+}
+
+.preset-pack-btn:active {
+  background: rgba(var(--p-rgb), 0.14);
+}
+
+/* Flash confirmation on apply */
+.preset-pack-btn.preset-pack-applied {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.18);
+  box-shadow: 0 0 8px rgba(var(--p-rgb), 0.35);
+}
+
+/* ─── Hover tooltips ──────────────────────────────────────── */
+#dso-tooltip {
+  position: fixed;
+  background: rgba(20, 20, 20, 0.95);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+#dso-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+#dso-tooltip .label {
+  color: var(--p);
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   KEYBOARD SYNTH — styles appended for synth feature
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Topbar toggle button ─── */
+.synth-toggle-btn {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+  color: #666;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.synth-toggle-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.06);
+}
+.synth-toggle-btn.synth-active {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.12);
+  box-shadow: 0 0 8px rgba(var(--p-rgb), 0.4);
+  animation: synth-pulse 2s ease-in-out infinite;
+}
+@keyframes synth-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(var(--p-rgb), 0.4); }
+  50%       { box-shadow: 0 0 14px rgba(var(--p-rgb), 0.7); }
+}
+
+/* ─── Synth panel ─── */
+.fp-synth {
+  min-width: 160px;
+}
+
+.synth-status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  background: #060606;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.synth-note-display {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--p);
+  letter-spacing: 1px;
+  min-width: 40px;
+  line-height: 1;
+}
+
+.synth-octave-display {
+  font-size: 10px;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+
+.synth-octave-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.synth-octave-row .sys-btn {
+  flex: 1;
+}
+
+/* ─── Interval grid ─── */
+.synth-interval-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.synth-iv-btn {
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  padding: 4px 2px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+  text-align: center;
+}
+.synth-iv-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.06);
+}
+.synth-iv-btn.active {
+  border-color: var(--p);
+  color: var(--p);
+  background: rgba(var(--p-rgb), 0.12);
+}
+
+/* ─── Wave select ─── */
+.synth-wave-select {
+  width: 100%;
+  background: var(--input-bg);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 3px 4px;
+  margin-bottom: 6px;
+}
+.synth-wave-select:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+/* ─── Mini keyboard diagram ─── */
+.synth-hint {
+  margin-top: 4px;
+}
+
+.synth-hint-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 4px;
+}
+
+.synth-key-row {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.synth-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+  border: 1px solid #333;
+  border-radius: 2px;
+  background: #1a1a1a;
+  color: #888;
+  line-height: 1;
+}
+
+.synth-key.sk-black {
+  background: #111;
+  color: #555;
+  border-color: #2a2a2a;
+  font-size: 7px;
+}
+
+/* Gap spacer (where no black key sits between naturals) */
+.synth-key.sk-gap {
+  width: 18px;
+  background: transparent;
+  border: none;
+}
+
+/* Highlight active key */
+.synth-key.sk-pressed {
+  background: rgba(var(--p-rgb), 0.25);
+  border-color: var(--p);
+  color: var(--p);
+}
+
+.synth-hint-text {
+  font-size: 9px;
+  color: #444;
+  line-height: 1.4;
+}
+
+/* ─── END KEYBOARD SYNTH STYLES ─── */
+
+/* ─── Synth floating overlay panel ─── */
+.synth-panel-overlay {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  z-index: 1200;
+  background: var(--panel);
+  border: 1px solid rgba(var(--p-rgb), 0.35);
+  border-radius: 6px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(var(--p-rgb), 0.15);
+  min-width: 180px;
+  max-width: 220px;
+  animation: synth-panel-in 0.15s ease;
+}
+@keyframes synth-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.synth-panel-overlay[hidden] { display: none; }
+
+.synth-panel-inner {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.synth-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.synth-panel-title {
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--p);
+  text-transform: uppercase;
+}
+
+.synth-panel-close {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+.synth-panel-close:hover { color: var(--text-hi); }
+
+/* ─── END KEYBOARD SYNTH FLOATING PANEL ─── */

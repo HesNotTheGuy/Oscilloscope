@@ -41,6 +41,9 @@
         </div>
       </div>
     </div>
+    <!-- ── KEYBOARD SYNTH TOGGLE (added for synth feature) ── -->
+    <button class="synth-toggle-btn" id="btn-synth" title="Keyboard Synth — play notes with your keyboard (K)">&#127929; SYNTH</button>
+
     <div class="rec-split" id="rec-split">
       <button class="rec-btn rec-main" id="btn-record">● REC</button>
       <button class="rec-btn rec-chevron" id="btn-record-mode" title="Recording options" aria-haspopup="true">▾</button>
@@ -165,6 +168,7 @@
       <div class="mode-row">
         <button class="mode-btn active" id="btn-yt">YT</button>
         <button class="mode-btn" id="btn-xy">XY</button>
+        <button class="mode-btn" id="btn-vs">VS</button>
       </div>
     </div>
 
@@ -637,6 +641,18 @@
         <button class="sys-btn" id="btn-preset-import">IMPORT</button>
         <input type="file" id="preset-import-file" accept=".json" hidden>
       </div>
+
+      <div class="fp-section-divider">VISUAL PACKS</div>
+      <div class="preset-pack-grid">
+        <button class="preset-pack-btn" data-pack-id="synthwave-demo"   title="Neon pink glow with bloom and reactive response">Synthwave</button>
+        <button class="preset-pack-btn" data-pack-id="vintage-crt"      title="Warm amber phosphor with slow decay">Vintage CRT</button>
+        <button class="preset-pack-btn" data-pack-id="lissajous-lab"    title="Classic green phosphor in XY mode, 2:3 ratio">Lissajous</button>
+        <button class="preset-pack-btn" data-pack-id="beat-drop"        title="OLED-dark with magenta bloom and beat-reactive flash">Beat Drop</button>
+        <button class="preset-pack-btn" data-pack-id="rainbow-trails"   title="Cyan XY spiral with long afterglow">Trails</button>
+        <button class="preset-pack-btn" data-pack-id="minimalist"       title="Clean modern look — thin trace, low glow, no FX">Minimal</button>
+        <button class="preset-pack-btn" data-pack-id="glitch"           title="MIL-SPEC orange with mirror and low persistence">Glitch</button>
+        <button class="preset-pack-btn" data-pack-id="wireframe-studio" title="Wooden-rack warm green with slow rotation">Wireframe</button>
+      </div>
     </div>
 
     <!-- Display / Customize -->
@@ -659,6 +675,77 @@
   </div><!-- /panel-store -->
 
 </div><!-- /app -->
+<!-- ══════════════════════════════════════════════════════════
+     KEYBOARD SYNTH PANEL — floating overlay, shown when synth
+     mode is active. NOT part of panel-store / layout system.
+     ══════════════════════════════════════════════════════════ -->
+<div class="synth-panel-overlay" id="synth-panel" hidden>
+  <div class="synth-panel-inner">
+    <div class="synth-panel-header">
+      <span class="synth-panel-title">&#127929; KEYBOARD SYNTH</span>
+      <button class="synth-panel-close" id="synth-panel-close" title="Close (ESC)">&#x2715;</button>
+    </div>
+
+    <div class="synth-status">
+      <span class="synth-note-display" id="synth-note-display">---</span>
+      <span class="synth-octave-display">OCT <span id="synth-octave-val">4</span></span>
+    </div>
+
+    <div class="synth-octave-row">
+      <button class="sys-btn" id="synth-oct-down" title="Octave down (-)">&#8722; OCT</button>
+      <button class="sys-btn" id="synth-oct-up"   title="Octave up (=)">+ OCT</button>
+    </div>
+
+    <div class="fp-section-divider">L:R INTERVAL</div>
+    <div class="synth-interval-grid" id="synth-interval-grid">
+      <button class="synth-iv-btn active" data-num="1" data-den="1" title="Unison — straight line">1:1</button>
+      <button class="synth-iv-btn" data-num="3" data-den="2" title="Perfect 5th — pretzel">3:2</button>
+      <button class="synth-iv-btn" data-num="4" data-den="3" title="Perfect 4th — 3-loop">4:3</button>
+      <button class="synth-iv-btn" data-num="5" data-den="4" title="Major 3rd — 4-loop">5:4</button>
+      <button class="synth-iv-btn" data-num="2" data-den="1" title="Octave — figure-8">2:1</button>
+      <button class="synth-iv-btn" data-num="5" data-den="3" title="Major 6th">5:3</button>
+    </div>
+
+    <div class="fp-section-divider">WAVE</div>
+    <select class="synth-wave-select" id="synth-wave">
+      <option value="sine">Sine</option>
+      <option value="triangle">Triangle</option>
+      <option value="square">Square</option>
+      <option value="sawtooth">Sawtooth</option>
+    </select>
+
+    <div class="synth-hint">
+      <div class="synth-hint-keys">
+        <span class="synth-key-row">
+          <span class="synth-key sk-black">S</span>
+          <span class="synth-key sk-black">D</span>
+          <span class="synth-key sk-gap"></span>
+          <span class="synth-key sk-black">G</span>
+          <span class="synth-key sk-black">H</span>
+          <span class="synth-key sk-black">J</span>
+          <span class="synth-key sk-gap"></span>
+          <span class="synth-key sk-black">L</span>
+          <span class="synth-key sk-black">;</span>
+        </span>
+        <span class="synth-key-row">
+          <span class="synth-key">Z</span>
+          <span class="synth-key">X</span>
+          <span class="synth-key">C</span>
+          <span class="synth-key">V</span>
+          <span class="synth-key">B</span>
+          <span class="synth-key">N</span>
+          <span class="synth-key">M</span>
+          <span class="synth-key">,</span>
+          <span class="synth-key">.</span>
+          <span class="synth-key">/</span>
+        </span>
+      </div>
+      <div class="synth-hint-text">&#8722;/= shift octave &bull; ESC exit</div>
+    </div>
+  </div>
+</div>
+<!-- ══ END KEYBOARD SYNTH PANEL ══ -->
+
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

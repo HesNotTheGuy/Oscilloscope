@@ -4,11 +4,15 @@ import { PresetManager } from '../preset-manager.js';
 
 // ─────────────────────────────────────────────────────────────
 //  PresetController — save, load, export, import presets
+//  + visual preset pack buttons
 // ─────────────────────────────────────────────────────────────
 export class PresetController {
   constructor(ctx) {
-    this.scope = ctx.scope;
-    this.store = ctx.store;
+    this.scope    = ctx.scope;
+    this.store    = ctx.store;
+    this.themeMgr = ctx.themeMgr || null;
+    this.sigGen   = ctx.sigGen   || null;
+    this.engine   = ctx.engine   || null;
     this.presetMgr = null;
   }
 
@@ -63,6 +67,8 @@ export class PresetController {
 
     const pm = new PresetManager(s);
     pm.installDefaults(BUILTIN_PRESETS);
+    if (this.themeMgr) pm.setThemeMgr(this.themeMgr);
+    if (this.sigGen && this.engine) pm.setSigGen(this.sigGen, this.engine);
     this.presetMgr = pm;
 
     let saveMode = false;
@@ -172,5 +178,19 @@ export class PresetController {
     });
 
     renderSlots();
+
+    // ── Visual Pack buttons ───────────────────────────────────
+    document.querySelectorAll('.preset-pack-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const packId = btn.dataset.packId;
+        if (!packId) return;
+        const applied = pm.applyPack(packId);
+        if (!applied) return;
+
+        // Flash confirmation on the button
+        btn.classList.add('preset-pack-applied');
+        setTimeout(() => btn.classList.remove('preset-pack-applied'), 600);
+      });
+    });
   }
 }

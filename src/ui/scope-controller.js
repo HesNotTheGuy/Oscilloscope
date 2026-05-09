@@ -76,12 +76,21 @@ export class ScopeController {
       s.mode = 'YT';
       document.getElementById('btn-yt').classList.add('active');
       document.getElementById('btn-xy').classList.remove('active');
+      document.getElementById('btn-vs').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-xy').addEventListener('click', () => {
       s.mode = 'XY';
       document.getElementById('btn-xy').classList.add('active');
       document.getElementById('btn-yt').classList.remove('active');
+      document.getElementById('btn-vs').classList.remove('active');
+      resetPhosphor(s);
+    });
+    document.getElementById('btn-vs').addEventListener('click', () => {
+      s.mode = 'VS';
+      document.getElementById('btn-vs').classList.add('active');
+      document.getElementById('btn-yt').classList.remove('active');
+      document.getElementById('btn-xy').classList.remove('active');
       resetPhosphor(s);
     });
 

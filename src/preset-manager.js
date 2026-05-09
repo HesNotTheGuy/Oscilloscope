@@ -1,12 +1,23 @@
 'use strict';
 
+import { getPresetPack } from './preset-packs.js';
+
 export class PresetManager {
   constructor(scope) {
     this.scope = scope;
     this.SLOT_COUNT = 8;
     this.STORAGE_KEY = 'osc_presets';
     this._slots = this._loadSlots();
+    this._themeMgr = null;
+    this._sigGen = null;
+    this._engine = null;
   }
+
+  /** Inject the theme manager so applyPack can switch themes. */
+  setThemeMgr(mgr) { this._themeMgr = mgr; }
+
+  /** Inject sigGen + engine for packs that activate the signal generator. */
+  setSigGen(sigGen, engine) { this._sigGen = sigGen; this._engine = engine; }
 
   _loadSlots() {
     try {
@@ -405,6 +416,111 @@ export class PresetManager {
       reader.onerror = () => resolve(-1);
       reader.readAsText(file);
     });
+  }
+
+  // ── Preset Packs ─────────────────────────────────────────
+
+  /**
+   * Apply a preset pack by ID.
+   * Applies theme, scope visual properties, FX, mode, and optional siggen.
+   * @param {string} packId
+   * @returns {boolean} true if pack found and applied
+   */
+  applyPack(packId) {
+    const pack = getPresetPack(packId);
+    if (!pack) return false;
+
+    const s = this.scope;
+
+    // Packs only affect the wave display — themes are independent.
+
+    // 1. Build a minimal preset-shaped object that _updateUI understands,
+    //    merging pack.scope over the current capture() so all required
+    //    fields are present (avoids undefined values in _updateUI).
+    const current = this.capture();
+    const sc = pack.scope;
+
+    const merged = {
+      ...current,
+      color:       sc.color       ?? current.color,
+      glowAmount:  sc.glowAmount  ?? current.glowAmount,
+      beamWidth:   sc.beamWidth   ?? current.beamWidth,
+      persistence: sc.persistence ?? current.persistence,
+      fx: sc.fx ? { ...current.fx, ...sc.fx } : current.fx,
+    };
+
+    // 3. Apply beam properties directly to scope
+    s.color       = merged.color;
+    s.glowAmount  = merged.glowAmount;
+    s.beamWidth   = merged.beamWidth;
+    s.persistence = merged.persistence;
+
+    // 4. Apply FX properties
+    const fx = merged.fx;
+    s.fx.bloom          = fx.bloom;
+    s.fx.bloomStr       = fx.bloomStr       ?? 1.0;
+    s.fx.reactive       = fx.reactive;
+    s.fx.reactiveStr    = fx.reactiveStr    ?? 1.0;
+    s.fx.beatFlash      = fx.beatFlash;
+    s.fx.beatStr        = fx.beatStr        ?? 0.35;
+    s.fx.beatSens       = fx.beatSens       ?? 1.5;
+    s.fx.beatInvert     = fx.beatInvert;
+    s.fx.afterglow      = fx.afterglow;
+    s.fx.afterglowSpeed = fx.afterglowSpeed ?? 0;
+    s.fx.afterglowStr   = fx.afterglowStr   ?? 0.7;
+    s.fx.mirrorX        = fx.mirrorX;
+    s.fx.mirrorY        = fx.mirrorY;
+    s.fx.rotation       = fx.rotation;
+    s.fx.rotSpeed       = fx.rotSpeed       ?? 0.003;
+
+    // 5. Apply mode (YT / XY / VS)
+    if (sc.mode) {
+      s.mode = sc.mode;
+      const btnYT = document.getElementById('btn-yt');
+      const btnXY = document.getElementById('btn-xy');
+      const btnVS = document.getElementById('btn-vs');
+      if (btnYT) btnYT.classList.toggle('active', sc.mode === 'YT');
+      if (btnXY) btnXY.classList.toggle('active', sc.mode === 'XY');
+      if (btnVS) btnVS.classList.toggle('active', sc.mode === 'VS');
+    }
+
+    // 6. Signal generator
+    if (pack.siggen && this._sigGen && this._engine) {
+      const sg = this._sigGen;
+      const e  = this._engine;
+      const p  = pack.siggen;
+      sg.freqL     = p.freqL;
+      sg.freqR     = p.freqR;
+      sg.phase     = p.phase;
+      sg.waveform  = p.waveform;
+      if (p.amplitude !== undefined) sg.setAmplitude(p.amplitude);
+
+      // Update siggen UI inputs if present
+      const flEl = document.getElementById('gen-freq-l');
+      const frEl = document.getElementById('gen-freq-r');
+      const phEl = document.getElementById('gen-phase');
+      const wvEl = document.getElementById('gen-wave');
+      if (flEl) flEl.value = p.freqL;
+      if (frEl) frEl.value = p.freqR;
+      if (phEl) { phEl.value = p.phase; const pv = document.getElementById('gen-phase-val'); if (pv) pv.textContent = p.phase + '°'; }
+      if (wvEl) wvEl.value = p.waveform;
+
+      if (!sg.active && e.actx) {
+        sg.init(e.actx);
+        sg.start(e.analyserL, e.analyserR);
+        const btnStart = document.getElementById('btn-gen-start');
+        const btnStop  = document.getElementById('btn-gen-stop');
+        if (btnStart) { btnStart.disabled = true; btnStart.classList.remove('accent'); }
+        if (btnStop)  { btnStop.disabled = false; btnStop.classList.add('active'); }
+        const stSrc = document.getElementById('st-src');
+        if (stSrc) stSrc.textContent = 'Signal Gen';
+      }
+    }
+
+    // 7. Update all visible UI controls for beam / FX
+    this._updateUI(merged);
+
+    return true;
   }
 
   getSlot(i) { return this._slots[i]; }
