@@ -20,7 +20,7 @@ export class SignalGenerator {
 
   init(actx) { this.actx = actx; }
 
-  start(analyserL, analyserR) {
+  start(analyserL, analyserR, audibleDest = null) {
     if (!this.actx) return;
     this.stop();
 
@@ -39,6 +39,15 @@ export class SignalGenerator {
     this._oscR.connect(this._gainR);
     this._gainL.connect(analyserL);
     this._gainR.connect(analyserR);
+
+    // Optional audio output routing (for keyboard synth).
+    // When audibleDest is provided, also route to that destination so
+    // the user hears the notes. The Lissajous-only callers omit this
+    // so the test signal stays silent.
+    if (audibleDest) {
+      this._gainL.connect(audibleDest);
+      this._gainR.connect(audibleDest);
+    }
 
     const now = this.actx.currentTime;
     // Phase offset: R starts phaseDelay seconds after L

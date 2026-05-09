@@ -12,6 +12,8 @@ import { KeyboardController } from './ui/keyboard-controller.js';
 import { PopOutController } from './ui/popout-controller.js';
 import { ThemeController } from './ui/theme-controller.js';
 import { ThemeManager } from './theme-manager.js';
+import { TooltipController } from './ui/tooltip-controller.js';
+import { KeyboardSynthController } from './ui/keyboard-synth-controller.js';
 
 // ─────────────────────────────────────────────────────────────
 //  UIController — thin orchestrator that delegates to domain
@@ -64,9 +66,10 @@ export class UIController {
     this._sigGen   = new SignalGenController(ctx);
     this._preset   = new PresetController(ctx);
     this._layout   = new LayoutController(ctx);
-    this._keyboard = new KeyboardController(ctx);
-    this._popout   = new PopOutController(ctx);
-    this._theme    = new ThemeController(ctx);
+    this._keyboard    = new KeyboardController(ctx);
+    this._popout      = new PopOutController(ctx);
+    this._theme       = new ThemeController(ctx);
+    this._kbSynth     = new KeyboardSynthController(ctx);
 
     // Initialize all domains
     this._scope.init();
@@ -91,6 +94,11 @@ export class UIController {
     this._layout.init();
     this._popout.init();
     this._keyboard.init();
+    this._kbSynth.init();
+
+    // Tooltip system — initialized after all controls exist
+    this._tooltip = new TooltipController();
+    this._tooltip.init();
   }
 
   async _ensureAudio() {
