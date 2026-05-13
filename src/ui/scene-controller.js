@@ -30,6 +30,8 @@ export class SceneController {
       document.getElementById('obj-rot-ctrls').style.display    = is3d  ? '' : 'none';
       document.getElementById('img-tilt-ctrls').style.display   = is3d  ? 'none' : '';
       document.getElementById('img-trace-ctrls').style.display  = is3d  ? 'none' : '';
+      const objRender = document.getElementById('obj-render-ctrls');
+      if (objRender) objRender.style.display = is3d ? '' : 'none';
     };
     document.getElementById('obj-mode-3d').addEventListener('click',  () => _showMode(true));
     document.getElementById('obj-mode-img').addEventListener('click', () => _showMode(false));
@@ -64,6 +66,19 @@ export class SceneController {
     const objDrop = document.getElementById('obj-drop-zone');
     const objFile = document.getElementById('obj-file');
 
+    const showWarning = () => {
+      const warn = document.getElementById('obj-warning');
+      if (!warn) return;
+      const msg = s._obj.warning;
+      if (msg) {
+        warn.textContent = '⚠ ' + msg;
+        warn.hidden = false;
+      } else {
+        warn.textContent = '';
+        warn.hidden = true;
+      }
+    };
+
     const loadObj = async file => {
       if (!file || !file.name.toLowerCase().endsWith('.obj')) return;
       document.getElementById('obj-name').textContent = 'Loading…';
@@ -72,6 +87,7 @@ export class SceneController {
       document.getElementById('obj-name').textContent =
         ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Parse error';
       objDrop.classList.toggle('loaded', ok);
+      showWarning();
       if (ok && file.path) this._lastObjPath = { path: file.path, name: file.name };
       return ok;
     };
@@ -84,10 +100,12 @@ export class SceneController {
         document.getElementById('obj-name').textContent =
           ok ? (fileName.length > 18 ? fileName.slice(0, 16) + '…' : fileName) : 'Parse error';
         objDrop.classList.toggle('loaded', ok);
+        showWarning();
         return ok;
       } catch (_) {
         document.getElementById('obj-name').textContent = 'File not found';
         objDrop.classList.remove('loaded');
+        showWarning();
         return false;
       }
     };
@@ -97,6 +115,26 @@ export class SceneController {
     objDrop.addEventListener('dragover',  e  => { e.preventDefault(); objDrop.classList.add('drag-over'); });
     objDrop.addEventListener('dragleave', () => objDrop.classList.remove('drag-over'));
     objDrop.addEventListener('drop',      e  => { e.preventDefault(); objDrop.classList.remove('drag-over'); loadObj(e.dataTransfer.files[0]); });
+
+    // ── OBJ render mode + density ──
+    document.querySelectorAll('.obj-render-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.obj-render-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        s._obj.renderMode = btn.dataset.render;
+      });
+    });
+    const densitySlider = document.getElementById('obj-density');
+    const densityVal    = document.getElementById('obj-density-val');
+    if (densitySlider) {
+      densitySlider.addEventListener('input', () => {
+        const pct = +densitySlider.value;
+        s._obj.density = pct / 100;
+        // Track user-set ceiling so auto-quality knows what to restore toward
+        s._obj._userDensity = pct / 100;
+        if (densityVal) densityVal.textContent = pct + '%';
+      });
+    }
 
     // ── OBJ Library ──
     const OBJ_LIB_KEY  = 'osc_obj_library';

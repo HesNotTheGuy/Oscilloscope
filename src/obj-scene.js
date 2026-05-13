@@ -50,6 +50,15 @@ export class ObjScene {
     this.powerSpeed = 0.004;
     this.powerLoop  = false;
 
+    // Render style — controls how the edge list is sampled per frame.
+    // Lower values dramatically reduce per-frame work for heavy models.
+    // 'wire'    — all edges in order (full mesh)
+    // 'sparse'  — stride-sample every Nth edge (deterministic, keeps shape)
+    // 'shimmer' — random subset each frame (animated sampling, ghostly look)
+    // 'dots'    — render vertices as short stubs only (skeletal point cloud)
+    this.renderMode = 'wire';
+    this.density    = 1.0;    // 0.05 – 1.0 — fraction of edges actually drawn
+
     // Movement FX (applied post-projection; shared amt/speed controls all active effects)
     this.float       = false;  // sinusoidal XY drift
     this.ripple      = false;  // expanding ring wave displaces points radially
@@ -79,6 +88,7 @@ export class ObjScene {
 
   load(text, name = 'model') {
     this.verts = []; this.edges = []; this.loaded = false;
+    this.warning = '';   // populated when the model was decimated
     const rawV   = [];
     const edgeSet = new Set();
     const addEdge = (a, b) => {
@@ -87,7 +97,15 @@ export class ObjScene {
       if (!edgeSet.has(key)) { edgeSet.add(key); this.edges.push([a, b]); }
     };
 
+    // Hard cap during parse — past this, stop adding edges entirely.
+    // Render loop iterates over edges every frame, so unbounded counts
+    // freeze the app. 200k is far beyond any visualizer-useful detail
+    // and gives the safety belt without truncating reasonable models.
+    const PARSE_EDGE_HARD_CAP = 200000;
+    let parseCapHit = false;
+
     for (const rawLine of text.split('\n')) {
+      if (this.edges.length >= PARSE_EDGE_HARD_CAP) { parseCapHit = true; break; }
       const parts = rawLine.trim().split(/\s+/);
       const cmd   = parts[0];
       if (cmd === 'v') {
@@ -110,6 +128,26 @@ export class ObjScene {
     }
 
     if (!rawV.length) return false;
+
+    // Render-safe edge budget. The render loop iterates over edgeCount
+    // every frame; even at 12k edges with tiling/radial/movement FX,
+    // we can blow past the GL budget. Decimate uniformly to keep
+    // shape readable while staying fast. Users can further reduce
+    // load via the density slider at render time.
+    const RENDER_EDGE_CAP = 12000;
+    const originalCount = this.edges.length;
+    if (originalCount > RENDER_EDGE_CAP) {
+      const stride = Math.ceil(originalCount / RENDER_EDGE_CAP);
+      const decimated = [];
+      for (let i = 0; i < originalCount; i += stride) decimated.push(this.edges[i]);
+      this.edges = decimated;
+      this.warning = `Model decimated: ${originalCount.toLocaleString()} → ${this.edges.length.toLocaleString()} edges` +
+                     (parseCapHit ? ' (parse cap hit — file truncated)' : '');
+      console.warn('[ObjScene]', this.warning);
+    } else if (parseCapHit) {
+      this.warning = `File truncated at ${PARSE_EDGE_HARD_CAP.toLocaleString()} edges`;
+      console.warn('[ObjScene]', this.warning);
+    }
 
     // Normalize vertices to [-1, 1]
     let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity,z0=Infinity,z1=-Infinity;
@@ -183,10 +221,50 @@ export class ObjScene {
     }
 
     const bufLen   = audioBuf ? audioBuf.length : 0;
-    const edgeCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this.edges.length);
+    const powerCount = Math.floor(Math.max(0, Math.min(1, this.power)) * this.edges.length);
+    const density    = Math.max(0.05, Math.min(1, this.density));
+    const mode       = this.renderMode || 'wire';
+
+    // Build the index list to iterate based on render mode + density.
+    // For 'dots' mode we sample vertices instead of edges, so we skip
+    // this and handle separately below.
+    let indices;
+    if (mode === 'dots') {
+      indices = null;   // handled in dots branch
+    } else if (mode === 'sparse' || (mode === 'wire' && density < 1)) {
+      // Deterministic stride sample — keeps shape coherent
+      const stride = Math.max(1, Math.round(1 / density));
+      indices = [];
+      for (let i = 0; i < powerCount; i += stride) indices.push(i);
+    } else if (mode === 'shimmer') {
+      // Random subset that refreshes every frame — animated sampling
+      const target = Math.max(1, Math.floor(powerCount * density));
+      indices = new Array(target);
+      for (let i = 0; i < target; i++) {
+        indices[i] = (Math.random() * powerCount) | 0;
+      }
+    } else {
+      // 'wire' at full density — render all up to powerCount
+      indices = null;
+    }
 
     const result = [];
-    for (let ei = 0; ei < edgeCount; ei++) {
+
+    // ── Dots mode — render each vertex as a 2-pixel stub ──────────
+    // Falls through to tile/radial/movement processing below.
+    if (mode === 'dots') {
+      const stride = Math.max(1, Math.round(1 / density));
+      for (let vi = 0; vi < this.verts.length; vi += stride) {
+        const [x, y] = xform(...this.verts[vi]);
+        const sx = toSx(x), sy = toSy(y);
+        // Tiny line stub so the renderer draws something (zero-length lines won't show)
+        result.push([[sx, sy], [sx + 1, sy + 1]]);
+      }
+    }
+
+    const iterCount = (mode === 'dots') ? 0 : (indices ? indices.length : powerCount);
+    for (let ii = 0; ii < iterCount; ii++) {
+      const ei = indices ? indices[ii] : ii;
       const [i0, i1] = this.edges[ei];
       let [ax, ay] = xform(...this.verts[i0]);
       let [bx, by] = xform(...this.verts[i1]);
