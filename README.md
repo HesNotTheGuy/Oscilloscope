@@ -95,6 +95,10 @@ The main display renders at full WebGL resolution with a multi-pass phosphor pip
 | **VS** | Vectorscope — L/R correlation in polar form. Mono = vertical line, out-of-phase = horizontal |
 | **FS** | Spectrum analyzer — 64 logarithmic frequency bars from 20 Hz to 20 kHz |
 
+<p align="center">
+  <img src="docs/screenshots/40-spectrum-mode.png" alt="Spectrum analyzer mode" width="860">
+</p>
+
 ### Channels
 
 Two independent input channels with full scope controls:
@@ -478,6 +482,10 @@ Save complete oscilloscope snapshots — channels, timebase, trigger, beam effec
 
 ### Visual Preset Packs
 
+<p align="center">
+  <img src="docs/screenshots/44-preset-packs.png" alt="Visual preset packs" width="860">
+</p>
+
 Curated one-click looks for the wave display — they only affect the beam (color, glow, FX, mode, signal generator), so you can mix-and-match with any UI theme.
 
 `Synthwave` · `Vintage CRT` · `Lissajous` · `Beat Drop` · `Trails` · `Minimal` · `Glitch` · `Wireframe`
@@ -548,6 +556,10 @@ Click **⤢ POP OUT** to open a second window containing only the scope display 
 
 ## Keyboard Synth
 
+<p align="center">
+  <img src="docs/screenshots/43-keyboard-synth.png" alt="Keyboard synth panel" width="860">
+</p>
+
 Press `K` (or click the 🎹 button in the topbar) to turn your computer keyboard into a polyphonic synth that drives the scope. The scope auto-switches to XY mode so harmonic intervals draw as Lissajous figures — chords appear as layered geometry.
 
 ### Layout
@@ -606,6 +618,10 @@ Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. E
 Hover any knob, slider, or button for an inline tooltip showing its current value and what it does.
 
 **Right-click the scope canvas** for quick actions: save screenshot, copy frame to clipboard, toggle measurements / grid / CRT curve, pop out display, toggle fullscreen, run / stop.
+
+<p align="center">
+  <img src="docs/screenshots/42-context-menu.png" alt="Right-click context menu" width="860">
+</p>
 
 Keyboard shortcuts can be remapped to MIDI input via the InputMapper.
 

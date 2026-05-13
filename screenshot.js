@@ -358,6 +358,86 @@ async function runShots(win, port) {
   await go(`(() => { window._dso.scope.setSnakeMode(false); return 'exit'; })()`);
   await wait(300);
 
+  // ── v1.4.0 Feature shots ─────────────────────────────────────────────────
+
+  // 40 Spectrum analyzer (FS) mode — full app
+  await closeMenus();
+  await flush();
+  // Switch to FS mode, idle signal already running
+  await go(`(() => {
+    const s = window._dso.scope;
+    s.mode = 'FS';
+    document.getElementById('btn-fs')?.classList.add('active');
+    document.getElementById('btn-yt')?.classList.remove('active');
+    document.getElementById('btn-xy')?.classList.remove('active');
+    document.getElementById('btn-vs')?.classList.remove('active');
+    return 'fs';
+  })()`);
+  await go(SET(`s.color='#00ff41'; s.glowAmount=20; s.beamWidth=2.0; s.persistence=0.4;`));
+  await wait(2000);
+  await snap('40-spectrum-mode.png', 'Spectrum analyzer (FS) mode');
+
+  // 41 Vectorscope (VS) mode — full app
+  await go(`(() => {
+    const s = window._dso.scope;
+    s.mode = 'VS';
+    document.getElementById('btn-vs')?.classList.add('active');
+    document.getElementById('btn-yt')?.classList.remove('active');
+    document.getElementById('btn-xy')?.classList.remove('active');
+    document.getElementById('btn-fs')?.classList.remove('active');
+    return 'vs';
+  })()`);
+  await flush();
+  await wait(2000);
+  await snap('41-vectorscope-mode.png', 'Vectorscope (VS) mode');
+
+  // Back to YT for the rest
+  await go(YT_MODE);
+  await flush();
+  await wait(500);
+
+  // 42 Right-click context menu — full app with menu open at center of canvas
+  await closeMenus();
+  await go(`(() => {
+    const canvas = document.getElementById('scope');
+    const rect = canvas.getBoundingClientRect();
+    // Dispatch a synthetic contextmenu event at the canvas center so the
+    // menu controller positions the menu and shows it.
+    const evt = new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    });
+    canvas.dispatchEvent(evt);
+    return 'ctx-menu';
+  })()`);
+  await wait(400);
+  await snap('42-context-menu.png', 'Right-click context menu on scope canvas');
+  // Hide menu
+  await go(`(() => { const m = document.getElementById('canvas-context-menu'); if (m) m.hidden = true; return 'hide'; })()`);
+  await wait(200);
+
+  // 43 Keyboard synth panel open
+  await closeMenus();
+  await go(`(() => {
+    document.getElementById('btn-synth')?.click();
+    return 'synth-on';
+  })()`);
+  await wait(800);
+  await snap('43-keyboard-synth.png', 'Keyboard synth panel');
+  // Disable synth
+  await go(`(() => {
+    document.getElementById('btn-synth')?.click();
+    return 'synth-off';
+  })()`);
+  await wait(400);
+
+  // 44 Visual preset packs — show presets panel with packs visible
+  await closeMenus();
+  await go(SHOW_PANEL('presets'));
+  await wait(1000);
+  await snap('44-preset-packs.png', 'Visual preset packs in the presets panel');
+
   // ── Theme gallery (Classic rig so panels are visible) ────────────────────
   console.log('\n  Switching to Classic rig for theme shots...');
   await closeMenus();
