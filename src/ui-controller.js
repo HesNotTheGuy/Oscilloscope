@@ -14,6 +14,8 @@ import { ThemeController } from './ui/theme-controller.js';
 import { ThemeManager } from './theme-manager.js';
 import { TooltipController } from './ui/tooltip-controller.js';
 import { KeyboardSynthController } from './ui/keyboard-synth-controller.js';
+import { CanvasContextMenuController } from './ui/canvas-context-menu.js';
+import { BpmDisplay } from './ui/bpm-display.js';
 
 // ─────────────────────────────────────────────────────────────
 //  UIController — thin orchestrator that delegates to domain
@@ -70,6 +72,8 @@ export class UIController {
     this._popout      = new PopOutController(ctx);
     this._theme       = new ThemeController(ctx);
     this._kbSynth     = new KeyboardSynthController(ctx);
+    this._ctxMenu     = new CanvasContextMenuController(ctx);
+    this._bpmDisplay  = new BpmDisplay(ctx);
 
     // Initialize all domains
     this._scope.init();
@@ -95,6 +99,8 @@ export class UIController {
     this._popout.init();
     this._keyboard.init();
     this._kbSynth.init();
+    this._ctxMenu.init();
+    this._bpmDisplay.init();
 
     // Tooltip system — initialized after all controls exist
     this._tooltip = new TooltipController();

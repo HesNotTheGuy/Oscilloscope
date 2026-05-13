@@ -3926,3 +3926,49 @@ body[data-theme="frosted-glass"] {
 .synth-panel-close:hover { color: var(--text-hi); }
 
 /* ─── END KEYBOARD SYNTH FLOATING PANEL ─── */
+
+
+/* ─── OBJ Warning Banner ─── */
+.obj-warning {
+  margin-top: 6px;
+  padding: 6px 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #ffc070;
+  background: rgba(var(--p-rgb), 0.04);
+  border: 1px solid rgba(255, 180, 80, 0.4);
+  border-radius: 4px;
+}
+.obj-warning[hidden] { display: none; }
+
+
+/* ─── Canvas right-click context menu ─── */
+.canvas-ctx-menu {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 220px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  z-index: 10000;
+  font-size: 12px;
+  user-select: none;
+}
+.canvas-ctx-menu[hidden] { display: none; }
+.ctx-item {
+  padding: 6px 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.ctx-item:hover {
+  background: rgba(var(--p-rgb), 0.1);
+  color: var(--p);
+}
+.ctx-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+/* ─── END Canvas right-click context menu ─── */

@@ -80,6 +80,7 @@
         <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
         <span class="st-item" id="st-freq">---</span>
         <span class="st-item" id="st-src">No signal</span>
+        <span class="st-item" id="st-bpm">— BPM</span>
       </div>
       <!-- UNDER zone -->
       <div class="panel-zone zone-under" id="zone-under" data-zone="under"></div>
@@ -169,6 +170,7 @@
         <button class="mode-btn active" id="btn-yt">YT</button>
         <button class="mode-btn" id="btn-xy">XY</button>
         <button class="mode-btn" id="btn-vs">VS</button>
+        <button class="mode-btn" id="btn-fs">FS</button>
       </div>
     </div>
 
@@ -445,6 +447,21 @@
       <div class="file-drop" id="obj-drop-zone">
         <span id="obj-name">Drop .obj / click</span>
         <input type="file" id="obj-file" accept=".obj" hidden>
+      </div>
+      <div id="obj-warning" class="obj-warning" hidden></div>
+
+      <!-- OBJ-only: render mode + density (reduces lag on heavy models) -->
+      <div id="obj-render-ctrls">
+        <div class="obj-mode-row" style="margin:6px 0 4px">
+          <button class="obj-render-btn obj-mode-btn active" data-render="wire" title="Full wireframe">Wire</button>
+          <button class="obj-render-btn obj-mode-btn" data-render="sparse" title="Evenly-sampled subset">Sparse</button>
+          <button class="obj-render-btn obj-mode-btn" data-render="shimmer" title="Random subset, refreshes each frame">Shimmer</button>
+          <button class="obj-render-btn obj-mode-btn" data-render="dots" title="Vertices only — skeletal points">Dots</button>
+        </div>
+        <label class="fp-range-label">Density
+          <input type="range" id="obj-density" min="5" max="100" value="100" step="5">
+          <span id="obj-density-val">100%</span>
+        </label>
       </div>
 
       <!-- OBJ Library — saved file paths, loaded on demand -->
@@ -747,5 +764,19 @@
 <!-- ══ END KEYBOARD SYNTH PANEL ══ -->
 
 <script type="module" src="src/main.js"></script>
+
+<!-- Canvas right-click context menu -->
+<div id="canvas-context-menu" class="canvas-ctx-menu" hidden>
+  <div class="ctx-item" data-action="screenshot">Save screenshot (PNG)</div>
+  <div class="ctx-item" data-action="copy">Copy frame to clipboard</div>
+  <div class="ctx-item" data-action="measure">Toggle measurements</div>
+  <div class="ctx-item" data-action="grid">Toggle grid</div>
+  <div class="ctx-item" data-action="crt">Toggle CRT curve</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="popout">Pop out display</div>
+  <div class="ctx-item" data-action="fullscreen">Toggle fullscreen</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="runstop">Run / Stop</div>
+</div>
 </body>
 </html>
