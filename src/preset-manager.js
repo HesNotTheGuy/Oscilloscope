@@ -196,6 +196,11 @@ export class PresetManager {
   }
 
   _updateUI(p) {
+    // Null-safe textContent setter
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
     // Helper to set value and dispatch input event
     const setVal = (id, val) => {
       const el = document.getElementById(id);
@@ -228,11 +233,11 @@ export class PresetManager {
 
     // Beam display
     setVal('beam-width', p.beamWidth);
-    document.getElementById('beam-width-val').textContent = p.beamWidth.toFixed(1);
+    setText('beam-width-val', p.beamWidth.toFixed(1));
     setVal('glow', p.glowAmount);
-    document.getElementById('glow-val').textContent = Math.round(p.glowAmount);
+    setText('glow-val', Math.round(p.glowAmount));
     setVal('persistence', p.persistence);
-    document.getElementById('persistence-val').textContent = p.persistence.toFixed(2);
+    setText('persistence-val', p.persistence.toFixed(2));
 
     // Ensure Display panel is uncollapsed so user sees the change
     const dispPanel = document.querySelector('[data-panel-id="display"]');
@@ -249,19 +254,19 @@ export class PresetManager {
       setCheck('fx-mirror-y', p.fx.mirrorY);
       setCheck('fx-rotate', p.fx.rotation);
       setVal('fx-rot-speed', p.fx.rotSpeed);
-      document.getElementById('fx-rs-val').textContent = p.fx.rotSpeed.toFixed(3);
+      setText('fx-rs-val', p.fx.rotSpeed.toFixed(3));
       setVal('fx-beat-sens', p.fx.beatSens);
-      document.getElementById('fx-bs-val').textContent = p.fx.beatSens.toFixed(2);
+      setText('fx-bs-val', p.fx.beatSens.toFixed(2));
       setVal('fx-afterglow-speed', p.fx.afterglowSpeed || 0);
-      document.getElementById('fx-ag-val').textContent = (p.fx.afterglowSpeed || 0).toFixed(3);
+      setText('fx-ag-val', (p.fx.afterglowSpeed || 0).toFixed(3));
       setVal('fx-afterglow-str', p.fx.afterglowStr || 0.7);
-      document.getElementById('fx-afterglow-str-val').textContent = (p.fx.afterglowStr || 0.7).toFixed(2);
+      setText('fx-afterglow-str-val', (p.fx.afterglowStr || 0.7).toFixed(2));
       setVal('fx-reactive-str', p.fx.reactiveStr ?? 1.0);
-      document.getElementById('fx-reactive-str-val').textContent = (p.fx.reactiveStr ?? 1.0).toFixed(1);
+      setText('fx-reactive-str-val', (p.fx.reactiveStr ?? 1.0).toFixed(1));
       setVal('fx-beat-str', p.fx.beatStr ?? 0.35);
-      document.getElementById('fx-beat-str-val').textContent = (p.fx.beatStr ?? 0.35).toFixed(2);
+      setText('fx-beat-str-val', (p.fx.beatStr ?? 0.35).toFixed(2));
       setVal('fx-bloom-str', p.fx.bloomStr ?? 1.0);
-      document.getElementById('fx-bloom-str-val').textContent = (p.fx.bloomStr ?? 1.0).toFixed(1);
+      setText('fx-bloom-str-val', (p.fx.bloomStr ?? 1.0).toFixed(1));
     }
 
     // Signal FX
@@ -289,13 +294,13 @@ export class PresetManager {
 
     // Scene transforms
     setVal('sc-scale', p.scale);
-    document.getElementById('sc-scale-val').textContent = p.scale.toFixed(2);
+    setText('sc-scale-val', p.scale.toFixed(2));
     setVal('sc-rz', p.rotZ || 0);
-    document.getElementById('sc-rz-val').textContent = Math.round(p.rotZ || 0) + '\u00B0';
+    setText('sc-rz-val', Math.round(p.rotZ || 0) + '\u00B0');
     setVal('sc-px', p.posX);
-    document.getElementById('sc-px-val').textContent = p.posX.toFixed(2);
+    setText('sc-px-val', p.posX.toFixed(2));
     setVal('sc-py', p.posY);
-    document.getElementById('sc-py-val').textContent = p.posY.toFixed(2);
+    setText('sc-py-val', p.posY.toFixed(2));
 
     // Tiling
     setSelect('sc-tile-x', p.tileX);
@@ -307,27 +312,27 @@ export class PresetManager {
     setCheck('sc-auto-rot-y', p.autoRotY);
     setCheck('sc-auto-rot-z', p.autoRotZ);
     setVal('sc-rot-spd-x', p.rotSpeedX);
-    document.getElementById('sc-rsx-val').textContent = p.rotSpeedX.toFixed(1);
+    setText('sc-rsx-val', p.rotSpeedX.toFixed(1));
     setVal('sc-rot-spd-y', p.rotSpeedY);
-    document.getElementById('sc-rsy-val').textContent = p.rotSpeedY.toFixed(1);
+    setText('sc-rsy-val', p.rotSpeedY.toFixed(1));
     setVal('sc-rot-spd-z', p.rotSpeedZ);
-    document.getElementById('sc-rsz-val').textContent = p.rotSpeedZ.toFixed(1);
+    setText('sc-rsz-val', p.rotSpeedZ.toFixed(1));
 
     setCheck('sc-beat-pulse', p.beatPulse);
     setCheck('sc-show-audio', p.showAudio);
 
     // Scroll
     setVal('sc-scroll-x', p.scrollX);
-    document.getElementById('sc-sx-val').textContent = p.scrollX.toFixed(2);
+    setText('sc-sx-val', p.scrollX.toFixed(2));
     setVal('sc-scroll-y', p.scrollY);
-    document.getElementById('sc-sy-val').textContent = p.scrollY.toFixed(2);
+    setText('sc-sy-val', p.scrollY.toFixed(2));
 
     // Breathe/shake/warp
     setCheck('sc-breathe', p.breathe);
     setCheck('sc-shake', p.shake);
     setCheck('sc-warp', p.warp);
     setVal('sc-warp-amt', p.warpAmt);
-    document.getElementById('sc-warp-val').textContent = p.warpAmt.toFixed(2);
+    setText('sc-warp-val', p.warpAmt.toFixed(2));
 
     // Motion FX
     if (p.float      !== undefined) setCheck('sc-float',  p.float);
@@ -337,20 +342,20 @@ export class PresetManager {
     if (p.explodeLoop!== undefined) setCheck('sc-explode-loop', p.explodeLoop);
     if (p.motionAmt  !== undefined) {
       setVal('sc-motion-amt', p.motionAmt);
-      document.getElementById('sc-motion-amt-val').textContent = p.motionAmt.toFixed(2);
+      setText('sc-motion-amt-val', p.motionAmt.toFixed(2));
     }
     if (p.motionSpeed !== undefined) {
       setVal('sc-motion-speed', p.motionSpeed);
-      document.getElementById('sc-motion-speed-val').textContent = p.motionSpeed.toFixed(1);
+      setText('sc-motion-speed-val', p.motionSpeed.toFixed(1));
     }
 
     // Draw power
     setVal('sc-power', p.power);
-    document.getElementById('sc-power-val').textContent = p.power.toFixed(2);
+    setText('sc-power-val', p.power.toFixed(2));
     setCheck('sc-auto-power', p.autoPower);
     setCheck('sc-power-loop', p.powerLoop);
     setVal('sc-power-speed', p.powerSpeed);
-    document.getElementById('sc-ps-val').textContent = p.powerSpeed.toFixed(3);
+    setText('sc-ps-val', p.powerSpeed.toFixed(3));
 
     // Display toggles
     setCheck('show-grid', p.showGrid);
@@ -399,8 +404,15 @@ export class PresetManager {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (ev) => {
+        let preset;
         try {
-          const preset = JSON.parse(ev.target.result);
+          preset = JSON.parse(ev.target.result);
+        } catch (e) {
+          console.warn('Preset import: JSON parse failed:', e);
+          resolve(-1);
+          return;
+        }
+        try {
           // Find next empty slot
           let idx = this._slots.findIndex(s => s === null);
           if (idx === -1) idx = this.SLOT_COUNT - 1; // overwrite last if all full
@@ -409,7 +421,7 @@ export class PresetManager {
           this._saveSlots();
           resolve(idx);
         } catch (e) {
-          console.error('Preset import failed:', e);
+          console.warn('Preset import: data application failed:', e);
           resolve(-1);
         }
       };

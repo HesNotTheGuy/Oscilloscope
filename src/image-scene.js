@@ -96,8 +96,17 @@ export class ImageScene {
         this._img.onload  = () => {
           this.loaded = true;
           this.name   = file.name;
+          if (!this._img.naturalWidth || !this._img.naturalHeight) {
+            this.loaded = false;
+            this.error  = 'Image has no intrinsic dimensions';
+            resolve(false);
+            return;
+          }
           this._computeTrace();
-          resolve(true);
+          if (this._traceNorm.length === 0) {
+            this.loaded = false;
+          }
+          resolve(this.loaded);
         };
         this._img.onerror = () => resolve(false);
         this._img.src = ev.target.result;
@@ -111,7 +120,7 @@ export class ImageScene {
     if (!this.loaded) return;
     const iW = this._img.naturalWidth;
     const iH = this._img.naturalHeight;
-    if (!iW || !iH) return;
+    if (!iW || !iH) { this._traceNorm = []; return; }
 
     const sW = this.sampleRes;
     const sH = Math.max(1, Math.round(sW * iH / iW));

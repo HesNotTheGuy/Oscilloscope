@@ -93,10 +93,12 @@ export class AudioEngine {
   async startMic() {
     if (this.micStream) this.stopMic();
     this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    this._connect(this.actx.createMediaStreamSource(this.micStream), 1);
+    this._micSource = this.actx.createMediaStreamSource(this.micStream);
+    this._connect(this._micSource, 1);
   }
 
   stopMic() {
+    if (this._micSource) { try { this._micSource.disconnect(); } catch (_) {} this._micSource = null; }
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
   }
 

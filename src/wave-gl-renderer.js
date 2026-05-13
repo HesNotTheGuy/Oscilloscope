@@ -146,7 +146,18 @@ export class WaveGLRenderer {
   }
 
   // Transparent export mode: final frame alpha = luminance
-  setAlphaMode(on) { this.alphaMode = !!on; }
+  setAlphaMode(on) {
+    this.alphaMode = !!on;
+    // Clear phosphor ping-pong FBOs to transparent black so first frames are clean
+    const gl = this.gl;
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.clearColor(0, 0, 0, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._fPhA);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._fPhB);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
+  }
 
   _buildQuadBuffer() {
     const gl = this.gl;

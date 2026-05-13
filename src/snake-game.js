@@ -35,14 +35,19 @@ export class SnakeGame {
   }
 
   _randomFood() {
-    // Pick a cell not on the snake
-    while (true) {
+    // Pick a cell not on the snake; cap attempts to avoid infinite loop when grid is full
+    const maxAttempts = this.cols * this.rows;
+    for (let i = 0; i < maxAttempts; i++) {
       const f = {
         x: Math.floor(Math.random() * this.cols),
         y: Math.floor(Math.random() * this.rows),
       };
       if (!this.snake.some(s => s.x === f.x && s.y === f.y)) return f;
     }
+    // Grid is full — snake has won
+    this.alive = false;
+    this.won   = true;
+    return null;
   }
 
   // Direction input — prevents 180° reversal
@@ -78,9 +83,10 @@ export class SnakeGame {
     this.snake.unshift({ x: nx, y: ny });
 
     // Food
-    if (nx === this.food.x && ny === this.food.y) {
+    if (this.food && nx === this.food.x && ny === this.food.y) {
       this.score++;
       this.food = this._randomFood();
+      if (!this.food) return;  // grid full — won, stop updating
       // Speed up slightly per food (cap at 60ms)
       this.tickMs = Math.max(60, this.tickMs - 3);
     } else {
@@ -97,11 +103,8 @@ export class SnakeGame {
     const body = this.snake.map(s => [s.x * c + half, s.y * c + half]);
 
     // Food: drawn as a small + cross (two short polylines)
-    const fx = this.food.x * c + half;
-    const fy = this.food.y * c + half;
-    const r  = c * 0.3;
-    const foodH = [[fx - r, fy], [fx + r, fy]];
-    const foodV = [[fx, fy - r], [fx, fy + r]];
+    const foodH = this.food ? (() => { const fx = this.food.x * c + half, fy = this.food.y * c + half, r = c * 0.3; return [[fx - r, fy], [fx + r, fy]]; })() : [];
+    const foodV = this.food ? (() => { const fx = this.food.x * c + half, fy = this.food.y * c + half, r = c * 0.3; return [[fx, fy - r], [fx, fy + r]]; })() : [];
 
     // Border rectangle so the playfield is visible
     const W = this.cols * c;
