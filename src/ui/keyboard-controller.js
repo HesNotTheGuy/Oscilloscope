@@ -169,6 +169,8 @@ export class KeyboardController {
               <div class="kb-help-section">SCENE</div>
               <div class="kb-help-row"><kbd>3</kbd> Toggle OBJ/IMG enable</div>
               <div class="kb-help-row"><kbd>Tab</kbd> Switch OBJ / IMG</div>
+              <div class="kb-help-section">SYNTH</div>
+              <div class="kb-help-row"><kbd>K</kbd> Toggle keyboard synth</div>
               <div class="kb-help-section" style="margin-top:12px;opacity:0.5">
                 Press <kbd>?</kbd> or <kbd>Esc</kbd> to close
               </div>

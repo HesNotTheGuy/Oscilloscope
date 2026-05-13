@@ -128,6 +128,8 @@ export class TooltipController {
     if (id === 'btn-yt')       return 'YT mode — voltage vs. time (standard waveform view)';
     if (id === 'btn-xy')       return 'XY mode — Lissajous figures (CH1=X axis, CH2=Y axis)';
     if (id === 'btn-vs')       return 'Vectorscope — L/R stereo correlation as a polar plot';
+    if (id === 'btn-fs')       return 'Spectrum analyzer — 64 log-spaced frequency bars (20 Hz – 20 kHz)';
+    if (id === 'btn-synth')    return 'Keyboard synth — press K to toggle, then play notes with your keyboard';
 
     // ── Transport / system buttons ──
     if (id === 'btn-record')    return 'Record video — audio is included. Use ▾ to choose Standard or Transparent';

@@ -3658,7 +3658,7 @@ body[data-theme="frosted-glass"] {
 /* ─── Hover tooltips ──────────────────────────────────────── */
 #dso-tooltip {
   position: fixed;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--panel);
   color: var(--text-hi);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -3673,6 +3673,10 @@ body[data-theme="frosted-glass"] {
   max-width: 320px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
+}
+/* Light themes need a softer shadow for readability */
+[data-theme="modern-minimal"] #dso-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 #dso-tooltip.visible {
   opacity: 1;

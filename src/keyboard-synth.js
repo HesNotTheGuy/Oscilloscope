@@ -121,9 +121,12 @@ export class KeyboardSynth {
       this._releaseVoice(key, true);   // forceFast = true
     }
 
-    // Restore previous sigGen state if it was active
+    // Restore previous sigGen state if it was active. Use the silent
+    // (2-arg) form to match how siggen-controller starts it — the
+    // synth was the only audible caller, so restoring with audio
+    // would leak speakers-on into the user's prior configuration.
     if (this._savedSigGenActive) {
-      this.sigGen.start(this.engine.analyserL, this.engine.analyserR, this.engine.gainNode);
+      this.sigGen.start(this.engine.analyserL, this.engine.analyserR);
     }
 
     // Restore scope mode
@@ -364,10 +367,12 @@ export class KeyboardSynth {
     const ytBtn = document.getElementById('btn-yt');
     const xyBtn = document.getElementById('btn-xy');
     const vsBtn = document.getElementById('btn-vs');
+    const fsBtn = document.getElementById('btn-fs');
     if (!ytBtn) return;
     ytBtn.classList.toggle('active', mode === 'YT');
     xyBtn.classList.toggle('active', mode === 'XY');
     if (vsBtn) vsBtn.classList.toggle('active', mode === 'VS');
+    if (fsBtn) fsBtn.classList.toggle('active', mode === 'FS');
   }
 
   _notify() {
