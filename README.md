@@ -93,6 +93,7 @@ The main display renders at full WebGL resolution with a multi-pass phosphor pip
 | **YT** | Voltage vs. time — the standard waveform view |
 | **XY** | CH1 drives X, CH2 drives Y — Lissajous and phase figures |
 | **VS** | Vectorscope — L/R correlation in polar form. Mono = vertical line, out-of-phase = horizontal |
+| **FS** | Spectrum analyzer — 64 logarithmic frequency bars from 20 Hz to 20 kHz |
 
 ### Channels
 
@@ -125,7 +126,9 @@ A readout strip along the bottom of the display shows live measurements updated 
 
 `Vpp` &bull; `Vmax` &bull; `Vmin` &bull; `Vrms` &bull; `Vavg` &bull; `frequency` &bull; `period`
 
-Toggle with **M** or the measurements checkbox.
+A second status strip under the scope shows channel state, timebase, trigger, signal frequency, source, and live **BPM** estimated from the beat detector.
+
+Toggle measurements with **M** or the measurements checkbox.
 
 ---
 
@@ -308,6 +311,10 @@ Load any Wavefront `.obj` file. The parser extracts edges from face definitions,
 | Auto-Rotate X/Y/Z | Per-axis continuous spin with independent speed |
 | Draw Power | How much of the edge list is drawn (0–100%) |
 | Auto Ramp | Animate Draw Power from 0→1 automatically |
+| Render Mode | Wire / Sparse / Shimmer / Dots — controls how edges are sampled per frame |
+| Density | 5–100% subsampling of the edge list — reduces lag on heavy models |
+
+Heavy `.obj` files are automatically decimated at load time (capped at 12k edges). The renderer also runs an adaptive frame-skipping watchdog: if a frame takes too long, the next is scheduled via `setTimeout(0)` instead of `requestAnimationFrame` so the control panel stays responsive. When sustained slowness is detected, density is automatically reduced and restored as headroom returns.
 
 ### 2D Image Mode
 
@@ -588,6 +595,7 @@ Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. E
 | `2` | XY mode |
 | `3` | Toggle scene mode on/off |
 | `4` | Vectorscope mode |
+| `5` | Spectrum analyzer mode |
 | `Tab` | Switch OBJ / Image scene |
 | `R` | Run / Stop scope |
 | `S` | Single trigger |
@@ -596,6 +604,8 @@ Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. E
 | `?` | Show shortcut help overlay |
 
 Hover any knob, slider, or button for an inline tooltip showing its current value and what it does.
+
+**Right-click the scope canvas** for quick actions: save screenshot, copy frame to clipboard, toggle measurements / grid / CRT curve, pop out display, toggle fullscreen, run / stop.
 
 Keyboard shortcuts can be remapped to MIDI input via the InputMapper.
 
