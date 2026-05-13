@@ -100,6 +100,7 @@ export class SignalGenController {
           document.getElementById('btn-xy').classList.add('active');
           document.getElementById('btn-yt').classList.remove('active');
           document.getElementById('btn-vs').classList.remove('active');
+          document.getElementById('btn-fs').classList.remove('active');
           resetPhosphor(s);
         }
         document.getElementById('st-src').textContent = 'Signal Gen';
@@ -125,6 +126,8 @@ export class SignalGenController {
         s.mode = 'XY';
         document.getElementById('btn-xy').classList.add('active');
         document.getElementById('btn-yt').classList.remove('active');
+        document.getElementById('btn-vs').classList.remove('active');
+        document.getElementById('btn-fs').classList.remove('active');
         resetPhosphor(s);
       }
       document.getElementById('st-src').textContent = 'Signal Gen';

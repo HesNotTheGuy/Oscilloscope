@@ -7,6 +7,7 @@ import { ImageScene } from './image-scene.js';
 import { TIMEBASE, TB_DEFAULT, VDIV, VD_DEFAULT } from './constants.js';
 import { SnakeGame } from './snake-game.js';
 import { computeVectorscopePoints } from './vectorscope.js';
+import { computeSpectrumPoints } from './spectrum.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -484,10 +485,70 @@ export class Oscilloscope {
   }
 
   // ── Main render loop ─────────────────────────────────────────────────
+  //
+  // Adaptive frame skipping: if the previous frame's CPU work took longer
+  // than SKIP_MS, schedule the next frame via setTimeout instead of rAF
+  // so pending UI events (clicks, slider drags, theme switches) can drain.
+  // This keeps the control panel responsive even when the scope is under
+  // heavy load (huge OBJ files, tiling × radial × motion FX combos).
+  //
+  // Auto-density: when sustained slowness is detected, automatically dial
+  // back the OBJ density to maintain frame budget. The user can disable
+  // this via the autoQuality flag.
   render() {
     if (!this.running) return;
+
+    const SKIP_MS       = 35;   // last-frame threshold above which we yield
+    const HEAVY_MS      = 50;   // sustained-heavy threshold for auto-density
+    const RECOVER_MS    = 18;   // restore density when frames get healthy
+    const SAMPLE_FRAMES = 8;    // EMA window for averaging frame times
+
+    // Yield path: previous frame was slow → let UI process events first
+    if (this._lastFrameMs && this._lastFrameMs > SKIP_MS && !this._yielded) {
+      this._yielded = true;
+      this._lastFrameMs = 0;   // reset so we don't infinite-yield
+      this.rafId = setTimeout(() => { this._yielded = false; this.render(); }, 0);
+      return;
+    }
+    this._yielded = false;
+
+    const t0 = performance.now();
     if (this._glr) this._renderGL(); else this._render2D();
+    const dur = performance.now() - t0;
+
+    // Exponential moving average of frame work time
+    this._avgFrameMs = this._avgFrameMs == null
+      ? dur
+      : (this._avgFrameMs * (SAMPLE_FRAMES - 1) + dur) / SAMPLE_FRAMES;
+    this._lastFrameMs = dur;
+
+    // Adaptive density: auto-reduce when sustained heavy, restore when calm
+    if (this.autoQuality !== false && this._obj && this._obj.loaded) {
+      if (this._avgFrameMs > HEAVY_MS && this._obj.density > 0.1) {
+        this._obj.density = Math.max(0.1, this._obj.density - 0.05);
+        this._notifyAutoQuality();
+      } else if (this._avgFrameMs < RECOVER_MS && this._obj.density < (this._obj._userDensity ?? 1)) {
+        this._obj.density = Math.min(this._obj._userDensity ?? 1, this._obj.density + 0.02);
+        this._notifyAutoQuality();
+      }
+    }
+
     this.rafId = requestAnimationFrame(() => this.render());
+  }
+
+  // Surface auto-density changes to the UI density slider so the user sees
+  // what's happening. Throttled to avoid input event spam.
+  _notifyAutoQuality() {
+    const now = performance.now();
+    if (this._lastAutoQNotify && now - this._lastAutoQNotify < 250) return;
+    this._lastAutoQNotify = now;
+    const slider = document.getElementById('obj-density');
+    const val    = document.getElementById('obj-density-val');
+    if (slider) {
+      const pct = Math.round(this._obj.density * 100);
+      slider.value = pct;
+      if (val) val.textContent = pct + '% (auto)';
+    }
   }
 
   // ── WebGL render path ────────────────────────────────────────────────
@@ -582,7 +643,7 @@ export class Oscilloscope {
       if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
       if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
       if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
-    } else {
+    } else if (this.mode === 'VS') {
       // VS / Vectorscope
       const scale = this.getVoltScale(this.ch1) * 4;
       const pts = computeVectorscopePoints(dataL, dataR, W, H, scale);
@@ -590,6 +651,13 @@ export class Oscilloscope {
       if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
       if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
       if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+    } else if (this.mode === 'FS') {
+      // FS / Frequency Spectrum — frequency-domain data via AnalyserNode
+      const freqL = new Float32Array(this.engine.analyserL.frequencyBinCount);
+      this.engine.analyserL.getFloatFrequencyData(freqL);
+      const sampleRate = this.engine.sampleRate || 48000;
+      const barSets = computeSpectrumPoints(freqL, W, H, { bars: 64, sampleRate });
+      for (const pts of barSets) allPts.push(pts);
     }
 
     // ③b OBJ / image overlay
@@ -724,10 +792,23 @@ export class Oscilloscope {
     } else if (this.mode === 'XY') {
       this.drawXY(pctx, dataL, dataR);
       this._drawMirrored(pctx, ctx => this.drawXY(ctx, dataL, dataR));
-    } else {
+    } else if (this.mode === 'VS') {
       // VS / Vectorscope — render using 2D beam path
       this.drawVS(pctx, dataL, dataR);
       this._drawMirrored(pctx, ctx => this.drawVS(ctx, dataL, dataR));
+    } else if (this.mode === 'FS') {
+      // FS / Frequency Spectrum — 2D fallback
+      const W2 = this.canvas.width, H2 = this.canvas.height;
+      const freqL = new Float32Array(this.engine.analyserL.frequencyBinCount);
+      this.engine.analyserL.getFloatFrequencyData(freqL);
+      const sampleRate = this.engine.sampleRate || 48000;
+      const barSets = computeSpectrumPoints(freqL, W2, H2, { bars: 64, sampleRate });
+      const color  = this._renderColor();
+      const glow   = this._renderGlow();
+      const bWidth = this._renderBeamWidth();
+      for (const pts of barSets) {
+        this._drawBeamPath(pctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
+      }
     }
     if (rotActive) pctx.restore();
 
@@ -781,7 +862,15 @@ export class Oscilloscope {
   }
 
   start() { if (this.running) return; this.running = true; this.render(); }
-  stop()  { this.running = false; if (this.rafId) cancelAnimationFrame(this.rafId); }
+  stop()  {
+    this.running = false;
+    if (this.rafId) {
+      // rafId may be either a rAF handle or a setTimeout handle (from the
+      // yield path in render()). Cancel both safely.
+      try { cancelAnimationFrame(this.rafId); } catch (_) {}
+      try { clearTimeout(this.rafId); } catch (_) {}
+    }
+  }
 
   autoSet() {
     const data = this.applyCoupling(this.engine.getDataL(), this.ch1.coupling);

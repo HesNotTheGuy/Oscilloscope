@@ -71,12 +71,13 @@ export class ScopeController {
       }));
     });
 
-    // ── YT / XY mode ──
+    // ── YT / XY / VS / FS mode ──
     document.getElementById('btn-yt').addEventListener('click', () => {
       s.mode = 'YT';
       document.getElementById('btn-yt').classList.add('active');
       document.getElementById('btn-xy').classList.remove('active');
       document.getElementById('btn-vs').classList.remove('active');
+      document.getElementById('btn-fs').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-xy').addEventListener('click', () => {
@@ -84,6 +85,7 @@ export class ScopeController {
       document.getElementById('btn-xy').classList.add('active');
       document.getElementById('btn-yt').classList.remove('active');
       document.getElementById('btn-vs').classList.remove('active');
+      document.getElementById('btn-fs').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-vs').addEventListener('click', () => {
@@ -91,6 +93,15 @@ export class ScopeController {
       document.getElementById('btn-vs').classList.add('active');
       document.getElementById('btn-yt').classList.remove('active');
       document.getElementById('btn-xy').classList.remove('active');
+      document.getElementById('btn-fs').classList.remove('active');
+      resetPhosphor(s);
+    });
+    document.getElementById('btn-fs').addEventListener('click', () => {
+      s.mode = 'FS';
+      document.getElementById('btn-fs').classList.add('active');
+      document.getElementById('btn-yt').classList.remove('active');
+      document.getElementById('btn-xy').classList.remove('active');
+      document.getElementById('btn-vs').classList.remove('active');
       resetPhosphor(s);
     });
 

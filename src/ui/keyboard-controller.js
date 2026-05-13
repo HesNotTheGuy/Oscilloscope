@@ -43,6 +43,7 @@ export class KeyboardController {
         'scope.modeYT':  () => document.getElementById('btn-yt').click(),
         'scope.modeXY':  () => document.getElementById('btn-xy').click(),
         'scope.modeVS':  () => document.getElementById('btn-vs').click(),
+        'scope.modeFS':  () => document.getElementById('btn-fs').click(),
         'scope.runStop':  () => document.getElementById('btn-run-stop').click(),
         'scope.single':   () => document.getElementById('btn-single').click(),
 
@@ -129,6 +130,7 @@ export class KeyboardController {
       if (key === '1') { ev.preventDefault(); document.getElementById('btn-yt').click(); return; }
       if (key === '2') { ev.preventDefault(); document.getElementById('btn-xy').click(); return; }
       if (key === '4') { ev.preventDefault(); document.getElementById('btn-vs').click(); return; }
+      if (key === '5') { ev.preventDefault(); document.getElementById('btn-fs').click(); return; }
       if (key === 'r' || key === 'R') { ev.preventDefault(); document.getElementById('btn-run-stop').click(); return; }
       if (key === 's' || key === 'S') { ev.preventDefault(); document.getElementById('btn-single').click(); return; }
       if (key === '3') { ev.preventDefault(); const cb = document.getElementById('obj-mode'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); return; }
@@ -160,6 +162,8 @@ export class KeyboardController {
               <div class="kb-help-section">SCOPE</div>
               <div class="kb-help-row"><kbd>1</kbd> YT mode</div>
               <div class="kb-help-row"><kbd>2</kbd> XY mode</div>
+              <div class="kb-help-row"><kbd>4</kbd> VS mode</div>
+              <div class="kb-help-row"><kbd>5</kbd> FS mode</div>
               <div class="kb-help-row"><kbd>R</kbd> Run / Stop</div>
               <div class="kb-help-row"><kbd>S</kbd> Single trigger</div>
               <div class="kb-help-section">SCENE</div>
