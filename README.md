@@ -531,6 +531,7 @@ Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown
 | **OLED Dark** | True black background, white trace, minimal UI chrome |
 | **Nixie Tube** | Warm orange glow, glass-tube bezel, vignette |
 | **Frosted Glass** | Glassmorphism — translucent panels with backdrop blur |
+| **Liquid Glass** | Heavy crystal blur over vivid animated wallpaper — macOS Tahoe energy |
 
 ---
 

@@ -303,6 +303,40 @@ export const THEMES = [
       symbolColor: '#aaccee',
     },
   },
+
+  // ── 11. Liquid Glass ───────────────────────────────────────
+  // Heavy backdrop-blur + SVG turbulence refraction at edges.
+  // Inspired by macOS Tahoe / liquid-glass desktops where window
+  // chrome appears as warped translucent crystal over a colorful
+  // wallpaper. Requires a vivid body background for the blur to
+  // refract — uses an animated multi-blob gradient.
+  {
+    id: 'liquid-glass',
+    name: 'Liquid Glass',
+    css: {
+      '--p':         '#ffe0f0',
+      '--p-rgb':     '255,224,240',
+      '--bg':        '#1a0820',
+      '--panel':     'rgba(255,255,255,0.04)',
+      '--border':    'rgba(255,255,255,0.18)',
+      '--text':      '#e0d0e8',
+      '--text-hi':   '#ffffff',
+      '--input-bg':  'rgba(255,255,255,0.06)',
+      '--bezel':     'rgba(255,255,255,0.05)',
+      '--knob-body': 'rgba(255,255,255,0.08)',
+    },
+    scope: {
+      traceColor:    '#ffaadd',
+      gradientStart: '#ffaadd',
+      glowAmount:    20,
+      beamWidth:     1.8,
+      persistence:   0.4,
+    },
+    titleBar: {
+      color:       '#1a0820',
+      symbolColor: '#ffe0f0',
+    },
+  },
 ];
 
 /** Look up a theme by ID. */

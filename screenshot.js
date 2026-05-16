@@ -462,7 +462,7 @@ async function runShots(win, port) {
   const themes = [
     'classic-lab', 'tektronix-blue', 'analog-amber', 'mil-spec',
     'modern-minimal', 'synthwave', 'wooden-rack', 'oled-dark',
-    'nixie-tube', 'frosted-glass',
+    'nixie-tube', 'frosted-glass', 'liquid-glass',
   ];
 
   for (const theme of themes) {

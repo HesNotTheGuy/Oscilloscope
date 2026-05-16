@@ -10,6 +10,14 @@
 </head>
 <body>
 
+  <!-- SVG filter for the Liquid Glass theme (refraction at panel edges) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="liquid-glass-refraction">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
   <!-- Top status bar (full-width, doubles as window drag area) -->
   <div class="topbar">
     <span class="brand">DSO&#8209;1</span>
