@@ -151,19 +151,10 @@ body {
 }
 .theme-select:focus { border-color: var(--p); }
 
-/* ─── Frosted Glass theme overrides ─── */
-[data-theme="frosted-glass"] .fp-section {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-[data-theme="frosted-glass"] .topbar {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-[data-theme="frosted-glass"] .scope-status {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
+/* Frosted Glass theme overrides moved to the consolidated theme block
+   further down in the file (around the [data-theme="frosted-glass"]
+   section). The older duplicate blur declarations were removed since
+   each backdrop-filter forces an additional GPU compositor pass. */
 
 /* ─── Modern Minimal (light theme) overrides ─── */
 [data-theme="modern-minimal"] ::-webkit-scrollbar-track { background: #e8e8e8; }

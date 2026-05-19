@@ -148,7 +148,10 @@ export class SceneController {
       try { return JSON.parse(localStorage.getItem(OBJ_LIB_KEY) || '[]'); }
       catch (_) { return []; }
     };
-    const _libSave = items => localStorage.setItem(OBJ_LIB_KEY, JSON.stringify(items));
+    const _libSave = items => {
+      try { localStorage.setItem(OBJ_LIB_KEY, JSON.stringify(items)); }
+      catch (e) { console.warn('[Scene] Failed to save OBJ library:', e.message); }
+    };
 
     let _activeLibIdx = -1;
 

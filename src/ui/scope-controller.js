@@ -125,12 +125,14 @@ export class ScopeController {
     const runBtn = document.getElementById('btn-run-stop');
     runBtn.addEventListener('click', () => {
       s.isRunning = !s.isRunning;
+      // Clear any stale single-trigger freeze when resuming live capture
+      if (s.isRunning) s.frozenData = null;
       runBtn.textContent = s.isRunning ? 'RUN' : 'STOP';
       runBtn.className   = 'run-stop-btn ' + (s.isRunning ? 'running' : 'stopped');
     });
 
     document.getElementById('btn-single').addEventListener('click', () => {
-      s.isRunning = true; s._singleArmed = true;
+      s.isRunning = true; s._singleArmed = true; s.frozenData = null;
       runBtn.textContent = 'RUN'; runBtn.className = 'run-stop-btn running';
     });
 

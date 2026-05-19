@@ -31,7 +31,11 @@ export class PresetManager {
   }
 
   _saveSlots() {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this._slots));
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this._slots));
+    } catch (e) {
+      console.warn('[PresetManager] Failed to save presets:', e.message);
+    }
   }
 
   capture() {

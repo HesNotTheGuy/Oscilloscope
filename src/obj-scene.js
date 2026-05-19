@@ -239,10 +239,16 @@ export class ObjScene {
     } else if (mode === 'shimmer') {
       // Random subset that refreshes every frame — animated sampling
       const target = Math.max(1, Math.floor(powerCount * density));
-      indices = new Array(target);
-      for (let i = 0; i < target; i++) {
-        indices[i] = (Math.random() * powerCount) | 0;
+      // Reuse a persistent Int32Array; the iteration count below trims it.
+      if (!this._shimmerBuf || this._shimmerBuf.length < target) {
+        this._shimmerBuf = new Int32Array(target);
       }
+      for (let i = 0; i < target; i++) {
+        this._shimmerBuf[i] = (Math.random() * powerCount) | 0;
+      }
+      indices = this._shimmerBuf;
+      // Save the active length so the consumer can iterate correctly
+      this._shimmerLen = target;
     } else {
       // 'wire' at full density — render all up to powerCount
       indices = null;
@@ -262,7 +268,11 @@ export class ObjScene {
       }
     }
 
-    const iterCount = (mode === 'dots') ? 0 : (indices ? indices.length : powerCount);
+    // Shimmer uses _shimmerLen since indices is a persistent buffer that
+    // may be larger than the active sample count.
+    const iterCount = (mode === 'dots') ? 0
+                    : (mode === 'shimmer') ? this._shimmerLen
+                    : (indices ? indices.length : powerCount);
     for (let ii = 0; ii < iterCount; ii++) {
       const ei = indices ? indices[ii] : ii;
       const [i0, i1] = this.edges[ei];
@@ -392,52 +402,77 @@ export class ObjScene {
 
     // ── Ripple spatial constants ──
     const rippleWaves = 3;  // concentric ring count (fixed aesthetic)
+    const ripplePhBase = this._ripplePh * Math.PI * 2;
+    const rippleScale  = rippleWaves * Math.PI * 2 / half;
+    const rippleAmp    = amt * 0.25 * half;
+    const twistScale   = amt * Math.PI * 1.5 / half;
+    const twistPh      = this._twistPh;
+    const doRipple     = this.ripple;
+    const doTwist      = this.twist;
+    const doExplode    = explodeF > 0;
 
-    return segs.map(([[x0,y0],[x1,y1]]) => {
-      let ax = x0, ay = y0, bx = x1, by = y1;
+    // Mutate segs in place — segs is already a fresh array owned by this
+    // function (built from edges, tiling, or radial symmetry above), and
+    // each endpoint sub-array is mutable. This eliminates the per-frame
+    // map() allocation that produced 5M+ object allocations/sec at scale.
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const p0 = seg[0], p1 = seg[1];
+      let ax = p0[0], ay = p0[1], bx = p1[0], by = p1[1];
 
-      // Ripple — radially displace each point based on distance from center
-      if (this.ripple) {
-        const rp = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-          const phase = (dist / half) * rippleWaves * Math.PI * 2 - this._ripplePh * Math.PI * 2;
-          const disp  = Math.sin(phase) * amt * 0.25 * half;
-          return [x + (dx/dist) * disp, y + (dy/dist) * disp];
-        };
-        [ax, ay] = rp(ax, ay);
-        [bx, by] = rp(bx, by);
+      if (doRipple) {
+        // Point A
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        let phase = dist * rippleScale - ripplePhBase;
+        let disp  = Math.sin(phase) * rippleAmp;
+        ax += (dx/dist) * disp;
+        ay += (dy/dist) * disp;
+        // Point B
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        phase = dist * rippleScale - ripplePhBase;
+        disp  = Math.sin(phase) * rippleAmp;
+        bx += (dx/dist) * disp;
+        by += (dy/dist) * disp;
       }
 
-      // Twist — rotate each point around center by angle ∝ distance
-      if (this.twist) {
-        const tp = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          const angle = (dist / half) * amt * Math.PI * 1.5 + this._twistPh;
-          const cos = Math.cos(angle), sin = Math.sin(angle);
-          return [cx + dx*cos - dy*sin, cy + dx*sin + dy*cos];
-        };
-        [ax, ay] = tp(ax, ay);
-        [bx, by] = tp(bx, by);
+      if (doTwist) {
+        // Point A
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let angle = dist * twistScale + twistPh;
+        let cos = Math.cos(angle), sin = Math.sin(angle);
+        ax = cx + dx*cos - dy*sin;
+        ay = cy + dx*sin + dy*cos;
+        // Point B
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy);
+        angle = dist * twistScale + twistPh;
+        cos = Math.cos(angle); sin = Math.sin(angle);
+        bx = cx + dx*cos - dy*sin;
+        by = cy + dx*sin + dy*cos;
       }
 
-      // Float — global sinusoidal drift
       ax += floatX; ay += floatY;
       bx += floatX; by += floatY;
 
-      // Explode — push each point outward from center
-      if (explodeF > 0) {
-        const ep = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-          return [x + (dx/dist) * explodeF, y + (dy/dist) * explodeF];
-        };
-        [ax, ay] = ep(ax, ay);
-        [bx, by] = ep(bx, by);
+      if (doExplode) {
+        // Point A
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        ax += (dx/dist) * explodeF;
+        ay += (dy/dist) * explodeF;
+        // Point B
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        bx += (dx/dist) * explodeF;
+        by += (dy/dist) * explodeF;
       }
 
-      return [[ax, ay], [bx, by]];
-    });
+      p0[0] = ax; p0[1] = ay;
+      p1[0] = bx; p1[1] = by;
+    }
+    return segs;
   }
 }

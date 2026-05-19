@@ -308,16 +308,19 @@ export class KeyboardSynth {
 
   _releaseVoice(voiceKeyOrPlainKey, forceFast = false) {
     // The argument can be the full voice key (e.g. "z@4") or just the
-    // plain keyboard key. For the plain-key case, find the matching voice.
-    let voiceKey = voiceKeyOrPlainKey;
-    if (!voiceKey.includes('@')) {
-      const plain = voiceKey;
-      voiceKey = null;
+    // plain keyboard key. For the plain-key case, release ALL voices
+    // that share that key — handles the case where the user shifted
+    // octave while holding the key, leaving voices at multiple octaves.
+    if (!voiceKeyOrPlainKey.includes('@')) {
+      const plain = voiceKeyOrPlainKey;
+      const matches = [];
       for (const k of this._voices.keys()) {
-        if (k.startsWith(plain + '@')) { voiceKey = k; break; }
+        if (k.startsWith(plain + '@')) matches.push(k);
       }
-      if (!voiceKey) return;
+      for (const k of matches) this._releaseVoice(k, forceFast);
+      return;
     }
+    const voiceKey = voiceKeyOrPlainKey;
     const v = this._voices.get(voiceKey);
     if (!v || v.releasing) return;
 

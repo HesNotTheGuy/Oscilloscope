@@ -129,18 +129,55 @@ export class Oscilloscope {
     }
   }
 
+  // Reusable mirror buffer pool (3 slots A/B/C for the 3 possible mirror
+  // axes that can be active simultaneously). Each call reuses the same
+  // outer array and sub-pair, eliminating ~4k allocations/sec at scale.
+  _mirrorPts(pts, ox, oy, sx, sy, slot) {
+    if (!this._mirPool) this._mirPool = { A: [], B: [], C: [] };
+    const out = this._mirPool[slot];
+    const n = pts.length;
+    // Grow / shrink
+    while (out.length < n) out.push([0, 0]);
+    if (out.length > n) out.length = n;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i], r = out[i];
+      r[0] = ox + sx * p[0];
+      r[1] = oy + sy * p[1];
+    }
+    return out;
+  }
+
   // ── Coupling ─────────────────────────────────────────────────────────
-  applyCoupling(data, coupling) {
-    if (coupling === 'GND') return new Float32Array(data.length);
-    // DC: return a copy. The input `data` is the engine's reusable buffer
-    // which gets overwritten next frame by getFloatTimeDomainData. Without
-    // a copy, single-trigger "frozen" data would silently track live audio.
-    if (coupling === 'DC')  return data.slice();
+  // Reusable per-channel output buffer. The L and R results must persist
+  // independently through the frame (both are read by the renderer), so
+  // we need two distinct buffers. Lazy-init since size matches input.
+  _getCouplingBuf(channel, len) {
+    if (!this._couplingBuf) this._couplingBuf = { L: null, R: null };
+    let buf = this._couplingBuf[channel];
+    if (!buf || buf.length !== len) {
+      buf = this._couplingBuf[channel] = new Float32Array(len);
+    }
+    return buf;
+  }
+  applyCoupling(data, coupling, channel = 'L') {
+    const len = data.length;
+    const out = this._getCouplingBuf(channel, len);
+    if (coupling === 'GND') {
+      out.fill(0);
+      return out;
+    }
+    // DC: copy into our buffer. The input `data` is the engine's reusable
+    // buffer which gets overwritten next frame by getFloatTimeDomainData.
+    // Without a copy, single-trigger "frozen" data would silently track
+    // live audio.
+    if (coupling === 'DC') {
+      out.set(data);
+      return out;
+    }
     let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i];
-    const mean = sum / data.length;
-    const out = new Float32Array(data.length);
-    for (let i = 0; i < data.length; i++) out[i] = data[i] - mean;
+    for (let i = 0; i < len; i++) sum += data[i];
+    const mean = sum / len;
+    for (let i = 0; i < len; i++) out[i] = data[i] - mean;
     return out;
   }
 
@@ -165,10 +202,13 @@ export class Oscilloscope {
   // mutated). state = [x1, x2, y1, y2]. Persisting state across frames
   // prevents transient ringing at the start of each buffer that would
   // otherwise create severe visual artifacts in XY mode.
-  _runBiquad(data, c, state) {
-    const out = new Float32Array(data.length);
+  // `outBuf` is an optional pre-allocated output buffer; if omitted a
+  // fresh Float32Array is created (used by tests).
+  _runBiquad(data, c, state, outBuf) {
+    const len = data.length;
+    const out = (outBuf && outBuf.length === len) ? outBuf : new Float32Array(len);
     let x1 = state[0], x2 = state[1], y1 = state[2], y2 = state[3];
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < len; i++) {
       const x0 = data[i];
       const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2;
       out[i] = y0;
@@ -201,8 +241,16 @@ export class Oscilloscope {
     const lo  = Math.min(this.filterLow,  this.filterHigh - 1);
     const hi  = Math.max(this.filterHigh, lo + 1);
     const st  = this._getFilterState(channel, lo, hi, sr);
-    const hp  = this._runBiquad(data, this._biquadCoeffs('hp', lo, sr), st.hp);
-    return this._runBiquad(hp, this._biquadCoeffs('lp', hi, sr), st.lp);
+    // Reusable per-channel intermediate + output buffers
+    const len = data.length;
+    if (!this._filterTmp) this._filterTmp = { L: null, R: null };
+    if (!this._filterOut) this._filterOut = { L: null, R: null };
+    if (!this._filterTmp[channel] || this._filterTmp[channel].length !== len) {
+      this._filterTmp[channel] = new Float32Array(len);
+      this._filterOut[channel] = new Float32Array(len);
+    }
+    const hp = this._runBiquad(data, this._biquadCoeffs('hp', lo, sr), st.hp, this._filterTmp[channel]);
+    return this._runBiquad(hp, this._biquadCoeffs('lp', hi, sr), st.lp, this._filterOut[channel]);
   }
 
   // ── Trigger ──────────────────────────────────────────────────────────
@@ -542,8 +590,14 @@ export class Oscilloscope {
     const now = performance.now();
     if (this._lastAutoQNotify && now - this._lastAutoQNotify < 250) return;
     this._lastAutoQNotify = now;
-    const slider = document.getElementById('obj-density');
-    const val    = document.getElementById('obj-density-val');
+    // Cache DOM refs once — these elements never move
+    if (this._autoQEls === undefined) {
+      this._autoQEls = {
+        slider: document.getElementById('obj-density'),
+        val:    document.getElementById('obj-density-val'),
+      };
+    }
+    const { slider, val } = this._autoQEls;
     if (slider) {
       const pct = Math.round(this._obj.density * 100);
       slider.value = pct;
@@ -589,11 +643,13 @@ export class Oscilloscope {
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
     let dataL, dataR;
     if (this.isRunning) {
-      dataL = this.applyCoupling(rawL, this.ch1.coupling);
-      dataR = this.applyCoupling(rawR, this.ch2.coupling);
+      dataL = this.applyCoupling(rawL, this.ch1.coupling, 'L');
+      dataR = this.applyCoupling(rawR, this.ch2.coupling, 'R');
       if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
       if (this._singleArmed) {
-        this.frozenData = { L: dataL, R: dataR };
+        // Capture independent copies for the freeze (coupling buffers will be
+        // reused on the next live frame, would otherwise alias).
+        this.frozenData = { L: dataL.slice(), R: dataR.slice() };
         this._singleArmed = false; this.isRunning = false;
       } else { this.frozenData = { L: dataL, R: dataR }; }
     } else {
@@ -627,9 +683,9 @@ export class Oscilloscope {
           });
         }
         allPts.push(pts);
-        if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
-        if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
-        if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+        if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
+        if (this.fx.mirrorY) allPts.push(this._mirrorPts(pts, 0, H,   1,-1, 'B'));
+        if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
       }
     } else if (this.mode === 'XY') {
       // XY / Lissajous
@@ -653,11 +709,16 @@ export class Oscilloscope {
       if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
     } else if (this.mode === 'FS') {
       // FS / Frequency Spectrum — frequency-domain data via AnalyserNode
-      const freqL = new Float32Array(this.engine.analyserL.frequencyBinCount);
-      this.engine.analyserL.getFloatFrequencyData(freqL);
-      const sampleRate = this.engine.sampleRate || 48000;
-      const barSets = computeSpectrumPoints(freqL, W, H, { bars: 64, sampleRate });
-      for (const pts of barSets) allPts.push(pts);
+      // Guard: analyser may be null before ensureAudio() resolves on first click
+      if (this.engine.analyserL) {
+        if (!this._freqBuf || this._freqBuf.length !== this.engine.analyserL.frequencyBinCount) {
+          this._freqBuf = new Float32Array(this.engine.analyserL.frequencyBinCount);
+        }
+        this.engine.analyserL.getFloatFrequencyData(this._freqBuf);
+        const sampleRate = this.engine.sampleRate || 48000;
+        const barSets = computeSpectrumPoints(this._freqBuf, W, H, { bars: 64, sampleRate });
+        for (const pts of barSets) allPts.push(pts);
+      }
     }
 
     // ③b OBJ / image overlay
@@ -761,11 +822,13 @@ export class Oscilloscope {
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
     let dataL, dataR;
     if (this.isRunning) {
-      dataL = this.applyCoupling(rawL, this.ch1.coupling);
-      dataR = this.applyCoupling(rawR, this.ch2.coupling);
+      dataL = this.applyCoupling(rawL, this.ch1.coupling, 'L');
+      dataR = this.applyCoupling(rawR, this.ch2.coupling, 'R');
       if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
       if (this._singleArmed) {
-        this.frozenData = { L: dataL, R: dataR };
+        // Capture independent copies for the freeze (coupling buffers will be
+        // reused on the next live frame, would otherwise alias).
+        this.frozenData = { L: dataL.slice(), R: dataR.slice() };
         this._singleArmed = false; this.isRunning = false;
       } else { this.frozenData = { L: dataL, R: dataR }; }
     } else {
@@ -798,16 +861,20 @@ export class Oscilloscope {
       this._drawMirrored(pctx, ctx => this.drawVS(ctx, dataL, dataR));
     } else if (this.mode === 'FS') {
       // FS / Frequency Spectrum — 2D fallback
-      const W2 = this.canvas.width, H2 = this.canvas.height;
-      const freqL = new Float32Array(this.engine.analyserL.frequencyBinCount);
-      this.engine.analyserL.getFloatFrequencyData(freqL);
-      const sampleRate = this.engine.sampleRate || 48000;
-      const barSets = computeSpectrumPoints(freqL, W2, H2, { bars: 64, sampleRate });
-      const color  = this._renderColor();
-      const glow   = this._renderGlow();
-      const bWidth = this._renderBeamWidth();
-      for (const pts of barSets) {
-        this._drawBeamPath(pctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
+      // Guard: analyser may be null before ensureAudio() resolves
+      if (this.engine.analyserL) {
+        if (!this._freqBuf || this._freqBuf.length !== this.engine.analyserL.frequencyBinCount) {
+          this._freqBuf = new Float32Array(this.engine.analyserL.frequencyBinCount);
+        }
+        this.engine.analyserL.getFloatFrequencyData(this._freqBuf);
+        const sampleRate = this.engine.sampleRate || 48000;
+        const barSets = computeSpectrumPoints(this._freqBuf, W, H, { bars: 64, sampleRate });
+        const color  = this._renderColor();
+        const glow   = this._renderGlow();
+        const bWidth = this._renderBeamWidth();
+        for (const pts of barSets) {
+          this._drawBeamPath(pctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
+        }
       }
     }
     if (rotActive) pctx.restore();
@@ -869,6 +936,7 @@ export class Oscilloscope {
       // yield path in render()). Cancel both safely.
       try { cancelAnimationFrame(this.rafId); } catch (_) {}
       try { clearTimeout(this.rafId); } catch (_) {}
+      this.rafId = null;   // prevent double-cancel on repeated stop() calls
     }
   }
 

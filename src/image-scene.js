@@ -478,49 +478,69 @@ export class ImageScene {
       explodeF = (t < 0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2) * amt * 1.5 * half;
     }
 
-    const rippleWaves = 3;
+    const rippleWaves  = 3;
+    const ripplePhBase = this._ripplePh * Math.PI * 2;
+    const rippleScale  = rippleWaves * Math.PI * 2 / half;
+    const rippleAmp    = amt * 0.25 * half;
+    const twistScale   = amt * Math.PI * 1.5 / half;
+    const twistPh      = this._twistPh;
+    const doRipple     = this.ripple;
+    const doTwist      = this.twist;
+    const doExplode    = explodeF > 0;
 
-    return segs.map(([[x0,y0],[x1,y1]]) => {
-      let ax = x0, ay = y0, bx = x1, by = y1;
+    // Mutate segs in place — see ObjScene._applyMoveFx for rationale.
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const p0 = seg[0], p1 = seg[1];
+      let ax = p0[0], ay = p0[1], bx = p1[0], by = p1[1];
 
-      if (this.ripple) {
-        const rp = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-          const phase = (dist / half) * rippleWaves * Math.PI * 2 - this._ripplePh * Math.PI * 2;
-          const disp  = Math.sin(phase) * amt * 0.25 * half;
-          return [x + (dx/dist) * disp, y + (dy/dist) * disp];
-        };
-        [ax, ay] = rp(ax, ay);
-        [bx, by] = rp(bx, by);
+      if (doRipple) {
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        let phase = dist * rippleScale - ripplePhBase;
+        let disp  = Math.sin(phase) * rippleAmp;
+        ax += (dx/dist) * disp;
+        ay += (dy/dist) * disp;
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        phase = dist * rippleScale - ripplePhBase;
+        disp  = Math.sin(phase) * rippleAmp;
+        bx += (dx/dist) * disp;
+        by += (dy/dist) * disp;
       }
 
-      if (this.twist) {
-        const tp = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          const angle = (dist / half) * amt * Math.PI * 1.5 + this._twistPh;
-          const cos = Math.cos(angle), sin = Math.sin(angle);
-          return [cx + dx*cos - dy*sin, cy + dx*sin + dy*cos];
-        };
-        [ax, ay] = tp(ax, ay);
-        [bx, by] = tp(bx, by);
+      if (doTwist) {
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let angle = dist * twistScale + twistPh;
+        let cos = Math.cos(angle), sin = Math.sin(angle);
+        ax = cx + dx*cos - dy*sin;
+        ay = cy + dx*sin + dy*cos;
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy);
+        angle = dist * twistScale + twistPh;
+        cos = Math.cos(angle); sin = Math.sin(angle);
+        bx = cx + dx*cos - dy*sin;
+        by = cy + dx*sin + dy*cos;
       }
 
       ax += floatX; ay += floatY;
       bx += floatX; by += floatY;
 
-      if (explodeF > 0) {
-        const ep = (x, y) => {
-          const dx = x - cx, dy = y - cy;
-          const dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-          return [x + (dx/dist) * explodeF, y + (dy/dist) * explodeF];
-        };
-        [ax, ay] = ep(ax, ay);
-        [bx, by] = ep(bx, by);
+      if (doExplode) {
+        let dx = ax - cx, dy = ay - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        ax += (dx/dist) * explodeF;
+        ay += (dy/dist) * explodeF;
+        dx = bx - cx; dy = by - cy;
+        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        bx += (dx/dist) * explodeF;
+        by += (dy/dist) * explodeF;
       }
 
-      return [[ax, ay], [bx, by]];
-    });
+      p0[0] = ax; p0[1] = ay;
+      p1[0] = bx; p1[1] = by;
+    }
+    return segs;
   }
 }

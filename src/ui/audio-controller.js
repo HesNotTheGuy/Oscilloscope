@@ -125,16 +125,20 @@ export class AudioController {
     }
 
     // ── Progress & status polling ──
+    // Cache element references once — these are static elements
+    const progressFill = document.getElementById('progress-fill');
+    const timeLbl      = document.getElementById('time-lbl');
+    const stFreq       = document.getElementById('st-freq');
+    const fmt = t => `${Math.floor(t / 60)}:${Math.floor(t % 60).toString().padStart(2, '0')}`;
     setInterval(() => {
       if (e.buffer) {
         const dur = e.buffer.duration;
         const cur = Math.min(e.getCurrentTime(), dur);
-        document.getElementById('progress-fill').style.width = (cur / dur * 100) + '%';
-        const fmt = t => `${Math.floor(t / 60)}:${Math.floor(t % 60).toString().padStart(2, '0')}`;
-        document.getElementById('time-lbl').textContent = `${fmt(cur)} / ${fmt(dur)}`;
+        if (progressFill) progressFill.style.width = (cur / dur * 100) + '%';
+        if (timeLbl) timeLbl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
       }
       const f = this.scope.measFreq;
-      document.getElementById('st-freq').textContent = f > 0
+      if (stFreq) stFreq.textContent = f > 0
         ? (f >= 1000 ? `${(f / 1000).toFixed(3)}kHz` : `${f.toFixed(2)}Hz`) : '---';
     }, 100);
   }

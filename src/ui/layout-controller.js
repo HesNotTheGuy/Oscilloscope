@@ -171,8 +171,12 @@ export class LayoutController {
           collapsed[s.dataset.panelId] = s.classList.contains('collapsed');
         });
       });
-      localStorage.setItem('osc_rigCurrent', JSON.stringify(rig));
-      localStorage.setItem('osc_panelCollapsed', JSON.stringify(collapsed));
+      try {
+        localStorage.setItem('osc_rigCurrent', JSON.stringify(rig));
+        localStorage.setItem('osc_panelCollapsed', JSON.stringify(collapsed));
+      } catch (e) {
+        console.warn('[Layout] Failed to save rig state:', e.message);
+      }
     };
 
     const applyRig = (rigDef) => {
