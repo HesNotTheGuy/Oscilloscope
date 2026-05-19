@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
   <img src="https://img.shields.io/badge/electron-33-brightgreen?style=flat-square" alt="Electron 33">
   <img src="https://img.shields.io/badge/renderer-WebGL-orange?style=flat-square" alt="WebGL">
-  <img src="https://img.shields.io/badge/version-1.4.0-informational?style=flat-square" alt="v1.4.0">
+  <img src="https://img.shields.io/badge/version-1.4.1-informational?style=flat-square" alt="v1.4.1">
   <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey?style=flat-square" alt="CC BY-NC 4.0">
 </p>
 
