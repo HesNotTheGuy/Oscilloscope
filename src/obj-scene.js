@@ -58,6 +58,8 @@ export class ObjScene {
     // 'dots'    — render vertices as short stubs only (skeletal point cloud)
     this.renderMode = 'wire';
     this.density    = 1.0;    // 0.05 – 1.0 — fraction of edges actually drawn
+    this._shimmerBuf = null;  // reusable Int32Array for shimmer index sampling
+    this._shimmerLen = 0;     // active sample count (set before read each frame)
 
     // Movement FX (applied post-projection; shared amt/speed controls all active effects)
     this.float       = false;  // sinusoidal XY drift

@@ -90,12 +90,17 @@ export class AudioController {
     btnRec.addEventListener('click', async () => {
       if (rec.isRecording) {
         rec.stop();
-        if (recMode === 'alpha') this.scope.setTransparentMode(false);
+        // Use the transparent state captured at START, not the current
+        // dropdown value — recMode can change mid-recording, which would
+        // otherwise leave the scope stuck in transparent mode.
+        if (this._recStartedTransparent) this.scope.setTransparentMode(false);
+        this._recStartedTransparent = false;
         btnRec.classList.remove('recording');
         setIdleLabel();
       } else {
         await this.ensureAudio();
         const transparent = recMode === 'alpha';
+        this._recStartedTransparent = transparent;
         if (transparent) this.scope.setTransparentMode(true);
         rec.start(e.actx, e.gainNode, { transparent });
         btnRec.textContent = '■ STOP';

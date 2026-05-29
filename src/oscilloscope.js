@@ -147,6 +147,12 @@ export class Oscilloscope {
     return out;
   }
 
+  // Reusable point buffer for vectorscope output (grown by computeVectorscopePoints)
+  _getVSBuf() {
+    if (!this._vsBuf) this._vsBuf = [];
+    return this._vsBuf;
+  }
+
   // ── Coupling ─────────────────────────────────────────────────────────
   // Reusable per-channel output buffer. The L and R results must persist
   // independently through the frame (both are read by the renderer), so
@@ -371,13 +377,19 @@ export class Oscilloscope {
   }
 
   // ── Build point array for YT ─────────────────────────────────────────
+  // Builds YT waveform points into a reusable pool buffer (this._ytBuf).
+  // The returned array is fully consumed within the same frame before the
+  // next call overwrites it (GL builds once/frame; 2D drawYT consumes it
+  // synchronously), so reuse is safe and avoids ~W allocations per frame.
   _buildYTPoints(data, ch, trigIdx, sampPx, yOffset = 0) {
     const W    = this.canvas.width, H = this.canvas.height;
     const midY = H/2 + ch.pos * (H/2) + yOffset;
     const vs   = this.getVoltScale(ch);
     const start = Math.max(0, trigIdx + this.hPos);
-    const pts  = [];
+    if (!this._ytBuf) this._ytBuf = [];
+    const pts  = this._ytBuf;
     const spx  = Math.max(0.01, sampPx);
+    let count = 0;
     for (let px = 0; px < W; px++) {
       const t  = start + px * spx;
       let val;
@@ -393,8 +405,12 @@ export class Oscilloscope {
         if (si >= data.length) break;
         val = data[si];
       }
-      pts.push([px, midY - Math.max(-2, Math.min(2, val)) * vs * (H/2)]);
+      const y = midY - Math.max(-2, Math.min(2, val)) * vs * (H/2);
+      if (count < pts.length) { const p = pts[count]; p[0] = px; p[1] = y; }
+      else pts.push([px, y]);
+      count++;
     }
+    if (pts.length > count) pts.length = count;
     return pts;
   }
 
@@ -672,15 +688,18 @@ export class Oscilloscope {
       if (trigIdx >= 0) {
         const sampPx = this.getSamplesPerPixel();
         measResult = { trigIdx, sampPx };
-        let pts = this._buildYTPoints(dataL, this.ch1, trigIdx, sampPx, 0);
-        // Rotation: rotate points around canvas center
+        const pts = this._buildYTPoints(dataL, this.ch1, trigIdx, sampPx, 0);
+        // Rotation: rotate points around canvas center (in place — pts is
+        // the reusable pool buffer; mirror passes read the rotated result).
         if (this.fx.rotation && this.fx._angle !== 0) {
           const cos = Math.cos(this.fx._angle), sin = Math.sin(this.fx._angle);
           const cx = W/2, cy = H/2;
-          pts = pts.map(([x,y]) => {
-            const dx=x-cx, dy=y-cy;
-            return [cx+dx*cos-dy*sin, cy+dx*sin+dy*cos];
-          });
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            const dx = p[0]-cx, dy = p[1]-cy;
+            p[0] = cx+dx*cos-dy*sin;
+            p[1] = cy+dx*sin+dy*cos;
+          }
         }
         allPts.push(pts);
         if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
@@ -696,17 +715,17 @@ export class Oscilloscope {
       const pts = [];
       for (let i = 0; i < n; i++) pts.push([cx + dataL[i]*sx, cy - dataR[i]*sy]);
       allPts.push(pts);
-      if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
-      if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
-      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+      if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
+      if (this.fx.mirrorY) allPts.push(this._mirrorPts(pts, 0, H,   1,-1, 'B'));
+      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
     } else if (this.mode === 'VS') {
       // VS / Vectorscope
       const scale = this.getVoltScale(this.ch1) * 4;
-      const pts = computeVectorscopePoints(dataL, dataR, W, H, scale);
+      const pts = computeVectorscopePoints(dataL, dataR, W, H, scale, this._getVSBuf());
       allPts.push(pts);
-      if (this.fx.mirrorX) allPts.push(pts.map(([x,y]) => [W-x, y]));
-      if (this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [x, H-y]));
-      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(pts.map(([x,y]) => [W-x, H-y]));
+      if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
+      if (this.fx.mirrorY) allPts.push(this._mirrorPts(pts, 0, H,   1,-1, 'B'));
+      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
     } else if (this.mode === 'FS') {
       // FS / Frequency Spectrum — frequency-domain data via AnalyserNode
       // Guard: analyser may be null before ensureAudio() resolves on first click
@@ -941,7 +960,9 @@ export class Oscilloscope {
   }
 
   autoSet() {
-    const data = this.applyCoupling(this.engine.getDataL(), this.ch1.coupling);
+    // Use a dedicated buffer slot ('AUTO') so a button-triggered autoSet
+    // can never contend with the live render's 'L' coupling buffer.
+    const data = this.applyCoupling(this.engine.getDataL(), this.ch1.coupling, 'AUTO');
     const freq = this.estimateFreq(data);
     if (freq > 0) {
       const target = (1/freq) * 3 / 10;
