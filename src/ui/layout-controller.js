@@ -1,5 +1,19 @@
 'use strict';
 
+// Safe localStorage JSON read — returns `fallback` if the key is missing
+// or the stored value is corrupted (never throws, so a bad value can't
+// take down init or a rig operation).
+function lsParse(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const v = JSON.parse(raw);
+    return v == null ? fallback : v;
+  } catch (_) {
+    return fallback;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  LayoutController — rig system, panels, tabs, search, drag-drop
 // ─────────────────────────────────────────────────────────────
@@ -159,7 +173,7 @@ export class LayoutController {
     const editBtn   = document.getElementById('rig-edit-btn');
     const saveBtn   = document.getElementById('rig-save-btn');
 
-    const savedCollapsed = JSON.parse(localStorage.getItem('osc_panelCollapsed') || '{}');
+    const savedCollapsed = lsParse('osc_panelCollapsed', {});
 
     const saveRigState = () => {
       const rig = {};
@@ -207,7 +221,7 @@ export class LayoutController {
         localStorage.setItem('osc_rigName', name);
       } else {
         exitTabbedMode();
-        const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+        const customs = lsParse('osc_customRigs', {});
         if (customs[name]) {
           applyRig(customs[name]);
           localStorage.setItem('osc_rigName', name);
@@ -252,7 +266,7 @@ export class LayoutController {
 
       const doSave = () => {
         const name = input.value.trim().toLowerCase().replace(/\s+/g, '-') || `rig-${Date.now()}`;
-        const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+        const customs = lsParse('osc_customRigs', {});
         customs[name] = rig;
         localStorage.setItem('osc_customRigs', JSON.stringify(customs));
         localStorage.setItem('osc_rigName', name);
@@ -277,7 +291,7 @@ export class LayoutController {
     updateBtn.addEventListener('click', () => {
       const name = rigSelect.value;
       if (BUILTIN_NAMES.includes(name)) return;
-      const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+      const customs = lsParse('osc_customRigs', {});
       customs[name] = getCurrentRig();
       localStorage.setItem('osc_customRigs', JSON.stringify(customs));
       saveRigState();
@@ -288,7 +302,7 @@ export class LayoutController {
     deleteBtn.addEventListener('click', () => {
       const name = rigSelect.value;
       if (BUILTIN_NAMES.includes(name)) return;
-      const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+      const customs = lsParse('osc_customRigs', {});
       delete customs[name];
       localStorage.setItem('osc_customRigs', JSON.stringify(customs));
       const opt = rigSelect.querySelector(`option[value="${name}"]`);
@@ -345,7 +359,7 @@ export class LayoutController {
             const name = (window.prompt('Save current layout as…', '') || '').trim();
             if (!name) return;
             const slug = name.toLowerCase().replace(/\s+/g, '-');
-            const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+            const customs = lsParse('osc_customRigs', {});
             customs[slug] = getCurrentRig();
             localStorage.setItem('osc_customRigs', JSON.stringify(customs));
             localStorage.setItem('osc_rigName', slug);
@@ -483,7 +497,7 @@ export class LayoutController {
     });
 
     // ── Load custom rigs into select ──
-    const customs = JSON.parse(localStorage.getItem('osc_customRigs') || '{}');
+    const customs = lsParse('osc_customRigs', {});
     Object.keys(customs).forEach(name => {
       const opt = document.createElement('option');
       opt.value = name; opt.textContent = name;
@@ -492,7 +506,7 @@ export class LayoutController {
 
     // ── Restore saved rig on startup ──
     const savedName = localStorage.getItem('osc_rigName') || 'default';
-    const savedRig  = JSON.parse(localStorage.getItem('osc_rigCurrent') || 'null');
+    const savedRig  = lsParse('osc_rigCurrent', null);
 
     if (savedRig) {
       applyRig(savedRig);

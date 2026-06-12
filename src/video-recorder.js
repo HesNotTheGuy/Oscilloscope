@@ -17,28 +17,8 @@ export class VideoRecorder {
     this._audioEngine = engine;
   }
 
-  /**
-   * start(opts?)                       — new form; uses setAudioEngine()
-   * start(actx, gainNode, opts?)       — legacy form; kept for back-compat
-   */
-  start(actxOrOpts, gainNode, legacyOpts) {
-    // Detect legacy call: first arg is an AudioContext instance
-    let opts = {};
-    if (actxOrOpts && typeof actxOrOpts.createMediaStreamDestination === 'function') {
-      // Legacy: start(actx, gainNode, opts)
-      // Prefer the engine if available; fall back to the passed gainNode.
-      opts = legacyOpts || {};
-      if (!this._audioEngine && gainNode) {
-        // Wrap gainNode in a minimal shim so the rest of start() works
-        this._legacyActx    = actxOrOpts;
-        this._legacyGain    = gainNode;
-        this._usingLegacy   = true;
-      }
-    } else {
-      opts = actxOrOpts || {};
-      this._usingLegacy = false;
-    }
-
+  /** Start recording. Audio comes from the engine set via setAudioEngine(). */
+  start(opts = {}) {
     const { transparent = false } = opts;
     this._transparent = transparent;
 
@@ -49,11 +29,6 @@ export class VideoRecorder {
     if (this._audioEngine) {
       const stream = this._audioEngine.getRecordingStream();
       if (stream) audioTracks.push(...stream.getAudioTracks());
-    } else if (this._usingLegacy && this._legacyActx && this._legacyGain) {
-      // Legacy fallback: create a tap on the gainNode directly
-      this._legacyDest = this._legacyActx.createMediaStreamDestination();
-      this._legacyGain.connect(this._legacyDest);
-      audioTracks.push(...this._legacyDest.stream.getAudioTracks());
     }
 
     const combined = new MediaStream([
@@ -89,10 +64,6 @@ export class VideoRecorder {
     if (this._recorder && this.isRecording) {
       this._recorder.stop();
       this.isRecording = false;
-      if (this._legacyDest) {
-        try { this._legacyDest.disconnect(); } catch (_) {}
-        this._legacyDest = null;
-      }
     }
   }
 

@@ -102,7 +102,7 @@ export class AudioController {
         const transparent = recMode === 'alpha';
         this._recStartedTransparent = transparent;
         if (transparent) this.scope.setTransparentMode(true);
-        rec.start(e.actx, e.gainNode, { transparent });
+        rec.start({ transparent });
         btnRec.textContent = '■ STOP';
         btnRec.classList.add('recording');
       }

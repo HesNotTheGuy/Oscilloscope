@@ -66,6 +66,11 @@ export class PresetManager {
         reactiveStr: s.fx.reactiveStr,
         beatStr: s.fx.beatStr,
         bloomStr: s.fx.bloomStr,
+        // Gradient beam
+        gradient: s.fx.gradient,
+        gradientStart: s.fx.gradientStart,
+        gradientEnd: s.fx.gradientEnd,
+        gradientDir: s.fx.gradientDir,
       },
       // Signal FX
       smooth: s.smooth,
@@ -142,6 +147,11 @@ export class PresetManager {
       s.fx.reactiveStr = preset.fx.reactiveStr ?? 1.0;
       s.fx.beatStr     = preset.fx.beatStr     ?? 0.35;
       s.fx.bloomStr    = preset.fx.bloomStr    ?? 1.0;
+      // Gradient beam (nullish-coalesced so older presets keep defaults)
+      s.fx.gradient      = preset.fx.gradient      ?? false;
+      s.fx.gradientStart = preset.fx.gradientStart ?? '#00ff41';
+      s.fx.gradientEnd   = preset.fx.gradientEnd   ?? '#ff00ff';
+      s.fx.gradientDir   = preset.fx.gradientDir   ?? 'h';
     }
 
     // Signal FX
@@ -271,6 +281,15 @@ export class PresetManager {
       setText('fx-beat-str-val', (p.fx.beatStr ?? 0.35).toFixed(2));
       setVal('fx-bloom-str', p.fx.bloomStr ?? 1.0);
       setText('fx-bloom-str-val', (p.fx.bloomStr ?? 1.0).toFixed(1));
+      // Gradient beam UI
+      setCheck('fx-gradient', p.fx.gradient ?? false);
+      const gStart = document.getElementById('gradient-start');
+      if (gStart) { gStart.value = p.fx.gradientStart ?? '#00ff41'; gStart.dispatchEvent(new Event('input', { bubbles: true })); }
+      const gEnd = document.getElementById('gradient-end');
+      if (gEnd) { gEnd.value = p.fx.gradientEnd ?? '#ff00ff'; gEnd.dispatchEvent(new Event('input', { bubbles: true })); }
+      // Direction buttons — click the matching one to reuse its active-class logic
+      const dirBtn = document.getElementById((p.fx.gradientDir ?? 'h') === 'v' ? 'grad-dir-v' : 'grad-dir-h');
+      if (dirBtn) dirBtn.click();
     }
 
     // Signal FX

@@ -67,11 +67,6 @@ export class KeyboardController {
       mapper.enableKeyboard();
     }
 
-    // Fallback: if no InputMapper, use legacy direct keyboard handler
-    if (!mapper) {
-      this._initLegacyKeyboard(s);
-    }
-
     // ── Snake easter egg ──
     this._initSnake(s);
   }
@@ -110,31 +105,6 @@ export class KeyboardController {
           if (!s._snake.alive) { ev.preventDefault(); s._snake.reset(); }
           break;
       }
-    });
-  }
-
-  _initLegacyKeyboard(s) {
-    document.addEventListener('keydown', ev => {
-      const tag = ev.target.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-
-      const key = ev.key;
-      if (key === '?') { ev.preventDefault(); this._toggleHelp(); return; }
-      if (this._kbHelpVisible && key === 'Escape') { ev.preventDefault(); this._toggleHelp(); return; }
-      if (key === ' ')      { ev.preventDefault(); document.getElementById('btn-play').click(); return; }
-      if (key === 'Escape') { ev.preventDefault(); document.getElementById('btn-stop-audio').click(); return; }
-      if (key === 'g' || key === 'G') { ev.preventDefault(); const cb = document.getElementById('show-grid'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); return; }
-      if (key === 'c' || key === 'C') { ev.preventDefault(); const cb = document.getElementById('crt-curve'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); return; }
-      if (key === 'm' || key === 'M') { ev.preventDefault(); document.getElementById('btn-measure').click(); return; }
-      if (key === 'f' || key === 'F' || key === 'F11') { ev.preventDefault(); if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); return; }
-      if (key === '1') { ev.preventDefault(); document.getElementById('btn-yt').click(); return; }
-      if (key === '2') { ev.preventDefault(); document.getElementById('btn-xy').click(); return; }
-      if (key === '4') { ev.preventDefault(); document.getElementById('btn-vs').click(); return; }
-      if (key === '5') { ev.preventDefault(); document.getElementById('btn-fs').click(); return; }
-      if (key === 'r' || key === 'R') { ev.preventDefault(); document.getElementById('btn-run-stop').click(); return; }
-      if (key === 's' || key === 'S') { ev.preventDefault(); document.getElementById('btn-single').click(); return; }
-      if (key === '3') { ev.preventDefault(); const cb = document.getElementById('obj-mode'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); return; }
-      if (key === 'Tab') { const cb = document.getElementById('obj-mode'); if (!cb.checked) return; ev.preventDefault(); if (s.obj3dMode) document.getElementById('obj-mode-img').click(); else document.getElementById('obj-mode-3d').click(); return; }
     });
   }
 

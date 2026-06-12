@@ -21,12 +21,8 @@ export class BpmDisplay {
   }
 
   _findBeatDetector() {
-    const s = this.scope;
-    if (s?._fxPipe?._beatDet) return s._fxPipe._beatDet;
-    if (s?._fxPipe?.beatDet)  return s._fxPipe.beatDet;
-    if (s?._beatDetector)      return s._beatDetector;
-    if (s?.engine?._beatDetector) return s.engine._beatDetector;
-    return null;
+    // The beat detector lives on the FX pipeline (fx-pipeline.js: _beatDet).
+    return this.scope?._fxPipe?._beatDet || null;
   }
 
   _refresh() {

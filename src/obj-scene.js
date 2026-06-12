@@ -1,5 +1,7 @@
 'use strict';
 
+import { applyMoveFx } from './move-fx.js';
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  ObjScene  —  parses .obj files and projects edges to screen space
 // ─────────────────────────────────────────────────────────────────────────────
@@ -360,121 +362,9 @@ export class ObjScene {
   }
 
   // ── Movement FX — applied to final screen-space segments ─────────────
-  // All four effects share motionAmt (intensity) and motionSpeed (rate).
-  // Called after tiling/radial so the FX sweep across the full visible field.
+  // Delegates to the shared applyMoveFx (see src/move-fx.js); this scene
+  // owns the animation phase state read/written there.
   _applyMoveFx(segs, W, H) {
-    const hasAny = this.float || this.ripple || this.twist || this.explode;
-    if (!hasAny || !segs.length) return segs;
-
-    const now = performance.now() / 1000;
-    const dt  = this._lastFxT > 0 ? Math.min(now - this._lastFxT, 0.05) : 1/60;
-    this._lastFxT = now;
-
-    const cx   = W / 2, cy = H / 2;
-    const half = Math.min(W, H) * 0.45;
-    const amt  = this.motionAmt;
-    const spd  = this.motionSpeed;
-
-    // ── Float: advance dual-phase oscillator ──
-    if (this.float) {
-      this._floatPhX += spd * 0.5  * dt * Math.PI * 2;
-      this._floatPhY += spd * 0.31 * dt * Math.PI * 2;  // ~golden-ratio offset keeps X/Y organic
-    }
-    const floatX = this.float ? Math.sin(this._floatPhX) * amt * 0.3 * half : 0;
-    const floatY = this.float ? Math.sin(this._floatPhY) * amt * 0.3 * half : 0;
-
-    // ── Ripple: expanding ring wave ──
-    if (this.ripple) this._ripplePh += spd * dt;
-
-    // ── Twist: wind/unwind angle ──
-    if (this.twist) this._twistPh += spd * 0.4 * dt;
-
-    // ── Explode: push outward then reset ──
-    let explodeF = 0;
-    if (this.explode) {
-      this._explodeT += spd * 0.3 * dt;
-      if (this._explodeT >= 1) {
-        if (this.explodeLoop) this._explodeT = 0;
-        else this._explodeT = 1;
-      }
-      // Ease in/out — fast burst, slow settle
-      const t = this._explodeT;
-      explodeF = (t < 0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2) * amt * 1.5 * half;
-    }
-
-    // ── Ripple spatial constants ──
-    const rippleWaves = 3;  // concentric ring count (fixed aesthetic)
-    const ripplePhBase = this._ripplePh * Math.PI * 2;
-    const rippleScale  = rippleWaves * Math.PI * 2 / half;
-    const rippleAmp    = amt * 0.25 * half;
-    const twistScale   = amt * Math.PI * 1.5 / half;
-    const twistPh      = this._twistPh;
-    const doRipple     = this.ripple;
-    const doTwist      = this.twist;
-    const doExplode    = explodeF > 0;
-
-    // Mutate segs in place — segs is already a fresh array owned by this
-    // function (built from edges, tiling, or radial symmetry above), and
-    // each endpoint sub-array is mutable. This eliminates the per-frame
-    // map() allocation that produced 5M+ object allocations/sec at scale.
-    for (let i = 0; i < segs.length; i++) {
-      const seg = segs[i];
-      const p0 = seg[0], p1 = seg[1];
-      let ax = p0[0], ay = p0[1], bx = p1[0], by = p1[1];
-
-      if (doRipple) {
-        // Point A
-        let dx = ax - cx, dy = ay - cy;
-        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-        let phase = dist * rippleScale - ripplePhBase;
-        let disp  = Math.sin(phase) * rippleAmp;
-        ax += (dx/dist) * disp;
-        ay += (dy/dist) * disp;
-        // Point B
-        dx = bx - cx; dy = by - cy;
-        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-        phase = dist * rippleScale - ripplePhBase;
-        disp  = Math.sin(phase) * rippleAmp;
-        bx += (dx/dist) * disp;
-        by += (dy/dist) * disp;
-      }
-
-      if (doTwist) {
-        // Point A
-        let dx = ax - cx, dy = ay - cy;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        let angle = dist * twistScale + twistPh;
-        let cos = Math.cos(angle), sin = Math.sin(angle);
-        ax = cx + dx*cos - dy*sin;
-        ay = cy + dx*sin + dy*cos;
-        // Point B
-        dx = bx - cx; dy = by - cy;
-        dist = Math.sqrt(dx*dx + dy*dy);
-        angle = dist * twistScale + twistPh;
-        cos = Math.cos(angle); sin = Math.sin(angle);
-        bx = cx + dx*cos - dy*sin;
-        by = cy + dx*sin + dy*cos;
-      }
-
-      ax += floatX; ay += floatY;
-      bx += floatX; by += floatY;
-
-      if (doExplode) {
-        // Point A
-        let dx = ax - cx, dy = ay - cy;
-        let dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-        ax += (dx/dist) * explodeF;
-        ay += (dy/dist) * explodeF;
-        // Point B
-        dx = bx - cx; dy = by - cy;
-        dist = Math.sqrt(dx*dx + dy*dy) || 0.001;
-        bx += (dx/dist) * explodeF;
-        by += (dy/dist) * explodeF;
-      }
-
-      p0[0] = ax; p0[1] = ay;
-      p1[0] = bx; p1[1] = by;
-    }
-    return segs;
+    return applyMoveFx(this, segs, W, H);
   }
 }
