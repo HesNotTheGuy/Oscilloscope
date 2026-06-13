@@ -44,6 +44,7 @@ export class KeyboardController {
         'scope.modeXY':  () => document.getElementById('btn-xy').click(),
         'scope.modeVS':  () => document.getElementById('btn-vs').click(),
         'scope.modeFS':  () => document.getElementById('btn-fs').click(),
+        'scope.modeSG':  () => document.getElementById('btn-sg').click(),
         'scope.runStop':  () => document.getElementById('btn-run-stop').click(),
         'scope.single':   () => document.getElementById('btn-single').click(),
 
@@ -134,6 +135,7 @@ export class KeyboardController {
               <div class="kb-help-row"><kbd>2</kbd> XY mode</div>
               <div class="kb-help-row"><kbd>4</kbd> VS mode</div>
               <div class="kb-help-row"><kbd>5</kbd> FS mode</div>
+              <div class="kb-help-row"><kbd>6</kbd> SG mode</div>
               <div class="kb-help-row"><kbd>R</kbd> Run / Stop</div>
               <div class="kb-help-row"><kbd>S</kbd> Single trigger</div>
               <div class="kb-help-section">SCENE</div>

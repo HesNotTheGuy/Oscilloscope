@@ -129,6 +129,7 @@ export class TooltipController {
     if (id === 'btn-xy')       return 'XY mode — Lissajous figures (CH1=X axis, CH2=Y axis)';
     if (id === 'btn-vs')       return 'Vectorscope — L/R stereo correlation as a polar plot';
     if (id === 'btn-fs')       return 'Spectrum analyzer — 64 log-spaced frequency bars (20 Hz – 20 kHz)';
+    if (id === 'btn-sg')       return 'Spectrogram — scrolling frequency-over-time waterfall heatmap (20 Hz – 20 kHz)';
     if (id === 'btn-synth')    return 'Keyboard synth — press K to toggle, then play notes with your keyboard';
 
     // ── Transport / system buttons ──

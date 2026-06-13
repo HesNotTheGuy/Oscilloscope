@@ -78,6 +78,7 @@ export class ScopeController {
       document.getElementById('btn-xy').classList.remove('active');
       document.getElementById('btn-vs').classList.remove('active');
       document.getElementById('btn-fs').classList.remove('active');
+      document.getElementById('btn-sg').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-xy').addEventListener('click', () => {
@@ -86,6 +87,7 @@ export class ScopeController {
       document.getElementById('btn-yt').classList.remove('active');
       document.getElementById('btn-vs').classList.remove('active');
       document.getElementById('btn-fs').classList.remove('active');
+      document.getElementById('btn-sg').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-vs').addEventListener('click', () => {
@@ -94,6 +96,7 @@ export class ScopeController {
       document.getElementById('btn-yt').classList.remove('active');
       document.getElementById('btn-xy').classList.remove('active');
       document.getElementById('btn-fs').classList.remove('active');
+      document.getElementById('btn-sg').classList.remove('active');
       resetPhosphor(s);
     });
     document.getElementById('btn-fs').addEventListener('click', () => {
@@ -102,6 +105,17 @@ export class ScopeController {
       document.getElementById('btn-yt').classList.remove('active');
       document.getElementById('btn-xy').classList.remove('active');
       document.getElementById('btn-vs').classList.remove('active');
+      document.getElementById('btn-sg').classList.remove('active');
+      resetPhosphor(s);
+    });
+    document.getElementById('btn-sg').addEventListener('click', () => {
+      s.mode = 'SG';
+      document.getElementById('btn-sg').classList.add('active');
+      document.getElementById('btn-yt').classList.remove('active');
+      document.getElementById('btn-xy').classList.remove('active');
+      document.getElementById('btn-vs').classList.remove('active');
+      document.getElementById('btn-fs').classList.remove('active');
+      if (s._spectrogram) s._spectrogram.clear();
       resetPhosphor(s);
     });
 
