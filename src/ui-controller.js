@@ -16,6 +16,7 @@ import { TooltipController } from './ui/tooltip-controller.js';
 import { KeyboardSynthController } from './ui/keyboard-synth-controller.js';
 import { CanvasContextMenuController } from './ui/canvas-context-menu.js';
 import { BpmDisplay } from './ui/bpm-display.js';
+import { FirstRunHint } from './ui/first-run-hint.js';
 
 // ─────────────────────────────────────────────────────────────
 //  UIController — thin orchestrator that delegates to domain
@@ -74,6 +75,7 @@ export class UIController {
     this._kbSynth     = new KeyboardSynthController(ctx);
     this._ctxMenu     = new CanvasContextMenuController(ctx);
     this._bpmDisplay  = new BpmDisplay(ctx);
+    this._firstRun    = new FirstRunHint(ctx);
 
     // Initialize all domains
     this._scope.init();
@@ -101,6 +103,7 @@ export class UIController {
     this._kbSynth.init();
     this._ctxMenu.init();
     this._bpmDisplay.init();
+    this._firstRun.init();
 
     // Tooltip system — initialized after all controls exist
     this._tooltip = new TooltipController();
