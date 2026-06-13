@@ -29,7 +29,10 @@ export class InputMapper {
     /** @type {Map<string, string>} key (lowercase) → action name */
     this._keyMap = new Map();
 
-    /** @type {Map<string, string>} "ch:cc" → action name */
+    /**
+     * "ch:cc" → action name (string) OR { type:'continuous', target:string }
+     * @type {Map<string, string|{type:string,target:string}>}
+     */
     this._midiMap = new Map();
 
     /** @type {boolean} whether keyboard listener is active */
@@ -37,6 +40,27 @@ export class InputMapper {
 
     /** @type {MIDIAccess|null} */
     this._midiAccess = null;
+
+    /** @type {boolean} */
+    this.midiAvailable = false;
+
+    /** @type {string[]} currently connected input device names */
+    this.midiDeviceNames = [];
+
+    /**
+     * Continuous target registry: name → { min, max, apply }
+     * @type {Map<string, {min:number, max:number, apply:Function}>}
+     */
+    this._continuousTargets = new Map();
+
+    /**
+     * Rising-edge tracking: "ch:cc" → last value (0-127)
+     * @type {Map<string, number>}
+     */
+    this._midiLastValue = new Map();
+
+    /** @type {Function|null} learn-mode callback */
+    this._learnCallback = null;
 
     this._loadMappings();
   }
@@ -151,10 +175,10 @@ export class InputMapper {
   // ── MIDI mapping ──────────────────────────────────────────
 
   /**
-   * Bind a MIDI CC to an action.
+   * Bind a MIDI CC to an action name or a continuous target descriptor.
    * @param {number} channel – MIDI channel (0-15)
    * @param {number} cc      – CC number (0-127)
-   * @param {string} action  – action name
+   * @param {string|{type:'continuous',target:string}} action
    */
   bindMidi(channel, cc, action) {
     this._midiMap.set(`${channel}:${cc}`, action);
@@ -166,11 +190,13 @@ export class InputMapper {
    */
   unbindMidi(channel, cc) {
     this._midiMap.delete(`${channel}:${cc}`);
+    this._midiLastValue.delete(`${channel}:${cc}`);
     this._saveMappings();
   }
 
   /**
    * Get all MIDI bindings as { "ch:cc": action } object.
+   * Values are action strings or continuous-target descriptors.
    */
   getMidiBindings() {
     const out = {};
@@ -179,35 +205,105 @@ export class InputMapper {
   }
 
   /**
+   * Register a continuous parameter target.
+   * @param {string} name
+   * @param {{min:number, max:number, apply:Function}} opts
+   */
+  registerContinuous(name, opts) {
+    this._continuousTargets.set(name, opts);
+  }
+
+  /**
+   * Start MIDI learn mode. The next CC message received will call
+   * callback({ channel, cc }) and then learn mode ends automatically.
+   * @param {Function} callback
+   */
+  startMidiLearn(callback) {
+    this._learnCallback = callback;
+  }
+
+  /**
+   * Cancel learn mode without binding anything.
+   */
+  cancelMidiLearn() {
+    this._learnCallback = null;
+  }
+
+  /**
    * Initialize Web MIDI access (if available).
-   * Call this after user gesture.
+   * @returns {Promise<boolean>} true if MIDI access was granted.
    */
   async enableMidi() {
-    if (this._midiAccess) return;
-    if (!navigator.requestMIDIAccess) return;
+    if (this._midiAccess) return true;
+    if (!navigator.requestMIDIAccess) return false;
 
     try {
       this._midiAccess = await navigator.requestMIDIAccess();
+      this.midiAvailable = true;
+      this._refreshDeviceNames();
       this._midiAccess.inputs.forEach(input => this._connectMidiInput(input));
       this._midiAccess.addEventListener('statechange', e => {
+        this._refreshDeviceNames();
         if (e.port.type === 'input' && e.port.state === 'connected') {
           this._connectMidiInput(e.port);
         }
+        if (this._onDeviceChange) this._onDeviceChange(this.midiDeviceNames);
       });
+      return true;
     } catch (err) {
       console.warn('MIDI access denied:', err);
+      return false;
     }
+  }
+
+  /** @param {Function} fn  called with device name array on hot-plug */
+  onMidiDeviceChange(fn) {
+    this._onDeviceChange = fn;
+  }
+
+  _refreshDeviceNames() {
+    if (!this._midiAccess) return;
+    const names = [];
+    this._midiAccess.inputs.forEach(input => {
+      if (input.state === 'connected') names.push(input.name);
+    });
+    this.midiDeviceNames = names;
   }
 
   _connectMidiInput(input) {
     input.onmidimessage = ev => {
       const [status, cc, value] = ev.data;
       // CC message: 0xB0-0xBF
-      if ((status & 0xF0) === 0xB0) {
-        const channel = status & 0x0F;
-        const key = `${channel}:${cc}`;
-        const action = this._midiMap.get(key);
-        if (action) this.trigger(action, value);
+      if ((status & 0xF0) !== 0xB0) return;
+      const channel = status & 0x0F;
+
+      // Learn mode intercepts the first message
+      if (this._learnCallback) {
+        const cb = this._learnCallback;
+        this._learnCallback = null;
+        cb({ channel, cc });
+        return;
+      }
+
+      const key = `${channel}:${cc}`;
+      const binding = this._midiMap.get(key);
+      if (!binding) return;
+
+      if (typeof binding === 'object' && binding.type === 'continuous') {
+        // Continuous: map 0-127 onto [min, max] and apply
+        const target = this._continuousTargets.get(binding.target);
+        if (target) {
+          const t = value / 127;
+          const mapped = target.min + t * (target.max - target.min);
+          target.apply(mapped);
+        }
+      } else {
+        // Trigger (action string): rising-edge only — fire when value crosses ≥64
+        const last = this._midiLastValue.get(key) ?? 0;
+        this._midiLastValue.set(key, value);
+        if (value >= 64 && last < 64) {
+          this.trigger(binding, value);
+        }
       }
     };
   }
@@ -215,6 +311,8 @@ export class InputMapper {
   // ── Persistence ───────────────────────────────────────────
 
   _saveMappings() {
+    // Continuous-target descriptors are plain objects, so they
+    // serialize to JSON and round-trip cleanly alongside action strings.
     const data = {
       keys: Object.fromEntries(this._keyMap),
       midi: Object.fromEntries(this._midiMap),
@@ -234,6 +332,7 @@ export class InputMapper {
       }
       if (data.midi) {
         for (const [k, v] of Object.entries(data.midi)) {
+          // v is either a string (action) or { type:'continuous', target } object
           this._midiMap.set(k, v);
         }
       }
