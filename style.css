@@ -4287,3 +4287,51 @@ body[data-theme="liquid-glass"] {
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
+
+/* ─── First-run hint ─── */
+.first-run-hint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9000;
+  width: 360px;
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+.first-run-hint.frh-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.frh-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-hi);
+}
+.frh-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.frh-row {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.frh-btn {
+  align-self: flex-end;
+  color: rgba(var(--p-rgb), 1);
+  border-color: rgba(var(--p-rgb), 0.5);
+}
+.frh-btn:hover:not(:disabled) {
+  background: rgba(var(--p-rgb), 0.08);
+}
