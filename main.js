@@ -38,12 +38,12 @@ function createWindow() {
 
   win = new BrowserWindow(winOpts);
 
-  // Grant microphone + media permissions automatically
+  // Grant microphone + media + MIDI permissions automatically
   win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
-    callback(permission === 'media');
+    callback(permission === 'media' || permission === 'midi');
   });
   win.webContents.session.setPermissionCheckHandler((_wc, permission) => {
-    return permission === 'media';
+    return permission === 'media' || permission === 'midi';
   });
 
   win.loadFile('index.html');

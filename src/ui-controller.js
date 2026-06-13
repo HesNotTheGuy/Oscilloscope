@@ -11,6 +11,7 @@ import { LayoutController } from './ui/layout-controller.js';
 import { KeyboardController } from './ui/keyboard-controller.js';
 import { PopOutController } from './ui/popout-controller.js';
 import { ThemeController } from './ui/theme-controller.js';
+import { MidiController } from './ui/midi-controller.js';
 import { ThemeManager } from './theme-manager.js';
 import { TooltipController } from './ui/tooltip-controller.js';
 import { KeyboardSynthController } from './ui/keyboard-synth-controller.js';
@@ -71,6 +72,7 @@ export class UIController {
     this._keyboard    = new KeyboardController(ctx);
     this._popout      = new PopOutController(ctx);
     this._theme       = new ThemeController(ctx);
+    this._midi        = new MidiController(ctx);
     this._kbSynth     = new KeyboardSynthController(ctx);
     this._ctxMenu     = new CanvasContextMenuController(ctx);
     this._bpmDisplay  = new BpmDisplay(ctx);
@@ -92,6 +94,9 @@ export class UIController {
 
     // Theme picker (after display controls exist so theme can update sliders)
     this._theme.init();
+
+    // MIDI hardware control (after all actions are registered)
+    this._midi.init();
 
     // Layout, popout, and keyboard are initialized last
     // (layout needs panels to exist, keyboard binds globally)

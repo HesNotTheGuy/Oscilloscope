@@ -3597,6 +3597,78 @@ body[data-theme="frosted-glass"] {
     0 0 20px rgba(170,204,238,0.04);
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   MIDI control rows (appended) — uses CSS vars for all 11 themes
+   ═══════════════════════════════════════════════════════════════════ */
+
+.midi-status {
+  font-size: 9px;
+  color: var(--text);
+  opacity: 0.7;
+  margin: 4px 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.midi-learn-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.midi-learn-row .sys-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.midi-bindings {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.midi-binding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  gap: 4px;
+}
+
+.midi-binding-info {
+  color: var(--text-hi);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-unbind-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 9px;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 2px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.midi-unbind-btn:hover {
+  color: var(--p);
+}
+
 /* ─────────────────────────────────────────────────────────────
    Visual Preset Packs
    ───────────────────────────────────────────────────────────── */
