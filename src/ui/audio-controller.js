@@ -47,8 +47,41 @@ export class AudioController {
       if (e.micStream) {
         e.stopMic(); btn.classList.remove('active'); stSrc.textContent = 'No signal';
       } else {
+        // System audio is exclusive with mic — stop it first.
+        if (e.sysAudioActive) {
+          e.stopSystemAudio();
+          document.getElementById('btn-sysaudio').classList.remove('active');
+        }
         try { await e.startMic(); btn.classList.add('active'); stSrc.textContent = 'Microphone'; }
         catch (_) { alert('Mic denied.'); }
+      }
+    });
+
+    // ── System audio (loopback) ──
+    document.getElementById('btn-sysaudio').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-sysaudio');
+      if (e.sysAudioActive) {
+        e.stopSystemAudio(); btn.classList.remove('active'); stSrc.textContent = 'No signal';
+      } else {
+        // Mic is exclusive with system audio — stop it first.
+        if (e.micStream) {
+          e.stopMic();
+          document.getElementById('btn-mic').classList.remove('active');
+        }
+        try {
+          await this.ensureAudio();
+          await e.startSystemAudio();
+          btn.classList.add('active'); stSrc.textContent = 'System audio';
+          // Handle external revocation (OS "Stop sharing" button).
+          const checkGone = setInterval(() => {
+            if (!e.sysAudioActive) {
+              btn.classList.remove('active'); stSrc.textContent = 'No signal';
+              clearInterval(checkGone);
+            }
+          }, 500);
+        } catch (_) {
+          // Picker canceled or permission denied — leave button inactive, no crash.
+        }
       }
     });
 

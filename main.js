@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 
 let win;
@@ -45,6 +45,14 @@ function createWindow() {
   win.webContents.session.setPermissionCheckHandler((_wc, permission) => {
     return permission === 'media';
   });
+
+  // Grant system-audio loopback without a picker (Windows WASAPI loopback).
+  // A video source is required by the API; the renderer discards it immediately.
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+      callback({ video: sources[0], audio: 'loopback' });
+    });
+  }, { useSystemPicker: false });
 
   win.loadFile('index.html');
 }

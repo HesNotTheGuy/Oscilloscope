@@ -102,6 +102,53 @@ export class AudioEngine {
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null; }
   }
 
+  // ── System audio (loopback) ───────────────────────────────────────────────
+  // Routes: analyserL/R + _recDest (if recording).
+  // Deliberately NOT connected to gainNode / actx.destination — avoids echo.
+  async startSystemAudio() {
+    if (this._sysStream) this.stopSystemAudio();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+    } catch (err) {
+      this.sysAudioActive = false;
+      throw err;
+    }
+    // Discard video tracks immediately — we only need audio.
+    stream.getVideoTracks().forEach(t => t.stop());
+
+    this._sysStream = stream;
+    this._sysSource = this.actx.createMediaStreamSource(stream);
+
+    // Tap point: a GainNode that we can connect to _recDest without routing to speakers.
+    this._sysGain = this.actx.createGain();
+    this._sysSource.connect(this._sysGain);
+
+    // Connect to analysers (stereo split, same pattern as _connect's 2-channel branch).
+    const split = this.actx.createChannelSplitter(2);
+    this._sysGain.connect(split);
+    split.connect(this.analyserL, 0);
+    split.connect(this.analyserR, 1);
+
+    // Also tap into recording destination if it already exists.
+    if (this._recDest) this._sysGain.connect(this._recDest);
+
+    this.sysAudioActive = true;
+
+    // Handle the user revoking capture from the OS (e.g. clicking "Stop sharing").
+    const audioTrack = stream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.onended = () => { this.stopSystemAudio(); };
+    }
+  }
+
+  stopSystemAudio() {
+    if (this._sysGain)   { try { this._sysGain.disconnect(); }   catch (_) {} this._sysGain   = null; }
+    if (this._sysSource) { try { this._sysSource.disconnect(); } catch (_) {} this._sysSource = null; }
+    if (this._sysStream) { this._sysStream.getTracks().forEach(t => t.stop()); this._sysStream = null; }
+    this.sysAudioActive = false;
+  }
+
   // ── Idle / ambient signal (visible only — connects to analysers, not output) ─
   startIdleSignal() {
     if (!this.actx) return;
@@ -186,11 +233,14 @@ export class AudioEngine {
 
   // ── Recording stream — tap the master gainNode into a MediaStream ──────────
   // Lazy init: node is created once per AudioContext lifecycle and reused.
+  // Also taps any live system-audio source so recordings include loopback audio.
   getRecordingStream() {
     if (!this.actx || !this.gainNode) return null;
     if (!this._recDest) {
       this._recDest = this.actx.createMediaStreamDestination();
       this.gainNode.connect(this._recDest);
+      // If system audio is already active, connect its tap now.
+      if (this._sysGain) this._sysGain.connect(this._recDest);
     }
     return this._recDest.stream;
   }
