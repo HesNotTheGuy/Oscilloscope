@@ -260,6 +260,7 @@ export class InputMapper {
       '2':   'scope.modeXY',
       '4':   'scope.modeVS',
       '5':   'scope.modeFS',
+      '6':   'scope.modeSG',
       'r':   'scope.runStop',
       's':   'scope.single',
       '3':   'scene.toggle',

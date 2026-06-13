@@ -8,6 +8,7 @@ import { TIMEBASE, TB_DEFAULT, VDIV, VD_DEFAULT } from './constants.js';
 import { SnakeGame } from './snake-game.js';
 import { computeVectorscopePoints } from './vectorscope.js';
 import { computeSpectrumPoints } from './spectrum.js';
+import { Spectrogram } from './spectrogram.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -738,6 +739,21 @@ export class Oscilloscope {
         const barSets = computeSpectrumPoints(this._freqBuf, W, H, { bars: 64, sampleRate });
         for (const pts of barSets) allPts.push(pts);
       }
+    } else if (this.mode === 'SG') {
+      // SG / Spectrogram — scrolling frequency-over-time waterfall
+      // Guard: analyser may be null before ensureAudio() resolves on first click
+      if (this.engine.analyserL) {
+        if (!this._freqBuf || this._freqBuf.length !== this.engine.analyserL.frequencyBinCount) {
+          this._freqBuf = new Float32Array(this.engine.analyserL.frequencyBinCount);
+        }
+        if (!this._spectrogram) {
+          this._spectrogram = new Spectrogram(96, 240);
+        }
+        this.engine.analyserL.getFloatFrequencyData(this._freqBuf);
+        const sampleRate = this.engine.sampleRate || 48000;
+        this._spectrogram.push(this._freqBuf, sampleRate);
+        // allPts stays empty — no GL beam geometry for SG mode
+      }
     }
 
     // ③b OBJ / image overlay
@@ -797,6 +813,10 @@ export class Oscilloscope {
     // ⑥ Overlay: grid + CRT + measurements
     const octx = glr.octx;
     octx.clearRect(0, 0, W, H);
+    // SG waterfall drawn first so grid + measurements render on top
+    if (this.mode === 'SG' && this._spectrogram) {
+      this._spectrogram.draw(octx, W, H, this.color);
+    }
     if (this.showGrid)  this.drawGrid(octx);
     if (this.crtCurve)  this.applyCRTCurve(octx);
 
@@ -894,6 +914,20 @@ export class Oscilloscope {
         for (const pts of barSets) {
           this._drawBeamPath(pctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
         }
+      }
+    } else if (this.mode === 'SG') {
+      // SG / Spectrogram — 2D fallback
+      if (this.engine.analyserL) {
+        if (!this._freqBuf || this._freqBuf.length !== this.engine.analyserL.frequencyBinCount) {
+          this._freqBuf = new Float32Array(this.engine.analyserL.frequencyBinCount);
+        }
+        if (!this._spectrogram) {
+          this._spectrogram = new Spectrogram(96, 240);
+        }
+        this.engine.analyserL.getFloatFrequencyData(this._freqBuf);
+        const sampleRate = this.engine.sampleRate || 48000;
+        this._spectrogram.push(this._freqBuf, sampleRate);
+        this._spectrogram.draw(pctx, W, H, this._renderColor());
       }
     }
     if (rotActive) pctx.restore();
