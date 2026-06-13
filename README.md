@@ -6,14 +6,14 @@
 
 <p align="center">
   <b>Real-time audio visualizer built as a fully functional digital oscilloscope</b><br>
-  WebGL-accelerated phosphor simulation &bull; Lissajous patterns &bull; 3D/2D scene rendering &bull; Music-reactive effects &bull; 10 visual themes
+  WebGL-accelerated phosphor simulation &bull; Lissajous patterns &bull; 3D/2D scene rendering &bull; Music-reactive effects &bull; 11 visual themes
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
   <img src="https://img.shields.io/badge/electron-33-brightgreen?style=flat-square" alt="Electron 33">
   <img src="https://img.shields.io/badge/renderer-WebGL-orange?style=flat-square" alt="WebGL">
-  <img src="https://img.shields.io/badge/version-1.4.1-informational?style=flat-square" alt="v1.4.1">
+  <img src="https://img.shields.io/badge/version-1.5.0-informational?style=flat-square" alt="v1.5.0">
   <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey?style=flat-square" alt="CC BY-NC 4.0">
 </p>
 
@@ -45,6 +45,7 @@
 - [Recording & Output](#recording--output)
 - [Keyboard Synth](#keyboard-synth)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [MIDI Control](#midi-control)
 - [Easter Eggs](#easter-eggs)
 - [Installation](#installation)
 - [Tech Stack](#tech-stack)
@@ -76,6 +77,8 @@ npm start
 
 Or grab the installer from the [Releases](../../releases) page — no Node.js required.
 
+On first launch a one-time welcome card points you at the essentials: drag in an audio file, press **K** for the keyboard synth, or **?** for the full shortcut list.
+
 ---
 
 ## The Scope Display
@@ -94,6 +97,7 @@ The main display renders at full WebGL resolution with a multi-pass phosphor pip
 | **XY** | CH1 drives X, CH2 drives Y — Lissajous and phase figures |
 | **VS** | Vectorscope — L/R correlation in polar form. Mono = vertical line, out-of-phase = horizontal |
 | **FS** | Spectrum analyzer — 64 logarithmic frequency bars from 20 Hz to 20 kHz |
+| **SG** | Spectrogram — scrolling frequency-over-time waterfall heatmap (20 Hz–20 kHz), tinted with the beam color |
 
 <p align="center">
   <img src="docs/screenshots/40-spectrum-mode.png" alt="Spectrum analyzer mode" width="860">
@@ -138,7 +142,7 @@ Toggle measurements with **M** or the measurements checkbox.
 
 ## Audio Input
 
-DSO-1 accepts three signal sources:
+DSO-1 accepts four signal sources:
 
 ### File Playback
 
@@ -147,6 +151,10 @@ Drag and drop any audio file onto the drop zone, or click to browse. Supported f
 ### Microphone
 
 Click the MIC button for live input. The scope shows your voice, instrument, or room audio in real time. Works with any system input device.
+
+### System Audio
+
+Click **🔊 SYSTEM** to visualize whatever your computer is already playing — Spotify, YouTube, a game, anything. Uses Windows loopback capture, so there's nothing to route or patch. The captured audio feeds the scope and is included in recordings, but is **never** sent back to your speakers (it's already playing), so there's no echo.
 
 ### Signal Generator
 
@@ -472,7 +480,7 @@ The WebGL pipeline simulates a real phosphor CRT:
   <img src="docs/screenshots/23-presets-panel.png" alt="Presets panel" width="860">
 </p>
 
-Save complete oscilloscope snapshots — channels, timebase, trigger, beam effects, scene settings, motion FX, display parameters — all stored in a single preset slot.
+Save complete oscilloscope snapshots — channels, timebase, trigger, beam effects (including the gradient beam), scene settings, motion FX, display parameters — all stored in a single preset slot.
 
 - **8 save slots** with custom names
 - **3 built-in presets**: Classic · Neon Glow · Amber Retro
@@ -517,7 +525,7 @@ Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown
   <img src="docs/screenshots/theme-synthwave.png" alt="Synthwave theme" width="860">
 </p>
 
-10 built-in visual themes, each with a distinct aesthetic personality. Select via the theme picker dropdown in the topbar — the choice persists in localStorage.
+11 built-in visual themes, each with a distinct aesthetic personality. Select via the theme picker dropdown in the topbar — the choice persists in localStorage.
 
 | Theme | Character |
 |-------|-----------|
@@ -532,6 +540,10 @@ Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown
 | **Nixie Tube** | Warm orange glow, glass-tube bezel, vignette |
 | **Frosted Glass** | Glassmorphism — translucent panels with backdrop blur |
 | **Liquid Glass** | Heavy crystal blur over vivid animated wallpaper — macOS Tahoe energy |
+
+### Import & Export
+
+The ⤓ and ⤒ buttons next to the theme dropdown export the active theme as a JSON file or import one back. Imported themes are validated and sanitized, stored in localStorage, and listed under a **Custom** group in the picker — share your color schemes by passing the JSON around. Custom themes carry color/scope settings; the structural per-theme flourishes (textures, bezels, blur) belong to the built-ins.
 
 ---
 
@@ -609,6 +621,7 @@ Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. E
 | `3` | Toggle scene mode on/off |
 | `4` | Vectorscope mode |
 | `5` | Spectrum analyzer mode |
+| `6` | Spectrogram mode |
 | `Tab` | Switch OBJ / Image scene |
 | `R` | Run / Stop scope |
 | `S` | Single trigger |
@@ -624,7 +637,18 @@ Hover any knob, slider, or button for an inline tooltip showing its current valu
   <img src="docs/screenshots/42-context-menu.png" alt="Right-click context menu" width="860">
 </p>
 
-Keyboard shortcuts can be remapped to MIDI input via the InputMapper.
+---
+
+## MIDI Control
+
+Plug in any MIDI controller and drive the scope with real hardware knobs and buttons. Open the **MIDI** section in the CTRL panel, pick a target from the dropdown, click **LEARN**, then move a control — it binds instantly.
+
+- **Continuous knobs/faders** map to Glow, Beam width, Persistence, Volume, and FX rotation speed (CC value 0–127 scaled to the parameter range).
+- **Buttons** can trigger Play/Pause, Run/Stop, and YT/XY mode switches.
+- Devices hot-plug — connect or disconnect at any time and the status updates.
+- Bindings persist in localStorage; remove any binding from the list with ✕.
+
+Keyboard shortcuts are also remappable through the same InputMapper.
 
 ---
 
@@ -670,14 +694,15 @@ Outputs go to the `dist/` folder.
 | Framework | Electron 33 |
 | Rendering | WebGL — GPU Gaussian blur, phosphor persistence, GLSL shaders |
 | Fallback | Canvas 2D with composite blend modes |
-| Audio | Web Audio API — AnalyserNode, real-time FFT, biquad filter chain |
+| Audio | Web Audio API — AnalyserNode, real-time FFT, biquad filter chain, system-audio loopback |
+| Input | Web MIDI API — hardware controller mapping with learn mode |
 | Recording | MediaRecorder API — VP8/WebM encoding, real-alpha transparent capture |
 | 3D | Custom Wavefront `.obj` parser, Euler rotation, perspective projection |
 | Image Trace | Sobel edge detection, greedy nearest-neighbor path sort, alpha boundary |
 | Layout | HTML5 Drag and Drop API, localStorage persistence |
 | Architecture | Modular ES modules — domain controllers under `src/ui/` |
-| Testing | Vitest — 134 unit tests |
-| Themes | 10 built-in CSS themes with scope parameter presets |
+| Testing | Vitest — 155 unit tests across 10 files |
+| Themes | 11 built-in CSS themes plus JSON import/export |
 
 ---
 
