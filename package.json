@@ -24,6 +24,7 @@
     "files": [
       "index.html",
       "display.html",
+      "splash.html",
       "style.css",
       "src/**/*",
       "main.js",

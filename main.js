@@ -5,6 +5,27 @@ const path = require('path');
 
 let win;
 let displayWin = null;
+let splashWin = null;
+
+// Frameless splash shown instantly on launch so a slow (or hung) startup
+// never looks like a dead app. Closed when the main window is ready.
+function createSplash() {
+  splashWin = new BrowserWindow({
+    width: 500,
+    height: 340,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    icon: path.join(__dirname, process.platform === 'darwin' ? 'icon.png' : 'icon.ico'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  splashWin.loadFile('splash.html');
+}
 
 function createWindow() {
   const isMac = process.platform === 'darwin';
@@ -14,6 +35,7 @@ function createWindow() {
     height: 960,
     minWidth: 800,
     minHeight: 600,
+    show: false, // stay hidden until ready-to-show; splash covers the gap
     backgroundColor: '#080808',
     autoHideMenuBar: true,
     title: 'DSO-1 Oscilloscope',
@@ -53,6 +75,17 @@ function createWindow() {
       callback({ video: sources[0], audio: 'loopback' });
     });
   }, { useSystemPicker: false });
+
+  // Swap splash → main window once the UI has actually painted.
+  const showMain = () => {
+    if (splashWin && !splashWin.isDestroyed()) splashWin.close();
+    splashWin = null;
+    if (win && !win.isDestroyed() && !win.isVisible()) win.show();
+  };
+  win.once('ready-to-show', showMain);
+  // Safety net: if the renderer hangs, show the main window anyway so the
+  // splash can never trap the user. showMain() is idempotent.
+  setTimeout(showMain, 20000);
 
   win.loadFile('index.html');
 }
@@ -137,7 +170,10 @@ ipcMain.on('display-frame', (_event, dataURL) => {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createSplash();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
