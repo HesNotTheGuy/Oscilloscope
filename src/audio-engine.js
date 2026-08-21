@@ -70,7 +70,11 @@ export class AudioEngine {
     this.source.start(0, this.pauseOffset % this.buffer.duration);
     this.startTime = this.actx.currentTime - this.pauseOffset;
     this.isPlaying = true;
-    this.source.onended = () => { this.isPlaying = false; };
+    // Bind the handler to *this* source: stopping the previous one fires its
+    // onended asynchronously, after the new source is already playing, so an
+    // unguarded handler would clear isPlaying on the live source.
+    const src = this.source;
+    src.onended = () => { if (this.source === src) this.isPlaying = false; };
   }
 
   pause() {
@@ -316,7 +320,11 @@ export class AudioEngine {
   }
 
   stopDrawSound() {
-    if (!this._drawActive) return;
+    // _drawActive stays true until the fade timer fires, so guarding on it
+    // alone lets every frame during the 400 ms fade schedule another teardown
+    // timer, orphaning the previous handle. An orphan that fires after a
+    // restart tears down the freshly-created nodes.
+    if (!this._drawActive || this._drawFading) return;
     const now = this.actx.currentTime;
     this._drawGain.gain.setTargetAtTime(0, now, 0.15);
     // Mark as fading so updateDrawSound/startDrawSound can detect mid-fade

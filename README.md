@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
-  <img src="https://img.shields.io/badge/electron-33-brightgreen?style=flat-square" alt="Electron 33">
+  <img src="https://img.shields.io/badge/electron-43-brightgreen?style=flat-square" alt="Electron 43">
   <img src="https://img.shields.io/badge/renderer-WebGL-orange?style=flat-square" alt="WebGL">
   <img src="https://img.shields.io/badge/version-1.5.0-informational?style=flat-square" alt="v1.5.0">
   <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey?style=flat-square" alt="CC BY-NC 4.0">
@@ -691,7 +691,7 @@ Outputs go to the `dist/` folder.
 
 | Component | Technology |
 |-----------|-----------|
-| Framework | Electron 33 |
+| Framework | Electron 43 |
 | Rendering | WebGL — GPU Gaussian blur, phosphor persistence, GLSL shaders |
 | Fallback | Canvas 2D with composite blend modes |
 | Audio | Web Audio API — AnalyserNode, real-time FFT, biquad filter chain, system-audio loopback |

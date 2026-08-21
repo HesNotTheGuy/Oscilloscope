@@ -2,10 +2,21 @@
 
 const { app, BrowserWindow, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
+const fs = require('fs/promises');
 
 let win;
 let displayWin = null;
 let splashWin = null;
+
+// Every window here loads a bundled local file and the app has no outbound
+// links. Anything that tries to navigate away — a dropped file, a stray
+// link — would land on foreign content that still inherits the preload
+// bridge, so refuse navigation and window.open outright.
+function hardenNavigation(wc) {
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wc.on('will-navigate', (e) => e.preventDefault());
+  wc.on('will-attach-webview', (e) => e.preventDefault());
+}
 
 // Frameless splash shown instantly on launch so a slow (or hung) startup
 // never looks like a dead app. Closed when the main window is ready.
@@ -24,6 +35,7 @@ function createSplash() {
       contextIsolation: true,
     },
   });
+  hardenNavigation(splashWin.webContents);
   splashWin.loadFile('splash.html');
 }
 
@@ -59,6 +71,7 @@ function createWindow() {
   }
 
   win = new BrowserWindow(winOpts);
+  hardenNavigation(win.webContents);
 
   // Grant microphone + media + MIDI permissions automatically
   win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
@@ -70,9 +83,20 @@ function createWindow() {
 
   // Grant system-audio loopback without a picker (Windows WASAPI loopback).
   // A video source is required by the API; the renderer discards it immediately.
+  // An empty callback({}) cancels the request, which rejects the renderer's
+  // getDisplayMedia() promise. Without it a failed/empty enumeration would
+  // leave that promise pending forever and the UI stuck "connecting".
   session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
     desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+      if (!sources.length) {
+        console.error('[display-media] no screen sources available');
+        callback({});
+        return;
+      }
       callback({ video: sources[0], audio: 'loopback' });
+    }).catch(err => {
+      console.error('[display-media] getSources failed:', err);
+      callback({});
     });
   }, { useSystemPicker: false });
 
@@ -89,6 +113,23 @@ function createWindow() {
 
   win.loadFile('index.html');
 }
+
+// ── OBJ library IPC ───────────────────────────────────────────────────────────
+
+// The renderer stores absolute paths of OBJ models the user dropped in, so the
+// library can reload them next launch. Deliberately narrow: .obj text only, and
+// size-capped, so this stays a model loader rather than a general file-read
+// primitive handed to the renderer.
+const OBJ_MAX_BYTES = 64 * 1024 * 1024;
+
+ipcMain.handle('read-file', async (_event, filePath) => {
+  if (typeof filePath !== 'string' || !filePath) throw new Error('invalid path');
+  if (path.extname(filePath).toLowerCase() !== '.obj') throw new Error('only .obj files may be read');
+  const stat = await fs.stat(filePath);
+  if (!stat.isFile()) throw new Error('not a file');
+  if (stat.size > OBJ_MAX_BYTES) throw new Error('file too large');
+  return fs.readFile(filePath, 'utf8');
+});
 
 // ── Display window IPC ────────────────────────────────────────────────────────
 
@@ -138,6 +179,7 @@ ipcMain.handle('open-display', (_event, opts = {}) => {
   };
 
   displayWin = new BrowserWindow(winOpts);
+  hardenNavigation(displayWin.webContents);
   displayWin.loadFile('display.html');
 
   if (fullscreen) {

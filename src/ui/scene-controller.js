@@ -88,7 +88,10 @@ export class SceneController {
         ok ? (file.name.length > 18 ? file.name.slice(0, 16) + '…' : file.name) : 'Parse error';
       objDrop.classList.toggle('loaded', ok);
       showWarning();
-      if (ok && file.path) this._lastObjPath = { path: file.path, name: file.name };
+      // file.path was removed in Electron 32 — webUtils.getPathForFile, exposed
+      // through the preload bridge, is the supported replacement.
+      const filePath = window.electronAPI?.getPathForFile?.(file);
+      if (ok && filePath) this._lastObjPath = { path: filePath, name: file.name };
       return ok;
     };
 

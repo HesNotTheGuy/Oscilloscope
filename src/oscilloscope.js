@@ -271,6 +271,17 @@ export class Oscilloscope {
     return this.trigMode === 'auto' ? 0 : -1;
   }
 
+  // SINGLE has to hold off until the trigger condition is actually met rather
+  // than freezing whatever frame arrives next — otherwise it captures an
+  // arbitrary slice, and in norm/single trigger mode the captured frame may
+  // contain no edge at all, leaving the display permanently blank.
+  // findTrigger returns -1 until a real edge appears (and 0 in auto, which
+  // free-runs). Modes with no trigger concept capture immediately.
+  _singleCaptureReady(dataL) {
+    if (this.mode !== 'YT') return true;
+    return this.findTrigger(dataL) >= 0;
+  }
+
   // ── Frequency estimation ─────────────────────────────────────────────
   estimateFreq(data) {
     const sr = this.engine.sampleRate;
@@ -663,7 +674,7 @@ export class Oscilloscope {
       dataL = this.applyCoupling(rawL, this.ch1.coupling, 'L');
       dataR = this.applyCoupling(rawR, this.ch2.coupling, 'R');
       if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
-      if (this._singleArmed) {
+      if (this._singleArmed && this._singleCaptureReady(dataL)) {
         // Capture independent copies for the freeze (coupling buffers will be
         // reused on the next live frame, would otherwise alias).
         this.frozenData = { L: dataL.slice(), R: dataR.slice() };
@@ -864,7 +875,7 @@ export class Oscilloscope {
       dataL = this.applyCoupling(rawL, this.ch1.coupling, 'L');
       dataR = this.applyCoupling(rawR, this.ch2.coupling, 'R');
       if (this.filterEnabled) { dataL = this.applyFilter(dataL, 'L'); dataR = this.applyFilter(dataR, 'R'); }
-      if (this._singleArmed) {
+      if (this._singleArmed && this._singleCaptureReady(dataL)) {
         // Capture independent copies for the freeze (coupling buffers will be
         // reused on the next live frame, would otherwise alias).
         this.frozenData = { L: dataL.slice(), R: dataR.slice() };

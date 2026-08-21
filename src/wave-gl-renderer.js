@@ -205,10 +205,15 @@ export class WaveGLRenderer {
 
   // Build triangle-strip quad geometry for a polyline (screen space)
   // colors: optional array of [r,g,b,a] per point for gradient beam
-  _buildLineGeom(pts, hw, colors) {
+  // Appends at vStart (a float index into _lineVerts) and returns the new float
+  // index, so many polylines can be packed into one buffer and drawn together.
+  // fallback: when non-null the caller is in per-vertex colour mode, so a set
+  // with no gradient of its own still has to emit colours for every vertex.
+  _buildLineGeom(pts, hw, colors, vStart = 0, fallback = null) {
     const v = this._lineVerts;
     const c = this._lineCols;
-    let vi = 0, ci = 0;
+    // 2 floats per vertex in v, 4 per vertex in c — so ci tracks vi at 2x.
+    let vi = vStart, ci = vStart * 2;
     for (let i = 0, N = pts.length - 1; i < N; i++) {
       const [x0,y0] = pts[i], [x1,y1] = pts[i+1];
       const dx=x1-x0, dy=y1-y0, len=Math.sqrt(dx*dx+dy*dy)||1;
@@ -221,8 +226,9 @@ export class WaveGLRenderer {
       v[vi++]=x1-nx; v[vi++]=y1-ny;
       v[vi++]=x1+nx; v[vi++]=y1+ny;
       // Per-vertex color (6 verts per segment: 2 from pt i, 2 from pt i, 2 from pt i+1... actually 3 from i, 3 from i+1 pattern)
-      if (colors) {
-        const c0 = colors[i], c1 = colors[i+1];
+      if (colors || fallback) {
+        const c0 = (colors && colors[i])   || fallback;
+        const c1 = (colors && colors[i+1]) || fallback;
         // Triangle 1: v0(i), v1(i+1), v2(i)  — Triangle 2: v3(i), v4(i+1), v5(i+1)
         c[ci++]=c0[0]; c[ci++]=c0[1]; c[ci++]=c0[2]; c[ci++]=c0[3];
         c[ci++]=c1[0]; c[ci++]=c1[1]; c[ci++]=c1[2]; c[ci++]=c1[3];
@@ -232,13 +238,35 @@ export class WaveGLRenderer {
         c[ci++]=c1[0]; c[ci++]=c1[1]; c[ci++]=c1[2]; c[ci++]=c1[3];
       }
     }
-    return vi >> 1;
+    return vi;
   }
 
   // colors: optional array of [r,g,b,a] per point (same length as pts) for gradient
   _addLine(pts, rgba, hw, colors) {
-    const gl = this.gl, nv = this._buildLineGeom(pts, hw, colors);
+    this._addLines([pts], rgba, hw, colors ? [colors] : null);
+  }
+
+  // Batched: pack every polyline that shares a colour into ONE buffer upload
+  // and ONE draw call. Scene/OBJ mode feeds a separate 2-point polyline per
+  // edge, so drawing one line at a time meant thousands of bufferData +
+  // drawArrays pairs per frame (up to the 12k RENDER_EDGE_CAP, multiplied
+  // again by tiling and mirroring).
+  _addLines(sets, rgba, hw, colorSets) {
+    const gl = this.gl;
+    const perVertexCols = !!colorSets && this._b_aC >= 0;
+    // In per-vertex mode every vertex needs a colour, so sets without a
+    // gradient of their own fall back to the group's flat colour.
+    const fallback = perVertexCols ? rgba : null;
+
+    let vi = 0;
+    for (let i = 0; i < sets.length; i++) {
+      const pts = sets[i];
+      if (!pts || pts.length < 2) continue;
+      vi = this._buildLineGeom(pts, hw, colorSets ? colorSets[i] : null, vi, fallback);
+    }
+    const nv = vi >> 1;
     if (!nv) return;
+
     gl.useProgram(this._pBeam);
     gl.uniform2f(this._b_uR, this.W, this.H);
 
@@ -249,7 +277,7 @@ export class WaveGLRenderer {
     gl.vertexAttribPointer(this._b_aP, 2, gl.FLOAT, false, 0, 0);
 
     // Color buffer — per-vertex gradient or uniform fallback
-    if (colors && this._b_aC >= 0) {
+    if (perVertexCols) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this._lineColBuf);
       gl.bufferData(gl.ARRAY_BUFFER, this._lineCols.subarray(0, nv*4), gl.DYNAMIC_DRAW);
       gl.enableVertexAttribArray(this._b_aC);
@@ -308,13 +336,14 @@ export class WaveGLRenderer {
     gl.viewport(0, 0, this.W, this.H);
     gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    for (let i = 0; i < pointSets.length; i++)
-      this._addLine(pointSets[i], rgba, hw, gradientColors ? gradientColors[i] : null);
-    // Extra color groups (e.g. scene overlay with independent color)
+    this._addLines(pointSets, rgba, hw, gradientColors || null);
+    // Extra color groups (e.g. scene overlay with independent color).
+    // NB: _rgba() returns a shared buffer, so `c` aliases `rgba` — safe only
+    // because each batch is fully consumed before the next _rgba() call.
     if (extraGroups) {
       for (const g of extraGroups) {
         const c = this._rgba(g.color, 1.0);
-        for (const pts of g.pts) this._addLine(pts, c, hw);
+        this._addLines(g.pts, c, hw, null);
       }
     }
     gl.disable(gl.BLEND);

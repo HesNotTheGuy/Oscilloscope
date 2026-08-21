@@ -241,8 +241,11 @@ export class ObjScene {
       indices = [];
       for (let i = 0; i < powerCount; i += stride) indices.push(i);
     } else if (mode === 'shimmer') {
-      // Random subset that refreshes every frame — animated sampling
-      const target = Math.max(1, Math.floor(powerCount * density));
+      // Random subset that refreshes every frame — animated sampling.
+      // Clamp to 0, not 1: with powerCount === 0 a floor of 1 would fabricate
+      // index 0 and the edge lookup below would destructure undefined, throwing
+      // out of the render loop for good.
+      const target = powerCount === 0 ? 0 : Math.max(1, Math.floor(powerCount * density));
       // Reuse a persistent Int32Array; the iteration count below trims it.
       if (!this._shimmerBuf || this._shimmerBuf.length < target) {
         this._shimmerBuf = new Int32Array(target);
@@ -279,7 +282,11 @@ export class ObjScene {
                     : (indices ? indices.length : powerCount);
     for (let ii = 0; ii < iterCount; ii++) {
       const ei = indices ? indices[ii] : ii;
-      const [i0, i1] = this.edges[ei];
+      const edge = this.edges[ei];
+      // A single bad index would throw out of the render loop and the scope
+      // would never draw again — skip instead.
+      if (!edge) continue;
+      const [i0, i1] = edge;
       let [ax, ay] = xform(...this.verts[i0]);
       let [bx, by] = xform(...this.verts[i1]);
 
