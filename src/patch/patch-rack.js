@@ -1,5 +1,7 @@
 'use strict';
 
+import { BeatDetector } from '../beat-detector.js';
+
 // ─────────────────────────────────────────────────────────────
 //  PatchRack — modular patch bay inserted between the engine's
 //  visual buses and its analysers. While enabled, everything the
@@ -17,19 +19,21 @@
 //     silences delay-free cycles) — feedback is a feature
 // ─────────────────────────────────────────────────────────────
 
-const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35 };
+const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35, 'fold.cv': 3 };
 
-const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing' };
+const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing', 'tracer.out': 'riding', 'pulse.out': 'punching' };
 const DEST_PHRASE = {
   'vcf.cv': 'the filter', 'vco.fm': 'the pitch', 'out.cv': 'the volume',
   'echo.cv': 'the echo time', 'vcf.in': 'into the filter', 'out.in': 'the speakers',
   'mix.a': 'into the mixer', 'mix.b': 'into the mixer',
   'echo.in': 'into the echo', 'drive.in': 'into the drive',
+  'tracer.in': 'the tracer', 'ghost.in': 'into the ghost', 'fold.in': 'into the fold', 'fold.cv': 'the fold',
 };
 const JACK_NAME = {
   'input.out': 'the source', 'vco.out': 'the synth', 'lfo.out': 'the LFO',
   'seq.out': 'the sequencer', 'sh.out': 'the S&H', 'vcf.out': 'the filter',
   'mix.out': 'the mix', 'echo.out': 'the echo', 'drive.out': 'the drive',
+  'tracer.out': 'the tracer', 'pulse.out': 'the pulse', 'ghost.out': 'the ghost', 'fold.out': 'the fold',
 };
 
 // Declarative module layout. knobs: [id, label, default]; jacks: [id, dir, kind, label]
@@ -67,6 +71,20 @@ const ROWS = [
     { id: 'out', name: 'Out', sub: 'speakers + visualizers', w: 150,
       knobs: [['out.monitor', 'Monitor', 0.8]],
       jacks: [['out.in', 'in', 'audio', '▸ In'], ['out.cv', 'in', 'cv', '▸ Trem']] },
+  ],
+  [
+    { id: 'tracer', name: 'Tracer', sub: 'the music moves the knobs', subDyn: 'tracer', w: 172,
+      knobs: [['tracer.speed', 'Speed', 0.5], ['tracer.gain', 'Gain', 0.33]],
+      jacks: [['tracer.in', 'in', 'audio', '▸ In'], ['tracer.out', 'out', 'cv', 'Out']] },
+    { id: 'pulse', name: 'Pulse', sub: 'fires on the beat', subDyn: 'pulse', w: 140,
+      knobs: [['pulse.decay', 'Decay', 0.3]],
+      jacks: [['pulse.out', 'out', 'cv', 'Out']], led: 'pk-led-pulse' },
+    { id: 'ghost', name: 'Ghost', sub: 'a second, blurrier you', w: 170,
+      knobs: [['ghost.rate', 'Rate', 0.5], ['ghost.depth', 'Depth', 0.5]],
+      jacks: [['ghost.in', 'in', 'audio', '▸ In'], ['ghost.out', 'out', 'audio', 'Out']] },
+    { id: 'fold', name: 'Fold', sub: 'creases the wave', w: 172,
+      knobs: [['fold.amt', 'Fold', 0.35]],
+      jacks: [['fold.in', 'in', 'audio', '▸ In'], ['fold.cv', 'in', 'cv', '▸ CV'], ['fold.out', 'out', 'audio', 'Out']] },
   ],
 ];
 
@@ -176,6 +194,10 @@ export class PatchRack {
       case 'vcf.res':   return 'Q ' + (0.5 + v * 18).toFixed(1);
       case 'echo.time': return (0.05 + v * 0.75).toFixed(2) + ' s';
       case 'drive.amt': return Math.round(1 + v * 39) + 'x';
+      case 'tracer.speed': return (2 * Math.pow(25, v)).toFixed(0) + ' Hz';
+      case 'tracer.gain': return (1 + v * 3).toFixed(1) + 'x';
+      case 'pulse.decay': return (0.05 + v * 0.95).toFixed(2) + ' s';
+      case 'ghost.rate': return (0.1 * Math.pow(40, v)).toFixed(2) + ' Hz';
       default:          return Math.round(v * 100) + '%';
     }
   }
@@ -208,6 +230,11 @@ export class PatchRack {
         a.drivePre.gain.setTargetAtTime(1 + v * 39, t, .02);
         a.drivePost.gain.setTargetAtTime(0.9 / (1 + v * 2.5), t, .02); break;
       case 'out.monitor': a.master.gain.setTargetAtTime(v * v, t, .02); break;
+      case 'tracer.speed': a.tracerLP.frequency.setTargetAtTime(2 * Math.pow(25, v), t, .02); break;
+      case 'tracer.gain': a.tracerGain.gain.setTargetAtTime(1 + v * 3, t, .02); break;
+      case 'ghost.rate': a.ghostLfo.frequency.setTargetAtTime(0.1 * Math.pow(40, v), t, .02); break;
+      case 'ghost.depth': a.ghostLfoGain.gain.setTargetAtTime(v * 0.005, t, .02); break;
+      case 'fold.amt': a.foldShaper.curve = this._foldCurve(v); break;
     }
   }
 
@@ -246,11 +273,38 @@ export class PatchRack {
     a.shaper = new WaveShaperNode(actx, { curve, oversample: '2x' });
     a.drivePost = new GainNode(actx, { gain: 0.9 });
     a.drivePre.connect(a.shaper).connect(a.drivePost);
+    // TRACER: |x| -> lowpass = the loudness of the input, as audio-rate CV
+    a.tracerIn = new GainNode(actx, { gain: 1 });
+    const absCurve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) absCurve[i] = Math.abs(i / 511.5 - 1);
+    a.tracerAbs = new WaveShaperNode(actx, { curve: absCurve });
+    a.tracerLP = new BiquadFilterNode(actx, { type: 'lowpass', frequency: 10, Q: 0.5 });
+    a.tracerGain = new GainNode(actx, { gain: 2 });
+    a.tracerIn.connect(a.tracerAbs).connect(a.tracerLP).connect(a.tracerGain);
+    // PULSE: beat-triggered decay envelope on a ConstantSource
+    a.pulseSrc = new ConstantSourceNode(actx, { offset: 0 });
+    // GHOST: dry + LFO-modulated short delay (chorus / CRT double image)
+    a.ghostIn = new GainNode(actx, { gain: 1 });
+    a.ghostDelay = new DelayNode(actx, { delayTime: 0.016, maxDelayTime: 0.06 });
+    a.ghostLfo = new OscillatorNode(actx, { type: 'sine', frequency: 0.6 });
+    a.ghostLfoGain = new GainNode(actx, { gain: 0.0025 });
+    a.ghostLfo.connect(a.ghostLfoGain).connect(a.ghostDelay.delayTime);
+    a.ghostWet = new GainNode(actx, { gain: 0.7 });
+    a.ghostOut = new GainNode(actx, { gain: 1 });
+    a.ghostIn.connect(a.ghostOut);
+    a.ghostIn.connect(a.ghostDelay).connect(a.ghostWet).connect(a.ghostOut);
+    // FOLD: sine-shaped wavefolder; knob rebuilds the curve, CV drives deeper
+    a.foldPre = new GainNode(actx, { gain: 1 });
+    a.foldShaper = new WaveShaperNode(actx, { curve: this._foldCurve(0.35), oversample: '4x' });
+    a.foldOut = new GainNode(actx, { gain: 0.9 });
+    a.foldPre.connect(a.foldShaper).connect(a.foldOut);
+    this._beat = new BeatDetector();
     a.master = new GainNode(actx, { gain: 0 });
     // limiter so feedback patches and hot drives can't blast the speakers
     a.limiter = new DynamicsCompressorNode(actx, { threshold: -6, ratio: 12 });
     a.master.connect(a.limiter);
     a.osc1.start(); a.osc2.start(); a.lfo.start(); a.seqSrc.start(); a.shSrc.start();
+    a.pulseSrc.start(); a.ghostLfo.start();
 
     const tap = (id, node) => {
       const an = actx.createAnalyser();
@@ -267,12 +321,19 @@ export class PatchRack {
     tap('mix.out', a.mixBus);
     tap('echo.out', a.echoOut);
     tap('drive.out', a.drivePost);
+    tap('tracer.out', a.tracerGain);
+    tap('pulse.out', a.pulseSrc);
+    tap('ghost.out', a.ghostOut);
+    tap('fold.out', a.foldOut);
     this.inTargets = {
       'vcf.in': a.filter, 'vcf.cv': a.filter.frequency,
       'vco.fm': [a.osc1.frequency, a.osc2.frequency],
       'mix.a': a.mixA, 'mix.b': a.mixB,
       'echo.in': a.echoIn, 'echo.cv': a.echoDelay.delayTime,
       'drive.in': a.drivePre,
+      'tracer.in': a.tracerIn,
+      'ghost.in': a.ghostIn,
+      'fold.in': a.foldPre, 'fold.cv': a.foldPre.gain,
       'out.in': a.master, 'out.cv': a.master.gain,
     };
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
@@ -282,6 +343,25 @@ export class PatchRack {
     this.connect('input.out', 'vcf.in');
     this.connect('lfo.out', 'vcf.cv');
     this.connect('vcf.out', 'out.in');
+  }
+
+  _foldCurve(v) {
+    const c = new Float32Array(2048);
+    const k = Math.PI * (0.5 + v * 5);
+    for (let i = 0; i < 2048; i++) c[i] = Math.sin((i / 1023.5 - 1) * k);
+    return c;
+  }
+
+  // One beat -> a snappy decay envelope on the PULSE output.
+  _firePulse() {
+    if (!this.audio) return;
+    const t = this.engine.actx.currentTime;
+    const dec = (0.05 + 0.95 * (this.knobs['pulse.decay'] ?? 0.3)) / 3;
+    const o = this.audio.pulseSrc.offset;
+    o.cancelScheduledValues(t);
+    o.setTargetAtTime(1, t, 0.004);
+    o.setTargetAtTime(0, t + 0.04, dec);
+    this._pulseLedUntil = performance.now() + 120;
   }
 
   _seqTick() {
@@ -362,7 +442,7 @@ export class PatchRack {
       const el = this.overlay.querySelector(`[data-pk-sub="${outId.split('.')[0]}"]`);
       if (!el) continue;
       const dests = this.cables.filter(c => c.from === outId).map(c => DEST_PHRASE[c.to] || c.to);
-      const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps' };
+      const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps', tracer: 'the music moves the knobs', pulse: 'fires on the beat' };
       if (dests.length) { el.textContent = VERB[outId] + ' ' + dests.join(' + '); el.classList.add('pk-live'); }
       else { el.textContent = DEFAULTS[outId.split('.')[0]]; el.classList.remove('pk-live'); }
     }
@@ -657,9 +737,12 @@ export class PatchRack {
       if (led && this.taps['input.out']) {
         const t = this.taps['input.out'];
         t.analyser.getFloatTimeDomainData(t.buf);
-        let peak = 0;
-        for (let i = 0; i < t.buf.length; i += 16) peak = Math.max(peak, Math.abs(t.buf[i]));
+        let peak = 0, sum = 0, n = 0;
+        for (let i = 0; i < t.buf.length; i += 8) { const v = t.buf[i]; peak = Math.max(peak, Math.abs(v)); sum += v * v; n++; }
         led.className = 'pk-led' + (peak > 0.01 ? ' pk-on-green' : '');
+        if (this._beat && this._beat.detect(Math.sqrt(sum / n)).beat) this._firePulse();
+        const pled = this.overlay.querySelector('#pk-led-pulse');
+        if (pled) pled.className = 'pk-led' + (performance.now() < (this._pulseLedUntil || 0) ? ' pk-on-amber' : '');
       }
       this._raf = requestAnimationFrame(frame);
     };
