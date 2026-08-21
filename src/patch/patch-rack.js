@@ -21,7 +21,8 @@ import { BeatDetector } from '../beat-detector.js';
 
 const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35, 'fold.cv': 3 };
 
-const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing', 'tracer.out': 'riding', 'pulse.out': 'punching' };
+const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing', 'tracer.out': 'riding', 'pulse.out': 'punching',
+  'drift.out': 'drifting', 'sweep.out': 'sweeping', 'memory.out': 'looping', 'strange.x': 'entangling', 'strange.y': 'entangling' };
 const DEST_PHRASE = {
   'vcf.cv': 'the filter', 'vco.fm': 'the pitch', 'out.cv': 'the volume',
   'echo.cv': 'the echo time', 'vcf.in': 'into the filter', 'out.in': 'the speakers',
@@ -34,6 +35,8 @@ const JACK_NAME = {
   'seq.out': 'the sequencer', 'sh.out': 'the S&H', 'vcf.out': 'the filter',
   'mix.out': 'the mix', 'echo.out': 'the echo', 'drive.out': 'the drive',
   'tracer.out': 'the tracer', 'pulse.out': 'the pulse', 'ghost.out': 'the ghost', 'fold.out': 'the fold',
+  'drift.out': 'the drift', 'sweep.out': 'the sweep', 'memory.out': 'the memory',
+  'strange.x': 'strange X', 'strange.y': 'strange Y',
 };
 
 // Declarative module layout. knobs: [id, label, default]; jacks: [id, dir, kind, label]
@@ -86,6 +89,20 @@ const ROWS = [
       knobs: [['fold.amt', 'Fold', 0.35]],
       jacks: [['fold.in', 'in', 'audio', '▸ In'], ['fold.cv', 'in', 'cv', '▸ CV'], ['fold.out', 'out', 'audio', 'Out']] },
   ],
+  [
+    { id: 'drift', name: 'Drift', sub: 'slow wander', subDyn: 'drift', w: 158,
+      knobs: [['drift.rate', 'Rate', 0.4], ['drift.slew', 'Slew', 0.5]],
+      jacks: [['drift.out', 'out', 'cv', 'Out']] },
+    { id: 'sweep', name: 'Sweep', sub: 'rise & fall', subDyn: 'sweep', w: 160,
+      knobs: [['sweep.rise', 'Rise', 0.45], ['sweep.fall', 'Fall', 0.45]],
+      jacks: [['sweep.out', 'out', 'cv', 'Out']] },
+    { id: 'memory', name: 'Memory', sub: 'a melody that mutates', subDyn: 'memory', w: 172,
+      knobs: [['memory.rate', 'Rate', 0.5], ['memory.lock', 'Lock', 0.35]],
+      jacks: [['memory.out', 'out', 'cv', 'Out']], led: 'pk-led-mem' },
+    { id: 'strange', name: 'Strange', sub: 'chaos, but elegant', subDyn: 'strange', w: 176,
+      knobs: [['strange.speed', 'Speed', 0.5]],
+      jacks: [['strange.x', 'out', 'cv', 'X'], ['strange.y', 'out', 'cv', 'Y']] },
+  ],
 ];
 
 // The patch book: named starting points, the software version of the patch
@@ -105,6 +122,14 @@ const RECIPES = {
   'scream': {
     knobs: { 'vcf.cutoff': 0.5, 'vcf.res': 0.7, 'drive.amt': 0.6, 'out.monitor': 0.5 },
     cables: [['input.out', 'vcf.in'], ['vcf.out', 'drive.in'], ['vcf.out', 'vcf.cv'], ['drive.out', 'out.in']] },
+  'weather': {
+    knobs: { 'vcf.cutoff': 0.55, 'drift.rate': 0.25, 'drift.slew': 0.7, 'strange.speed': 0.45,
+             'echo.time': 0.45, 'echo.fdbk': 0.5 },
+    cables: [['input.out', 'vcf.in'], ['drift.out', 'vcf.cv'], ['vcf.out', 'echo.in'],
+             ['strange.x', 'echo.cv'], ['echo.out', 'out.in']] },
+  'mutation': {
+    knobs: { 'vco.level': 0.6, 'memory.rate': 0.5, 'memory.lock': 0.7, 'vcf.cutoff': 0.5, 'vcf.res': 0.4 },
+    cables: [['memory.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['sweep.out', 'vcf.cv'], ['vcf.out', 'out.in']] },
   'step melody': {
     knobs: { 'vco.level': 0.6, 'vco.freq': 0.5, 'seq.rate': 0.55, 'vcf.cutoff': 0.55, 'echo.time': 0.35, 'echo.fdbk': 0.4 },
     cables: [['seq.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['vcf.out', 'echo.in'],
@@ -228,6 +253,11 @@ export class PatchRack {
       case 'tracer.gain': return (1 + v * 3).toFixed(1) + 'x';
       case 'pulse.decay': return (0.05 + v * 0.95).toFixed(2) + ' s';
       case 'ghost.rate': return (0.1 * Math.pow(40, v)).toFixed(2) + ' Hz';
+      case 'drift.rate': return (0.2 * Math.pow(40, v)).toFixed(1) + ' Hz';
+      case 'drift.slew': return (0.05 * Math.pow(40, v)).toFixed(2) + ' s';
+      case 'sweep.rise': case 'sweep.fall': return (0.05 * Math.pow(80, v)).toFixed(2) + ' s';
+      case 'memory.rate': return (0.5 * Math.pow(32, v)).toFixed(1) + ' Hz';
+      case 'strange.speed': return (0.2 * Math.pow(25, v)).toFixed(1) + 'x';
       default:          return Math.round(v * 100) + '%';
     }
   }
@@ -328,6 +358,11 @@ export class PatchRack {
     a.foldShaper = new WaveShaperNode(actx, { curve: this._foldCurve(0.35), oversample: '4x' });
     a.foldOut = new GainNode(actx, { gain: 0.9 });
     a.foldPre.connect(a.foldShaper).connect(a.foldOut);
+    a.driftSrc = new ConstantSourceNode(actx, { offset: 0 });
+    a.sweepSrc = new ConstantSourceNode(actx, { offset: 0 });
+    a.memSrc = new ConstantSourceNode(actx, { offset: 0 });
+    a.strangeX = new ConstantSourceNode(actx, { offset: 0 });
+    a.strangeY = new ConstantSourceNode(actx, { offset: 0 });
     this._beat = new BeatDetector();
     a.master = new GainNode(actx, { gain: 0 });
     // limiter so feedback patches and hot drives can't blast the speakers
@@ -335,6 +370,7 @@ export class PatchRack {
     a.master.connect(a.limiter);
     a.osc1.start(); a.osc2.start(); a.lfo.start(); a.seqSrc.start(); a.shSrc.start();
     a.pulseSrc.start(); a.ghostLfo.start();
+    a.driftSrc.start(); a.sweepSrc.start(); a.memSrc.start(); a.strangeX.start(); a.strangeY.start();
 
     const tap = (id, node) => {
       const an = actx.createAnalyser();
@@ -355,6 +391,11 @@ export class PatchRack {
     tap('pulse.out', a.pulseSrc);
     tap('ghost.out', a.ghostOut);
     tap('fold.out', a.foldOut);
+    tap('drift.out', a.driftSrc);
+    tap('sweep.out', a.sweepSrc);
+    tap('memory.out', a.memSrc);
+    tap('strange.x', a.strangeX);
+    tap('strange.y', a.strangeY);
     this.inTargets = {
       'vcf.in': a.filter, 'vcf.cv': a.filter.frequency,
       'vco.fm': [a.osc1.frequency, a.osc2.frequency],
@@ -368,6 +409,7 @@ export class PatchRack {
     };
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
     this._seqTick(); this._shTick();
+    this._driftTick(); this._sweepTick(); this._memTick(); this._strangeTick();
 
     // Starter patch: whatever the app is playing, through a wobbling filter.
     this.connect('input.out', 'vcf.in');
@@ -412,6 +454,63 @@ export class PatchRack {
       if (led) led.className = 'pk-led' + (v > 0 ? ' pk-on-amber' : '');
     }
     setTimeout(() => this._shTick(), 1000 / (0.5 * Math.pow(60, this.knobs['sh.rate'] ?? 0.5)));
+  }
+
+  // DRIFT: glide to a new random target at RATE; SLEW sets how lazily.
+  _driftTick() {
+    if (this.audio) {
+      const slew = 0.05 * Math.pow(40, this.knobs['drift.slew'] ?? 0.5);
+      this.audio.driftSrc.offset.setTargetAtTime(Math.random() * 2 - 1, this.engine.actx.currentTime, slew);
+    }
+    setTimeout(() => this._driftTick(), 1000 / (0.2 * Math.pow(40, this.knobs['drift.rate'] ?? 0.4)));
+  }
+
+  // SWEEP: looping rise/fall ramp with independent slopes (0..1 out).
+  _sweepTick() {
+    if (this.audio) {
+      const rise = 0.05 * Math.pow(80, this.knobs['sweep.rise'] ?? 0.45);
+      const fall = 0.05 * Math.pow(80, this.knobs['sweep.fall'] ?? 0.45);
+      const st = this._sweep = this._sweep || { v: 0, up: true };
+      const step = 0.025;
+      st.v += st.up ? step / rise : -step / fall;
+      if (st.v >= 1) { st.v = 1; st.up = false; }
+      if (st.v <= 0) { st.v = 0; st.up = true; }
+      this.audio.sweepSrc.offset.setTargetAtTime(st.v, this.engine.actx.currentTime, 0.012);
+    }
+    setTimeout(() => this._sweepTick(), 25);
+  }
+
+  // MEMORY: 16-step Turing loop; LOCK morphs mutation -> frozen melody.
+  _memTick() {
+    if (this.audio) {
+      const st = this._mem = this._mem || { slots: Array.from({ length: 16 }, () => Math.random()), idx: 0 };
+      st.idx = (st.idx + 1) % 16;
+      const mutated = Math.random() > (this.knobs['memory.lock'] ?? 0.35);
+      if (mutated) st.slots[st.idx] = Math.random();
+      this.audio.memSrc.offset.setTargetAtTime(st.slots[st.idx], this.engine.actx.currentTime, 0.004);
+      const led = this.overlay.querySelector('#pk-led-mem');
+      if (led) led.className = 'pk-led' + (mutated ? ' pk-on-amber' : ' pk-on-green');
+    }
+    setTimeout(() => this._memTick(), 1000 / (0.5 * Math.pow(32, this.knobs['memory.rate'] ?? 0.5)));
+  }
+
+  // STRANGE: Lorenz attractor, X and Y outs normalized to ~±1.
+  _strangeTick() {
+    if (this.audio) {
+      const st = this._lorenz = this._lorenz || { x: 1, y: 1, z: 20 };
+      const speed = 0.2 * Math.pow(25, this.knobs['strange.speed'] ?? 0.5);
+      const dt = 0.0035 * speed;
+      for (let i = 0; i < 8; i++) {
+        const dx = 10 * (st.y - st.x);
+        const dy = st.x * (28 - st.z) - st.y;
+        const dz = st.x * st.y - (8 / 3) * st.z;
+        st.x += dx * dt; st.y += dy * dt; st.z += dz * dt;
+      }
+      const t = this.engine.actx.currentTime;
+      this.audio.strangeX.offset.setTargetAtTime(Math.max(-1, Math.min(1, st.x / 20)), t, 0.02);
+      this.audio.strangeY.offset.setTargetAtTime(Math.max(-1, Math.min(1, st.y / 25)), t, 0.02);
+    }
+    setTimeout(() => this._strangeTick(), 25);
   }
 
   // ── Patching ────────────────────────────────────────────────
@@ -520,13 +619,21 @@ export class PatchRack {
       const c = this.cables.find(cb => cb.from === id || cb.to === id);
       this.jackEls[id].className = 'pk-jack' + (c ? ' pk-lit-' + c.kind : '') + (id === this.probeId ? ' pk-probed' : '');
     }
+    const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps',
+      tracer: 'the music moves the knobs', pulse: 'fires on the beat',
+      drift: 'slow wander', sweep: 'rise & fall', memory: 'a melody that mutates', strange: 'chaos, but elegant' };
+    const byModule = {};
     for (const outId in VERB) {
-      const el = this.overlay.querySelector(`[data-pk-sub="${outId.split('.')[0]}"]`);
+      const mod = outId.split('.')[0];
+      if (!byModule[mod]) byModule[mod] = { verb: VERB[outId], dests: [] };
+      for (const c of this.cables) if (c.from === outId) byModule[mod].dests.push(DEST_PHRASE[c.to] || c.to);
+    }
+    for (const mod in byModule) {
+      const el = this.overlay.querySelector(`[data-pk-sub="${mod}"]`);
       if (!el) continue;
-      const dests = this.cables.filter(c => c.from === outId).map(c => DEST_PHRASE[c.to] || c.to);
-      const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps', tracer: 'the music moves the knobs', pulse: 'fires on the beat' };
-      if (dests.length) { el.textContent = VERB[outId] + ' ' + dests.join(' + '); el.classList.add('pk-live'); }
-      else { el.textContent = DEFAULTS[outId.split('.')[0]]; el.classList.remove('pk-live'); }
+      const d = byModule[mod].dests;
+      if (d.length) { el.textContent = byModule[mod].verb + ' ' + d.join(' + '); el.classList.add('pk-live'); }
+      else { el.textContent = DEFAULTS[mod]; el.classList.remove('pk-live'); }
     }
   }
 
