@@ -88,6 +88,30 @@ const ROWS = [
   ],
 ];
 
+// The patch book: named starting points, the software version of the patch
+// recipe cards semi-modular makers ship. Every recipe assumes the app is
+// already playing something (the INPUT module carries it).
+const RECIPES = {
+  'wobble': {
+    knobs: { 'vcf.cutoff': 0.62, 'vcf.res': 0.2, 'lfo.rate': 0.45, 'lfo.depth': 0.6 },
+    cables: [['input.out', 'vcf.in'], ['lfo.out', 'vcf.cv'], ['vcf.out', 'out.in']] },
+  'self-playing': {
+    knobs: { 'vcf.cutoff': 0.35, 'vcf.res': 0.45, 'tracer.speed': 0.5, 'tracer.gain': 0.5, 'pulse.decay': 0.25 },
+    cables: [['input.out', 'vcf.in'], ['input.out', 'tracer.in'], ['tracer.out', 'vcf.cv'],
+             ['pulse.out', 'out.cv'], ['vcf.out', 'out.in']] },
+  'tape ghost': {
+    knobs: { 'echo.time': 0.5, 'echo.fdbk': 0.55, 'lfo.rate': 0.3, 'lfo.depth': 0.5, 'ghost.rate': 0.5, 'ghost.depth': 0.6 },
+    cables: [['input.out', 'ghost.in'], ['ghost.out', 'echo.in'], ['lfo.out', 'echo.cv'], ['echo.out', 'out.in']] },
+  'scream': {
+    knobs: { 'vcf.cutoff': 0.5, 'vcf.res': 0.7, 'drive.amt': 0.6, 'out.monitor': 0.5 },
+    cables: [['input.out', 'vcf.in'], ['vcf.out', 'drive.in'], ['vcf.out', 'vcf.cv'], ['drive.out', 'out.in']] },
+  'step melody': {
+    knobs: { 'vco.level': 0.6, 'vco.freq': 0.5, 'seq.rate': 0.55, 'vcf.cutoff': 0.55, 'echo.time': 0.35, 'echo.fdbk': 0.4 },
+    cables: [['seq.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['vcf.out', 'echo.in'],
+             ['lfo.out', 'vcf.cv'], ['echo.out', 'out.in']] },
+};
+const STORE_KEY = 'dso1.patches';
+
 export class PatchRack {
   constructor(engine) {
     this.engine = engine;
@@ -121,6 +145,8 @@ export class PatchRack {
       <div class="pk-top">
         <div class="pk-title">PATCH<em> MODE</em></div>
         <button class="pk-btn pk-active" id="pk-mode">PATCHING</button>
+        <select class="pk-btn" id="pk-book" title="Patch book — starting points and your saved patches"></select>
+        <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
         <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
         <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
         <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
@@ -438,6 +464,40 @@ export class PatchRack {
   }
 
   _snapshot() { return this.cables.map(c => ({ from: c.from, to: c.to })); }
+
+  serialize() {
+    return { knobs: { ...this.knobs }, lfoType: this._lfoType,
+             cables: this.cables.map(c => [c.from, c.to]) };
+  }
+  applyPatch(data) {
+    this._pushUndo();                                    // recipes are undoable too
+    while (this.cables.length) this.removeCable(0);
+    if (data.knobs) for (const id in data.knobs) this.setKnob(id, data.knobs[id]);
+    if (data.lfoType) {
+      this._lfoType = data.lfoType;
+      if (this.audio) this.audio.lfo.type = data.lfoType;
+      this.overlay.querySelectorAll('[data-pk-wave]').forEach(x =>
+        x.classList.toggle('pk-active', x.dataset.pkWave === data.lfoType));
+    }
+    for (const [from, to] of (data.cables || [])) {
+      if (this.taps[from] && this.inTargets[to]) this.connect(from, to);
+    }
+  }
+  _savedPatches() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (_) { return {}; }
+  }
+  _refreshBook() {
+    const sel = this.overlay.querySelector('#pk-book');
+    if (!sel) return;
+    const saved = this._savedPatches();
+    sel.innerHTML = '<option value="">PATCH BOOK</option>' +
+      '<optgroup label="recipes">' +
+      Object.keys(RECIPES).map(n => `<option value="r:${n}">${n}</option>`).join('') +
+      '</optgroup>' +
+      (Object.keys(saved).length
+        ? '<optgroup label="saved">' + Object.keys(saved).map(n => `<option value="s:${n}">${n}</option>`).join('') + '</optgroup>'
+        : '');
+  }
   _pushUndo() {
     this._undo = this._undo || [];
     this._undo.push(this._snapshot());
@@ -579,6 +639,30 @@ export class PatchRack {
         this.overlay.querySelectorAll('[data-pk-wave]').forEach(x => x.classList.toggle('pk-active', x === b));
         if (this.audio) this.audio.lfo.type = this._lfoType;
       });
+    });
+
+    // patch book + save
+    this._refreshBook();
+    const bookSel = this.overlay.querySelector('#pk-book');
+    bookSel.addEventListener('change', () => {
+      const v = bookSel.value;
+      if (!v) return;
+      const [kind, name] = [v.slice(0, 1), v.slice(2)];
+      const data = kind === 'r' ? RECIPES[name] : this._savedPatches()[name];
+      if (data) { this.applyPatch(data); this._flashHint('loaded \u201c' + name + '\u201d \u2014 Ctrl+Z restores the old patch'); }
+    });
+    bookSel.addEventListener('pointerdown', e => e.stopPropagation());
+    this.overlay.querySelector('#pk-save').addEventListener('click', e => {
+      e.stopPropagation();
+      const saved = this._savedPatches();
+      let n = 1;
+      while (saved['patch ' + n]) n++;
+      const name = 'patch ' + n;
+      saved[name] = this.serialize();
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(saved)); } catch (_) {}
+      this._refreshBook();
+      this.overlay.querySelector('#pk-book').value = 's:' + name;
+      this._flashHint('saved as \u201c' + name + '\u201d');
     });
 
     // mode toggle + close
