@@ -92,7 +92,7 @@ export class SignalGenController {
       if (!sg.active) {
         await this.ensureAudio();
         sg.init(e.actx);
-        sg.start(e.analyserL, e.analyserR);
+        sg.start(e.visBusL, e.visBusR);
         btnGenStart.disabled = true;  btnGenStop.disabled = false;
         btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
         if (s.mode !== 'XY') {
@@ -107,7 +107,7 @@ export class SignalGenController {
         document.getElementById('st-src').textContent = 'Signal Gen';
       } else {
         sg.setFreqL(sg.freqL); sg.setFreqR(sg.freqR); sg.setWaveform(sg.waveform);
-        sg.stop(); sg.init(e.actx); sg.start(e.analyserL, e.analyserR);
+        sg.stop(); sg.init(e.actx); sg.start(e.visBusL, e.visBusR);
       }
     };
 
@@ -120,7 +120,7 @@ export class SignalGenController {
       await this.ensureAudio();
       sg.freqL = +genFreqL.value; sg.freqR = +genFreqR.value;
       sg.phase = +genPhase.value; sg.waveform = genWave.value;
-      sg.init(e.actx); sg.start(e.analyserL, e.analyserR);
+      sg.init(e.actx); sg.start(e.visBusL, e.visBusR);
       btnGenStart.disabled = true;  btnGenStop.disabled = false;
       btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
       if (s.mode !== 'XY') {

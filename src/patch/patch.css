@@ -1,0 +1,119 @@
+/* ── PATCH mode rack ──────────────────────────────────────────────────
+   Self-contained palette (matches the PATCH-1 prototype), all classes
+   pk- prefixed so nothing collides with the app's global styles. */
+#pk-overlay {
+  --pk-room: rgba(6, 8, 7, 0.96);
+  --pk-panel: #141715;
+  --pk-panel-hi: #1c211e;
+  --pk-ink: #e8e4d8;
+  --pk-ink-dim: #8a887e;
+  --pk-audio: #00ff41;
+  --pk-cv: #ffb300;
+  --pk-red: #ff3b30;
+  --pk-mono: 'IBM Plex Mono', Consolas, monospace;
+  position: fixed; inset: 0; z-index: 950;
+  background: var(--pk-room);
+  font-family: var(--pk-mono);
+  color: var(--pk-ink);
+  display: flex; flex-direction: column; align-items: center;
+  overflow: auto;
+}
+#pk-overlay.pk-hidden { display: none; }
+
+.pk-top {
+  width: 100%; max-width: 1100px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 18px;
+  padding: 16px 24px 8px; flex-wrap: wrap;
+}
+.pk-title { font-size: 17px; font-weight: 600; letter-spacing: .18em; }
+.pk-title em { font-style: normal; color: var(--pk-audio); }
+.pk-hint { font-size: 10px; color: var(--pk-ink-dim); letter-spacing: .05em; flex: 1; min-width: 220px; }
+.pk-hint b { color: var(--pk-ink); font-weight: 500; }
+.pk-btn {
+  font-family: var(--pk-mono); font-size: 9px; letter-spacing: .1em; padding: 4px 8px;
+  background: #101312; color: var(--pk-ink-dim); border: 1px solid #2c322e;
+  border-radius: 3px; cursor: pointer;
+}
+.pk-btn.pk-active { color: var(--pk-cv); border-color: var(--pk-cv); }
+.pk-btn:focus-visible { outline: 1px solid var(--pk-ink); outline-offset: 1px; }
+.pk-close { font-size: 13px; padding: 3px 9px; }
+
+.pk-legend {
+  display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
+  font-size: 9.5px; color: var(--pk-ink-dim); letter-spacing: .05em; padding: 0 16px 10px;
+}
+.pk-legend .pk-swatch { display: inline-block; width: 20px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.pk-legend .pk-sw-audio { background: var(--pk-audio); box-shadow: 0 0 5px var(--pk-audio); }
+.pk-legend .pk-sw-cv { background: var(--pk-cv); box-shadow: 0 0 5px var(--pk-cv); }
+
+.pk-rack { position: relative; padding: 0 12px 24px; margin: 0 auto; }
+.pk-rail {
+  height: 20px; background: linear-gradient(#343a36, #222724 60%, #171b19);
+  border-radius: 3px; margin: 0 4px; position: relative;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 -1px 0 rgba(0,0,0,.6) inset;
+}
+.pk-row { display: flex; gap: 5px; padding: 5px 8px; }
+.pk-module {
+  background: linear-gradient(178deg, var(--pk-panel-hi), var(--pk-panel) 30%, #101312);
+  border: 1px solid #060807; border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 6px 14px rgba(0,0,0,.5);
+  padding: 10px 8px 12px; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  min-height: 250px; box-sizing: border-box; flex: 0 0 auto;
+}
+.pk-name {
+  font-size: 14px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
+  border-bottom: 1px solid #2c322e; padding: 0 6px 4px; width: 88%; text-align: center;
+}
+.pk-sub { font-size: 8.5px; letter-spacing: .05em; color: var(--pk-ink-dim); margin-top: -3px; transition: color .25s; text-align: center; }
+.pk-sub.pk-live { color: var(--pk-cv); }
+
+.pk-knobs { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.pk-knobs.pk-seq { gap: 5px; }
+.pk-kwrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pk-knob {
+  width: 40px; height: 40px; border-radius: 50%; cursor: ns-resize; position: relative;
+  background: radial-gradient(circle at 38% 32%, #4e554f, rgba(35,39,36,0.28) 55%), radial-gradient(circle, #2c312d 60%, #191d1a);
+  box-shadow: 0 0 0 2px #0a0c0b, 0 2px 5px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.08) inset;
+  touch-action: none;
+}
+.pk-knob .pk-ptr {
+  position: absolute; left: 50%; top: 3px; width: 2.5px; height: 12px; margin-left: -1.25px;
+  background: var(--pk-ink); border-radius: 2px; transform-origin: 50% 17px;
+}
+.pk-knob.pk-mini { width: 27px; height: 27px; }
+.pk-knob.pk-mini .pk-ptr { height: 8px; top: 2px; transform-origin: 50% 11.5px; }
+.pk-kwrap label { font-size: 8.5px; letter-spacing: .12em; color: var(--pk-ink-dim); text-transform: uppercase; }
+.pk-kwrap .pk-val { font-size: 9px; color: var(--pk-audio); min-height: 11px; font-weight: 500; }
+
+.pk-jacks { display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap; justify-content: center; }
+.pk-jwrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pk-jwrap.pk-out { padding: 2px 4px 3px; border: 1px solid #2c322e; border-radius: 5px; }
+.pk-jwrap label { font-size: 8.5px; letter-spacing: .1em; color: var(--pk-ink-dim); text-transform: uppercase; }
+.pk-jwrap.pk-out label { color: var(--pk-ink); }
+.pk-jack {
+  width: 28px; height: 28px; border-radius: 50%; cursor: crosshair; position: relative;
+  background: radial-gradient(circle at 50% 50%, #000 0 34%, #454b46 36% 52%, rgba(35,39,36,0.26) 54% 66%, #101312 70%);
+  box-shadow: 0 0 0 1.5px #060807, 0 1px 0 rgba(255,255,255,.07);
+  touch-action: none;
+}
+.pk-jack.pk-lit-audio { box-shadow: 0 0 0 1.5px #060807, 0 0 9px rgba(0,255,65,.55); }
+.pk-jack.pk-lit-cv { box-shadow: 0 0 0 1.5px #060807, 0 0 9px rgba(255,179,0,.55); }
+.pk-jack.pk-probed { box-shadow: 0 0 0 2.5px var(--pk-ink), 0 0 12px rgba(232,228,216,.7); }
+.pk-rack.pk-dragging .pk-jack:not(.pk-target):not(.pk-drag-src) { opacity: .3; }
+.pk-rack.pk-dragging .pk-knob { opacity: .5; }
+.pk-jack.pk-target { animation: pk-pulse .8s ease-in-out infinite; }
+@keyframes pk-pulse {
+  0%, 100% { box-shadow: 0 0 0 1.5px #060807, 0 0 6px rgba(232,228,216,.35); }
+  50% { box-shadow: 0 0 0 1.5px #060807, 0 0 16px rgba(232,228,216,.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pk-jack.pk-target { animation: none; box-shadow: 0 0 0 1.5px #060807, 0 0 14px rgba(232,228,216,.8); }
+}
+
+.pk-led { width: 6px; height: 6px; border-radius: 50%; background: #241512; }
+.pk-led.pk-on-green { background: var(--pk-audio); box-shadow: 0 0 6px var(--pk-audio); }
+.pk-led.pk-on-amber { background: var(--pk-cv); box-shadow: 0 0 6px var(--pk-cv); }
+
+.pk-waves { display: flex; gap: 4px; }
+#pk-cables { position: absolute; inset: 0; pointer-events: none; z-index: 5; }

@@ -542,7 +542,7 @@ export class PresetManager {
 
       if (!sg.active && e.actx) {
         sg.init(e.actx);
-        sg.start(e.analyserL, e.analyserR);
+        sg.start(e.visBusL, e.visBusR);
         const btnStart = document.getElementById('btn-gen-start');
         const btnStop  = document.getElementById('btn-gen-stop');
         if (btnStart) { btnStart.disabled = true; btnStart.classList.remove('accent'); }
@@ -572,4 +572,4 @@ export class PresetManager {
     this._saveSlots();
   }
 }
-
+

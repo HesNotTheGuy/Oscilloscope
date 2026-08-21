@@ -38,6 +38,14 @@ export class AudioEngine {
     };
     this.analyserL = mkA();
     this.analyserR = mkA();
+
+    // Visual buses: every source feeds these, and they normally pass straight
+    // through to the analysers. PATCH mode re-routes them through the rack so
+    // the whole visualiser stack shows the processed signal.
+    this.visBusL = this.actx.createGain();
+    this.visBusR = this.actx.createGain();
+    this.visBusL.connect(this.analyserL);
+    this.visBusR.connect(this.analyserR);
   }
 
   _connect(node, channels = 1) {
@@ -45,11 +53,11 @@ export class AudioEngine {
     if (channels >= 2) {
       const split = this.actx.createChannelSplitter(2);
       node.connect(split);
-      split.connect(this.analyserL, 0);
-      split.connect(this.analyserR, 1);
+      split.connect(this.visBusL, 0);
+      split.connect(this.visBusR, 1);
     } else {
-      node.connect(this.analyserL);
-      node.connect(this.analyserR);
+      node.connect(this.visBusL);
+      node.connect(this.visBusR);
     }
   }
 
@@ -131,8 +139,8 @@ export class AudioEngine {
     // Connect to analysers (stereo split, same pattern as _connect's 2-channel branch).
     const split = this.actx.createChannelSplitter(2);
     this._sysGain.connect(split);
-    split.connect(this.analyserL, 0);
-    split.connect(this.analyserR, 1);
+    split.connect(this.visBusL, 0);
+    split.connect(this.visBusR, 1);
 
     // Also tap into recording destination if it already exists.
     if (this._recDest) this._sysGain.connect(this._recDest);
@@ -195,8 +203,8 @@ export class AudioEngine {
 
     // Connect everything to analysers only (silent — no audio output)
     for (const n of [fund.g, h2.g, h3.g, h5.g, noiseGn]) {
-      n.connect(this.analyserL);
-      n.connect(this.analyserR);
+      n.connect(this.visBusL);
+      n.connect(this.visBusR);
     }
 
     [fund.osc, h2.osc, h3.osc, h5.osc, lfo, noise].forEach(n => n.start());

@@ -126,7 +126,7 @@ export class KeyboardSynth {
     // synth was the only audible caller, so restoring with audio
     // would leak speakers-on into the user's prior configuration.
     if (this._savedSigGenActive) {
-      this.sigGen.start(this.engine.analyserL, this.engine.analyserR);
+      this.sigGen.start(this.engine.visBusL, this.engine.visBusR);
     }
 
     // Restore scope mode
@@ -287,8 +287,8 @@ export class KeyboardSynth {
 
     oscL.connect(gainL);
     oscR.connect(gainR);
-    gainL.connect(this.engine.analyserL);
-    gainR.connect(this.engine.analyserR);
+    gainL.connect(this.engine.visBusL);
+    gainR.connect(this.engine.visBusR);
     if (this.engine.gainNode) {
       gainL.connect(this.engine.gainNode);
       gainR.connect(this.engine.gainNode);
