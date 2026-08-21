@@ -22,13 +22,16 @@ import { BeatDetector } from '../beat-detector.js';
 const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35, 'fold.cv': 3 };
 
 const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing', 'tracer.out': 'riding', 'pulse.out': 'punching',
-  'drift.out': 'drifting', 'sweep.out': 'sweeping', 'memory.out': 'looping', 'strange.x': 'entangling', 'strange.y': 'entangling' };
+  'drift.out': 'drifting', 'sweep.out': 'sweeping', 'memory.out': 'looping', 'strange.x': 'entangling', 'strange.y': 'entangling',
+  'orbit.x': 'circling', 'orbit.y': 'circling',
+  'divide.d2': 'clocking', 'divide.d4': 'clocking', 'divide.d8': 'clocking', 'bounce.out': 'bouncing' };
 const DEST_PHRASE = {
   'vcf.cv': 'the filter', 'vco.fm': 'the pitch', 'out.cv': 'the volume',
   'echo.cv': 'the echo time', 'vcf.in': 'into the filter', 'out.in': 'the speakers',
   'mix.a': 'into the mixer', 'mix.b': 'into the mixer',
   'echo.in': 'into the echo', 'drive.in': 'into the drive',
   'tracer.in': 'the tracer', 'ghost.in': 'into the ghost', 'fold.in': 'into the fold', 'fold.cv': 'the fold',
+  'divide.in': 'the divider', 'bounce.trig': 'the bounce',
 };
 const JACK_NAME = {
   'input.out': 'the source', 'vco.out': 'the synth', 'lfo.out': 'the LFO',
@@ -37,6 +40,9 @@ const JACK_NAME = {
   'tracer.out': 'the tracer', 'pulse.out': 'the pulse', 'ghost.out': 'the ghost', 'fold.out': 'the fold',
   'drift.out': 'the drift', 'sweep.out': 'the sweep', 'memory.out': 'the memory',
   'strange.x': 'strange X', 'strange.y': 'strange Y',
+  'orbit.x': 'orbit X', 'orbit.y': 'orbit Y',
+  'divide.d2': 'the half-time', 'divide.d4': 'the quarter-time', 'divide.d8': 'the eighth-time',
+  'bounce.out': 'the bounce',
 };
 
 // Declarative module layout. knobs: [id, label, default]; jacks: [id, dir, kind, label]
@@ -103,6 +109,19 @@ const ROWS = [
       knobs: [['strange.speed', 'Speed', 0.5]],
       jacks: [['strange.x', 'out', 'cv', 'X'], ['strange.y', 'out', 'cv', 'Y']] },
   ],
+  [
+    { id: 'orbit', name: 'Orbit', sub: 'two waves, one circle', subDyn: 'orbit', w: 176,
+      knobs: [['orbit.rate', 'Rate', 0.45], ['orbit.phase', 'Phase', 0.5]],
+      jacks: [['orbit.x', 'out', 'cv', 'X'], ['orbit.y', 'out', 'cv', 'Y']] },
+    { id: 'divide', name: 'Divide', sub: 'slower copies of a beat', subDyn: 'divide', w: 196,
+      knobs: [],
+      jacks: [['divide.in', 'in', 'cv', '\u25b8 Trig'], ['divide.d2', 'out', 'cv', '\u00f72'],
+              ['divide.d4', 'out', 'cv', '\u00f74'], ['divide.d8', 'out', 'cv', '\u00f78']],
+      led: 'pk-led-div' },
+    { id: 'bounce', name: 'Bounce', sub: 'drop it, watch it settle', subDyn: 'bounce', w: 168,
+      knobs: [['bounce.decay', 'Bounce', 0.5]],
+      jacks: [['bounce.trig', 'in', 'cv', '\u25b8 Trig'], ['bounce.out', 'out', 'cv', 'Out']] },
+  ],
 ];
 
 // The patch book: named starting points, the software version of the patch
@@ -130,6 +149,10 @@ const RECIPES = {
   'mutation': {
     knobs: { 'vco.level': 0.6, 'memory.rate': 0.5, 'memory.lock': 0.7, 'vcf.cutoff': 0.5, 'vcf.res': 0.4 },
     cables: [['memory.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['sweep.out', 'vcf.cv'], ['vcf.out', 'out.in']] },
+  'bouncing': {
+    knobs: { 'vcf.cutoff': 0.5, 'vcf.res': 0.5, 'pulse.decay': 0.2, 'bounce.decay': 0.6, 'orbit.rate': 0.35, 'orbit.phase': 0.5 },
+    cables: [['input.out', 'vcf.in'], ['pulse.out', 'divide.in'], ['divide.d2', 'bounce.trig'],
+             ['bounce.out', 'vcf.cv'], ['orbit.x', 'echo.cv'], ['vcf.out', 'echo.in'], ['echo.out', 'out.in']] },
   'step melody': {
     knobs: { 'vco.level': 0.6, 'vco.freq': 0.5, 'seq.rate': 0.55, 'vcf.cutoff': 0.55, 'echo.time': 0.35, 'echo.fdbk': 0.4 },
     cables: [['seq.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['vcf.out', 'echo.in'],
@@ -258,6 +281,9 @@ export class PatchRack {
       case 'sweep.rise': case 'sweep.fall': return (0.05 * Math.pow(80, v)).toFixed(2) + ' s';
       case 'memory.rate': return (0.5 * Math.pow(32, v)).toFixed(1) + ' Hz';
       case 'strange.speed': return (0.2 * Math.pow(25, v)).toFixed(1) + 'x';
+      case 'orbit.rate': return (0.02 * Math.pow(100, v)).toFixed(2) + ' Hz';
+      case 'orbit.phase': return Math.round(v * 180) + '\u00b0';
+      case 'bounce.decay': return Math.round(v * 100) + '%';
       default:          return Math.round(v * 100) + '%';
     }
   }
@@ -363,6 +389,21 @@ export class PatchRack {
     a.memSrc = new ConstantSourceNode(actx, { offset: 0 });
     a.strangeX = new ConstantSourceNode(actx, { offset: 0 });
     a.strangeY = new ConstantSourceNode(actx, { offset: 0 });
+    a.orbitX = new ConstantSourceNode(actx, { offset: 0 });
+    a.orbitY = new ConstantSourceNode(actx, { offset: 0 });
+    // Trigger inputs: a gain node the cables land on, tapped by an analyser
+    // so the tick loop can watch for rising edges (gates driving gates).
+    a.divIn = new GainNode(actx, { gain: 1 });
+    a.divAn = actx.createAnalyser(); a.divAn.fftSize = 256;
+    a.divIn.connect(a.divAn);
+    a.div2 = new ConstantSourceNode(actx, { offset: 0 });
+    a.div4 = new ConstantSourceNode(actx, { offset: 0 });
+    a.div8 = new ConstantSourceNode(actx, { offset: 0 });
+    a.bounceIn = new GainNode(actx, { gain: 1 });
+    a.bounceAn = actx.createAnalyser(); a.bounceAn.fftSize = 256;
+    a.bounceIn.connect(a.bounceAn);
+    a.bounceSrc = new ConstantSourceNode(actx, { offset: 0 });
+    this._edgeBuf = new Float32Array(256);
     this._beat = new BeatDetector();
     a.master = new GainNode(actx, { gain: 0 });
     // limiter so feedback patches and hot drives can't blast the speakers
@@ -371,6 +412,7 @@ export class PatchRack {
     a.osc1.start(); a.osc2.start(); a.lfo.start(); a.seqSrc.start(); a.shSrc.start();
     a.pulseSrc.start(); a.ghostLfo.start();
     a.driftSrc.start(); a.sweepSrc.start(); a.memSrc.start(); a.strangeX.start(); a.strangeY.start();
+    a.orbitX.start(); a.orbitY.start(); a.div2.start(); a.div4.start(); a.div8.start(); a.bounceSrc.start();
 
     const tap = (id, node) => {
       const an = actx.createAnalyser();
@@ -396,12 +438,20 @@ export class PatchRack {
     tap('memory.out', a.memSrc);
     tap('strange.x', a.strangeX);
     tap('strange.y', a.strangeY);
+    tap('orbit.x', a.orbitX);
+    tap('orbit.y', a.orbitY);
+    tap('divide.d2', a.div2);
+    tap('divide.d4', a.div4);
+    tap('divide.d8', a.div8);
+    tap('bounce.out', a.bounceSrc);
     this.inTargets = {
       'vcf.in': a.filter, 'vcf.cv': a.filter.frequency,
       'vco.fm': [a.osc1.frequency, a.osc2.frequency],
       'mix.a': a.mixA, 'mix.b': a.mixB,
       'echo.in': a.echoIn, 'echo.cv': a.echoDelay.delayTime,
       'drive.in': a.drivePre,
+      'divide.in': a.divIn,
+      'bounce.trig': a.bounceIn,
       'tracer.in': a.tracerIn,
       'ghost.in': a.ghostIn,
       'fold.in': a.foldPre, 'fold.cv': a.foldPre.gain,
@@ -410,6 +460,7 @@ export class PatchRack {
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
     this._seqTick(); this._shTick();
     this._driftTick(); this._sweepTick(); this._memTick(); this._strangeTick();
+    this._orbitTick(); this._edgeTick();
 
     // Starter patch: whatever the app is playing, through a wobbling filter.
     this.connect('input.out', 'vcf.in');
@@ -511,6 +562,63 @@ export class PatchRack {
       this.audio.strangeY.offset.setTargetAtTime(Math.max(-1, Math.min(1, st.y / 25)), t, 0.02);
     }
     setTimeout(() => this._strangeTick(), 25);
+  }
+
+  // ORBIT: quadrature pair. PHASE morphs X/Y from a diagonal line (0\u00b0)
+  // through a circle (90\u00b0) to the opposite diagonal (180\u00b0) in XY mode.
+  _orbitTick() {
+    if (this.audio) {
+      const rate = 0.02 * Math.pow(100, this.knobs['orbit.rate'] ?? 0.45);
+      const ph = (this.knobs['orbit.phase'] ?? 0.5) * Math.PI;
+      this._orbitPhase = (this._orbitPhase || 0) + 2 * Math.PI * rate * 0.016;
+      const t = this.engine.actx.currentTime;
+      this.audio.orbitX.offset.setTargetAtTime(Math.sin(this._orbitPhase), t, 0.012);
+      this.audio.orbitY.offset.setTargetAtTime(Math.sin(this._orbitPhase + ph), t, 0.012);
+    }
+    setTimeout(() => this._orbitTick(), 16);
+  }
+
+  // Rising-edge watcher for the two trigger inputs. Hysteresis on 0.45 keeps
+  // a decaying envelope (PULSE, BOUNCE) from re-triggering on its own tail.
+  _edgeTick() {
+    if (this.audio) {
+      const a = this.audio, t = this.engine.actx.currentTime;
+      const peakOf = an => {
+        an.getFloatTimeDomainData(this._edgeBuf);
+        let p = 0;
+        for (let i = 0; i < this._edgeBuf.length; i += 4) p = Math.max(p, Math.abs(this._edgeBuf[i]));
+        return p;
+      };
+      // DIVIDE: binary counter -> gates at half, quarter, eighth speed
+      const dHigh = peakOf(a.divAn) > 0.45;
+      if (dHigh && !this._divHigh) {
+        this._divCount = ((this._divCount || 0) + 1) & 7;
+        const c = this._divCount;
+        a.div2.offset.setTargetAtTime(c & 1 ? 1 : 0, t, 0.004);
+        a.div4.offset.setTargetAtTime(c & 2 ? 1 : 0, t, 0.004);
+        a.div8.offset.setTargetAtTime(c & 4 ? 1 : 0, t, 0.004);
+        this._divLedUntil = performance.now() + 90;
+      }
+      this._divHigh = dHigh;
+      const led = this.overlay && this.overlay.querySelector('#pk-led-div');
+      if (led) led.className = 'pk-led' + (performance.now() < (this._divLedUntil || 0) ? ' pk-on-amber' : '');
+
+      // BOUNCE: one trigger -> a settling series of shorter, weaker hops
+      const bHigh = peakOf(a.bounceAn) > 0.45;
+      if (bHigh && !this._bounceHigh) {
+        const keep = 0.45 + 0.45 * (this.knobs['bounce.decay'] ?? 0.5);
+        const o = a.bounceSrc.offset;
+        o.cancelScheduledValues(t);
+        let when = t, amp = 1, gap = 0.26;
+        for (let i = 0; i < 7 && amp > 0.02; i++) {
+          o.setTargetAtTime(amp, when, 0.006);
+          o.setTargetAtTime(0, when + gap * 0.3, gap * 0.16);
+          when += gap; amp *= keep; gap *= 0.74;
+        }
+      }
+      this._bounceHigh = bHigh;
+    }
+    setTimeout(() => this._edgeTick(), 16);
   }
 
   // ── Patching ────────────────────────────────────────────────
@@ -621,7 +729,8 @@ export class PatchRack {
     }
     const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps',
       tracer: 'the music moves the knobs', pulse: 'fires on the beat',
-      drift: 'slow wander', sweep: 'rise & fall', memory: 'a melody that mutates', strange: 'chaos, but elegant' };
+      drift: 'slow wander', sweep: 'rise & fall', memory: 'a melody that mutates', strange: 'chaos, but elegant',
+      orbit: 'two waves, one circle', divide: 'slower copies of a beat', bounce: 'drop it, watch it settle' };
     const byModule = {};
     for (const outId in VERB) {
       const mod = outId.split('.')[0];

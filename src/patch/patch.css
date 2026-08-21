@@ -24,6 +24,10 @@
   width: 100%; max-width: 1100px; box-sizing: border-box;
   display: flex; align-items: center; gap: 18px;
   padding: 16px 24px 8px; flex-wrap: wrap;
+  /* The rack is taller than the viewport now — keep the mini scope, mode
+     toggle and patch book pinned instead of letting them scroll away. */
+  position: sticky; top: 0; z-index: 10;
+  background: var(--pk-room);
 }
 .pk-title { font-size: 17px; font-weight: 600; letter-spacing: .18em; }
 .pk-title em { font-style: normal; color: var(--pk-audio); }
