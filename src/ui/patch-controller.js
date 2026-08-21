@@ -31,6 +31,15 @@ export class PatchController {
       }
       return stream;
     };
+
+    // The app's volume control targets the dry master, which is out of the
+    // audible path while patched — forward it to the rack's Monitor so the
+    // volume knob never mysteriously stops working.
+    const origVol = this.engine.setVolume.bind(this.engine);
+    this.engine.setVolume = v => {
+      origVol(v);
+      if (this.rack && this.rack.enabled) this.rack.setKnob('out.monitor', Math.min(1, Math.max(0, v)));
+    };
   }
 
   async toggle() {
@@ -46,6 +55,9 @@ export class PatchController {
       this.btn.classList.remove('active');
     } else {
       this.rack.enable();
+      // entering patch mode keeps the current loudness
+      const g = this.engine.gainNode ? this.engine.gainNode.gain.value : 0.8;
+      this.rack.setKnob('out.monitor', Math.min(1, Math.max(0, g)));
       this.btn.classList.add('active');
     }
   }

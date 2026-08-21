@@ -121,13 +121,15 @@ export class PatchRack {
       <div class="pk-top">
         <div class="pk-title">PATCH<em> MODE</em></div>
         <button class="pk-btn pk-active" id="pk-mode">PATCHING</button>
-        <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it on the scope &middot; click a cable to unplug</div>
+        <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
+        <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
         <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
       </div>
       <div class="pk-legend">
         <span><span class="pk-swatch pk-sw-audio"></span>sound</span>
         <span><span class="pk-swatch pk-sw-cv"></span>modulation (moves a knob for you)</span>
         <span>signal flows out → in &mdash; follow the moving dot</span>
+        <span class="pk-warn" id="pk-warn">live input is audible through the patch &mdash; headphones recommended</span>
       </div>
       <div class="pk-rack" id="pk-rack"><canvas id="pk-cables"></canvas></div>`;
     document.body.appendChild(el);
@@ -136,6 +138,8 @@ export class PatchRack {
     this.cablesCv = el.querySelector('#pk-cables');
     this.cctx = this.cablesCv.getContext('2d');
     this.hintEl = el.querySelector('#pk-hint');
+    this.miniCv = el.querySelector('#pk-mini');
+    this.miniCtx = this.miniCv.getContext('2d');
     this._hintIdle = this.hintEl.innerHTML;
     this._hintLocked = 'cables locked &mdash; drag knobs, click jacks to probe';
 
@@ -433,6 +437,24 @@ export class PatchRack {
     this._refreshJacks();
   }
 
+  _snapshot() { return this.cables.map(c => ({ from: c.from, to: c.to })); }
+  _pushUndo() {
+    this._undo = this._undo || [];
+    this._undo.push(this._snapshot());
+    if (this._undo.length > 50) this._undo.shift();
+  }
+  undo() {
+    if (!this._undo || !this._undo.length) return;
+    const snap = this._undo.pop();
+    while (this.cables.length) this.removeCable(0);
+    for (const c of snap) this.connect(c.from, c.to);
+  }
+  _flashHint(msg) {
+    this.hintEl.textContent = msg;
+    clearTimeout(this._hintTimer);
+    this._hintTimer = setTimeout(() => { this.hintEl.innerHTML = this.playMode ? this._hintLocked : this._hintIdle; }, 2500);
+  }
+
   _refreshJacks() {
     for (const id in this.jackEls) {
       const c = this.cables.find(cb => cb.from === id || cb.to === id);
@@ -536,9 +558,13 @@ export class PatchRack {
       this.setKnob(id, parseFloat(k.dataset.v));
       k.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
-        k.setPointerCapture(e.pointerId);
+        // double-press resets to default (native dblclick is suppressed by preventDefault)
+        const now = performance.now();
+        if (now - (k._lastDown || 0) < 350) { k._lastDown = 0; this.setKnob(id, parseFloat(k.dataset.v)); return; }
+        k._lastDown = now;
+        try { k.setPointerCapture(e.pointerId); } catch (_) {}
         const y0 = e.clientY, v0 = this.knobs[id];
-        const move = ev => this.setKnob(id, v0 + (y0 - ev.clientY) / 150);
+        const move = ev => this.setKnob(id, v0 + (y0 - ev.clientY) / (ev.shiftKey ? 1500 : 150));
         const up = () => { k.removeEventListener('pointermove', move); k.removeEventListener('pointerup', up); this._lastDragEnd = performance.now(); };
         k.addEventListener('pointermove', move); k.addEventListener('pointerup', up);
       });
@@ -563,11 +589,19 @@ export class PatchRack {
       modeBtn.textContent = this.playMode ? 'PLAYING' : 'PATCHING';
       modeBtn.classList.toggle('pk-active', !this.playMode);
       this.hintEl.innerHTML = this.playMode ? this._hintLocked : this._hintIdle;
+      // performance view declutters itself: dim the whole cable layer
+      // (CSS opacity composites once — per-stroke alpha stacks back up)
+      this.cablesCv.style.opacity = this.playMode ? '0.4' : '1';
       if (this._drag) this._endDrag();
     });
     this.overlay.querySelector('#pk-close').addEventListener('click', () => this.onClose && this.onClose());
     document.addEventListener('keydown', e => {
-      if (this.enabled && e.key === 'Escape') { e.stopPropagation(); this.onClose && this.onClose(); }
+      if (!this.enabled) return;
+      if (e.key === 'Escape') { e.stopPropagation(); this.onClose && this.onClose(); }
+      else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault(); e.stopPropagation();
+        this.undo(); this._flashHint('undone');
+      }
     }, true);
 
     // jack drags (grab anywhere on the port)
@@ -609,6 +643,7 @@ export class PatchRack {
         if (d < bestD) { bestD = d; best = id; }
       }
       if (best) {
+        this._pushUndo();
         const from = srcDir === 'out' ? this._drag.fromId : best;
         const to = srcDir === 'out' ? best : this._drag.fromId;
         this.connect(from, to);
@@ -627,7 +662,7 @@ export class PatchRack {
       if (!this.enabled || this.playMode) return;
       if (performance.now() - this._lastDragEnd < 400) return;   // ignore the click a drag leaves behind
       const i = this._hitCable(rackPt(e));
-      if (i >= 0) this.removeCable(i);
+      if (i >= 0) { this._pushUndo(); this.removeCable(i); this._flashHint('unplugged \u2014 Ctrl+Z to undo'); }
     });
     addEventListener('resize', () => { if (this.enabled) this._layout(); });
   }
@@ -702,7 +737,10 @@ export class PatchRack {
     }
     cctx.shadowColor = 'rgb(' + col + ')'; cctx.shadowBlur = hovered ? 14 : 9;
     cctx.strokeStyle = 'rgba(' + col + ',' + (hovered ? 1 : 0.9) + ')';
-    cctx.lineWidth = hovered ? 2.8 : 1.6; cctx.stroke();
+    cctx.lineWidth = hovered ? 2.8 : 1.6;
+    if (kind === 'cv') cctx.setLineDash([7, 5]);          // modulation reads as dashed, not just amber
+    cctx.stroke();
+    cctx.setLineDash([]);
     cctx.shadowBlur = 0;
     if (idx >= 0) {                                      // direction dot: out -> in
       const tp = this._reducedMotion ? 0.6 : ((performance.now() / 1600) + idx * 0.37) % 1;
@@ -720,6 +758,34 @@ export class PatchRack {
     }
   }
 
+  _drawMini() {
+    if (!this.miniCtx || !this.engine.analyserL) return;
+    const mc = this.miniCtx, W = this.miniCv.width, H = this.miniCv.height;
+    mc.setTransform(1, 0, 0, 1, 0, 0);
+    mc.fillStyle = '#020604'; mc.fillRect(0, 0, W, H);
+    mc.strokeStyle = 'rgba(0,255,65,0.10)'; mc.lineWidth = 1;
+    mc.beginPath();
+    for (let i = 1; i < 8; i++) { mc.moveTo(i * W / 8, 0); mc.lineTo(i * W / 8, H); }
+    mc.moveTo(0, H / 2); mc.lineTo(W, H / 2);
+    mc.stroke();
+    const buf = this.engine.getDataL();
+    const isCv = this.probeId && this.jackEls[this.probeId] && this.jackEls[this.probeId].dataset.kind === 'cv';
+    const col = isCv ? '#ffb300' : '#00ff41';
+    const span = 2048;
+    let start = 0;
+    for (let i = 1; i < span; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { start = i; break; }
+    mc.strokeStyle = col; mc.lineWidth = 2; mc.shadowColor = col; mc.shadowBlur = 6;
+    mc.beginPath();
+    for (let x = 0; x < W; x++) {
+      const v = buf[start + Math.floor(x / W * span)] || 0;
+      const y = H / 2 - v * H * 0.44;
+      x ? mc.lineTo(x, y) : mc.moveTo(x, y);
+    }
+    mc.stroke(); mc.shadowBlur = 0;
+    mc.fillStyle = col; mc.font = '600 15px "IBM Plex Mono", monospace';
+    mc.fillText(this.probeId ? 'PROBE ' + this.probeId : 'OUT', 8, 18);
+  }
+
   _startLoop() {
     this._reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = () => {
@@ -732,6 +798,12 @@ export class PatchRack {
         this.cctx.globalAlpha = 0.6;
         this._drawCable(from, { x: this._drag.x, y: this._drag.y }, this.jackEls[this._drag.fromId].dataset.kind, null, -1, false);
         this.cctx.globalAlpha = 1;
+      }
+      this._drawMini();
+      if (!this._warnNext || performance.now() > this._warnNext) {   // time-based: frame rate varies
+        this._warnNext = performance.now() + 800;
+        const w = this.overlay.querySelector('#pk-warn');
+        if (w) w.classList.toggle('pk-show', !!(this.engine.micStream || this.engine.sysAudioActive));
       }
       const led = this.overlay.querySelector('#pk-led-input');
       if (led && this.taps['input.out']) {

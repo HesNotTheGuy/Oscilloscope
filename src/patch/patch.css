@@ -117,3 +117,9 @@
 
 .pk-waves { display: flex; gap: 4px; }
 #pk-cables { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.pk-mini {
+  border: 2px solid #060807; background: #020604; border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0,255,65,.12) inset; flex: 0 0 auto;
+}
+.pk-warn { display: none; color: var(--pk-cv); font-size: 9.5px; letter-spacing: .05em; }
+.pk-warn.pk-show { display: inline; }
