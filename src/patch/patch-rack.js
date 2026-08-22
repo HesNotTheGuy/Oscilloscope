@@ -32,6 +32,7 @@ const DEST_PHRASE = {
   'echo.in': 'into the echo', 'drive.in': 'into the drive',
   'tracer.in': 'the tracer', 'ghost.in': 'into the ghost', 'fold.in': 'into the fold', 'fold.cv': 'the fold',
   'divide.in': 'the divider', 'bounce.trig': 'the bounce',
+  'vector.x': 'the scope\u2019s X', 'vector.y': 'the scope\u2019s Y',
 };
 const JACK_NAME = {
   'input.out': 'the source', 'vco.out': 'the synth', 'lfo.out': 'the LFO',
@@ -121,6 +122,9 @@ const ROWS = [
     { id: 'bounce', name: 'Bounce', sub: 'drop it, watch it settle', subDyn: 'bounce', w: 168,
       knobs: [['bounce.decay', 'Bounce', 0.5]],
       jacks: [['bounce.trig', 'in', 'cv', '\u25b8 Trig'], ['bounce.out', 'out', 'cv', 'Out']] },
+    { id: 'vector', name: 'Vector', sub: 'draws on the XY scope', w: 176,
+      knobs: [['vector.gain', 'Gain', 0.5]],
+      jacks: [['vector.x', 'in', 'cv', '\u25b8 X'], ['vector.y', 'in', 'cv', '\u25b8 Y']] },
   ],
 ];
 
@@ -149,6 +153,10 @@ const RECIPES = {
   'mutation': {
     knobs: { 'vco.level': 0.6, 'memory.rate': 0.5, 'memory.lock': 0.7, 'vcf.cutoff': 0.5, 'vcf.res': 0.4 },
     cables: [['memory.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['sweep.out', 'vcf.cv'], ['vcf.out', 'out.in']] },
+  'lissajous': {
+    knobs: { 'orbit.rate': 0.5, 'orbit.phase': 0.5, 'vector.gain': 0.5, 'vcf.cutoff': 0.6 },
+    cables: [['input.out', 'vcf.in'], ['vcf.out', 'out.in'],
+             ['orbit.x', 'vector.x'], ['orbit.y', 'vector.y']] },
   'bouncing': {
     knobs: { 'vcf.cutoff': 0.5, 'vcf.res': 0.5, 'pulse.decay': 0.2, 'bounce.decay': 0.6, 'orbit.rate': 0.35, 'orbit.phase': 0.5 },
     cables: [['input.out', 'vcf.in'], ['pulse.out', 'divide.in'], ['divide.d2', 'bounce.trig'],
@@ -284,6 +292,7 @@ export class PatchRack {
       case 'orbit.rate': return (0.02 * Math.pow(100, v)).toFixed(2) + ' Hz';
       case 'orbit.phase': return Math.round(v * 180) + '\u00b0';
       case 'bounce.decay': return Math.round(v * 100) + '%';
+      case 'vector.gain': return (0.25 + v * 1.75).toFixed(2) + 'x';
       default:          return Math.round(v * 100) + '%';
     }
   }
@@ -316,6 +325,10 @@ export class PatchRack {
         a.drivePre.gain.setTargetAtTime(1 + v * 39, t, .02);
         a.drivePost.gain.setTargetAtTime(0.9 / (1 + v * 2.5), t, .02); break;
       case 'out.monitor': a.master.gain.setTargetAtTime(v * v, t, .02); break;
+      case 'vector.gain': {
+        const g = 0.25 + v * 1.75;
+        a.vecL.gain.setTargetAtTime(g, t, .02); a.vecR.gain.setTargetAtTime(g, t, .02); break;
+      }
       case 'tracer.speed': a.tracerLP.frequency.setTargetAtTime(2 * Math.pow(25, v), t, .02); break;
       case 'tracer.gain': a.tracerGain.gain.setTargetAtTime(1 + v * 3, t, .02); break;
       case 'ghost.rate': a.ghostLfo.frequency.setTargetAtTime(0.1 * Math.pow(40, v), t, .02); break;
@@ -404,6 +417,12 @@ export class PatchRack {
     a.bounceIn.connect(a.bounceAn);
     a.bounceSrc = new ConstantSourceNode(actx, { offset: 0 });
     this._edgeBuf = new Float32Array(256);
+    // VECTOR: feeds the app's left/right analysers directly so the XY /
+    // vectorscope mode can draw two independent signals. Deliberately NOT
+    // routed to the limiter — CV here is sub-audio and must never reach
+    // the speakers as DC.
+    a.vecL = new GainNode(actx, { gain: 1 });
+    a.vecR = new GainNode(actx, { gain: 1 });
     this._beat = new BeatDetector();
     a.master = new GainNode(actx, { gain: 0 });
     // limiter so feedback patches and hot drives can't blast the speakers
@@ -452,6 +471,8 @@ export class PatchRack {
       'drive.in': a.drivePre,
       'divide.in': a.divIn,
       'bounce.trig': a.bounceIn,
+      'vector.x': a.vecL,
+      'vector.y': a.vecR,
       'tracer.in': a.tracerIn,
       'ghost.in': a.ghostIn,
       'fold.in': a.foldPre, 'fold.cv': a.foldPre.gain,
@@ -744,9 +765,41 @@ export class PatchRack {
       if (d.length) { el.textContent = byModule[mod].verb + ' ' + d.join(' + '); el.classList.add('pk-live'); }
       else { el.textContent = DEFAULTS[mod]; el.classList.remove('pk-live'); }
     }
+    this._refreshAnalyserFeed();          // vector patching changes the feed
   }
 
   // ── Probing: the app's visualisers show the probed point ────
+  // What SHOULD be feeding the app's analysers right now. Precedence:
+  // an active probe wins; otherwise a patched VECTOR input drives that
+  // channel; otherwise both channels hear the patch master.
+  _desiredFeed() {
+    if (!this.enabled || !this.audio) return { L: null, R: null };
+    const a = this.audio;
+    if (this.probeId && this.taps[this.probeId]) {
+      const n = this.taps[this.probeId].node;
+      return { L: n, R: n };
+    }
+    return {
+      L: this.cables.some(c => c.to === 'vector.x') ? a.vecL : a.master,
+      R: this.cables.some(c => c.to === 'vector.y') ? a.vecR : a.master,
+    };
+  }
+  // Reconcile actual wiring with _desiredFeed(). One place, so probe,
+  // vector patching, enable and disable can't disagree about the routing.
+  _refreshAnalyserFeed() {
+    const e = this.engine, want = this._desiredFeed();
+    if (this._feedL !== want.L) {
+      if (this._feedL) { try { this._feedL.disconnect(e.analyserL); } catch (_) {} }
+      if (want.L) want.L.connect(e.analyserL);
+      this._feedL = want.L;
+    }
+    if (this._feedR !== want.R) {
+      if (this._feedR) { try { this._feedR.disconnect(e.analyserR); } catch (_) {} }
+      if (want.R) want.R.connect(e.analyserR);
+      this._feedR = want.R;
+    }
+  }
+
   toggleProbe(id) {
     let target = id;
     if (this.jackEls[id].dataset.dir === 'in') {
@@ -754,18 +807,7 @@ export class PatchRack {
       target = c ? c.from : null;
     }
     if (!target || !this.taps[target]) return;
-    const e = this.engine, a = this.audio;
-    // restore the previous feed
-    if (this.probeId) { try { this.taps[this.probeId].node.disconnect(e.analyserL); } catch (_) {} try { this.taps[this.probeId].node.disconnect(e.analyserR); } catch (_) {} }
-    else if (this.enabled) { try { a.master.disconnect(e.analyserL); } catch (_) {} try { a.master.disconnect(e.analyserR); } catch (_) {} }
     this.probeId = this.probeId === target ? null : target;
-    if (this.probeId) {
-      this.taps[this.probeId].node.connect(e.analyserL);
-      this.taps[this.probeId].node.connect(e.analyserR);
-    } else if (this.enabled) {
-      a.master.connect(e.analyserL);
-      a.master.connect(e.analyserR);
-    }
     this._refreshJacks();
     const sub = this.overlay.querySelector('[data-pk-sub-input]');
     if (sub) {
@@ -786,8 +828,6 @@ export class PatchRack {
     try { e.visBusR.disconnect(e.analyserR); } catch (_) {}
     e.visBusL.connect(a.inputGain);
     e.visBusR.connect(a.inputGain);
-    a.master.connect(e.analyserL);
-    a.master.connect(e.analyserR);
     // audible path: master gain no longer feeds the speakers directly
     try { e.gainNode.disconnect(e.actx.destination); } catch (_) {}
     a.limiter.connect(e.actx.destination);
@@ -797,6 +837,7 @@ export class PatchRack {
       a.limiter.connect(e._recDest);
     }
     this.enabled = true;
+    this._refreshAnalyserFeed();
     this.overlay.classList.remove('pk-hidden');
     this._layout();
     this._startLoop();
@@ -805,11 +846,11 @@ export class PatchRack {
   disable() {
     if (!this.enabled) return;
     const e = this.engine, a = this.audio;
-    if (this.probeId) this.toggleProbe(this.probeId);   // release the probe first
+    this.probeId = null;
+    this.enabled = false;
+    this._refreshAnalyserFeed();                        // detaches both channels
     try { e.visBusL.disconnect(a.inputGain); } catch (_) {}
     try { e.visBusR.disconnect(a.inputGain); } catch (_) {}
-    try { a.master.disconnect(e.analyserL); } catch (_) {}
-    try { a.master.disconnect(e.analyserR); } catch (_) {}
     try { a.limiter.disconnect(e.actx.destination); } catch (_) {}
     if (e._recDest) {
       try { a.limiter.disconnect(e._recDest); } catch (_) {}
@@ -818,7 +859,6 @@ export class PatchRack {
     e.visBusL.connect(e.analyserL);
     e.visBusR.connect(e.analyserR);
     e.gainNode.connect(e.actx.destination);
-    this.enabled = false;
     this.overlay.classList.add('pk-hidden');
     this._stopLoop();
   }
