@@ -151,6 +151,20 @@ const ROWS = [
   ],
 ];
 
+// Every knob in the rack, derived from ROWS. Exported so MIDI targets can be
+// registered at startup — a saved CC binding has to resolve even if the user
+// hasn't opened PATCH mode yet this session.
+export function patchKnobIds() {
+  const out = [];
+  for (const row of ROWS) {
+    for (const m of row) {
+      for (const [id, label] of m.knobs) out.push({ id, label, module: m.name });
+      if (m.seq) for (let i = 0; i < 8; i++) out.push({ id: 'seq.s' + i, label: 'Step ' + (i + 1), module: m.name });
+    }
+  }
+  return out;
+}
+
 // The patch book: named starting points, the software version of the patch
 // recipe cards semi-modular makers ship. Every recipe assumes the app is
 // already playing something (the INPUT module carries it).
@@ -204,8 +218,10 @@ const RECIPES = {
 const STORE_KEY = 'dso1.patches';
 
 export class PatchRack {
-  constructor(engine) {
+  constructor(engine, inputMap = null) {
     this.engine = engine;
+    this.inputMap = inputMap;
+    this._learningKnob = null;
     this.enabled = false;
     this.playMode = false;
     this.probeId = null;
@@ -1012,7 +1028,14 @@ export class PatchRack {
         k.addEventListener('pointermove', move); k.addEventListener('pointerup', up);
       });
       k.addEventListener('wheel', e => { e.preventDefault(); this.setKnob(id, this.knobs[id] - Math.sign(e.deltaY) * .03); }, { passive: false });
+      // Right-click = MIDI learn, the way hardware-oriented software does it,
+      // instead of hunting for the knob's name in a 40-item dropdown.
+      k.addEventListener('contextmenu', e => {
+        e.preventDefault(); e.stopPropagation();
+        this._midiLearn(id, k);
+      });
     });
+    this._refreshMidiBadges();
 
     // LFO wave selector
     this.overlay.querySelectorAll('[data-pk-wave]').forEach(b => {
@@ -1064,7 +1087,11 @@ export class PatchRack {
     this.overlay.querySelector('#pk-close').addEventListener('click', () => this.onClose && this.onClose());
     document.addEventListener('keydown', e => {
       if (!this.enabled) return;
-      if (e.key === 'Escape') { e.stopPropagation(); this.onClose && this.onClose(); }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        if (this._learningKnob) { this._cancelLearn(); this._flashHint('learn cancelled'); return; }
+        this.onClose && this.onClose();
+      }
       else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault(); e.stopPropagation();
         this.undo(); this._flashHint('undone');
@@ -1132,6 +1159,55 @@ export class PatchRack {
       if (i >= 0) { this._pushUndo(); this.removeCable(i); this._flashHint('unplugged \u2014 Ctrl+Z to undo'); }
     });
     addEventListener('resize', () => { if (this.enabled) this._layout(); });
+  }
+
+  // ── MIDI learn ──────────────────────────────────────────────
+  _midiLearn(id, knobEl) {
+    const mapper = this.inputMap;
+    if (!mapper || !mapper.enableMidi) { this._flashHint('MIDI is not available'); return; }
+    if (this._learningKnob) this._cancelLearn();
+    this._learningKnob = { id, el: knobEl };
+    knobEl.classList.add('pk-learning');
+    this._flashHint('move a knob on your controller \u2014 Esc cancels');
+    mapper.enableMidi().then(ok => {
+      if (ok === false) { this._cancelLearn(); this._flashHint('no MIDI device found'); return; }
+      if (!this._learningKnob) return;                 // cancelled while waiting
+      mapper.startMidiLearn(({ channel, cc }) => {
+        if (!this._learningKnob) return;
+        mapper.bindMidi(channel, cc, { type: 'continuous', target: 'patch.' + id });
+        this._cancelLearn();
+        this._refreshMidiBadges();
+        this._flashHint('bound CC ' + cc + ' \u2192 ' + id);
+      });
+    }).catch(() => { this._cancelLearn(); this._flashHint('MIDI unavailable'); });
+  }
+
+  _cancelLearn() {
+    if (this._learningKnob) this._learningKnob.el.classList.remove('pk-learning');
+    this._learningKnob = null;
+    if (this.inputMap && this.inputMap.startMidiLearn) this.inputMap.startMidiLearn(null);
+  }
+
+  // Show which hardware CC drives each knob, so a board stays readable.
+  _refreshMidiBadges() {
+    if (!this.inputMap || !this.inputMap.getMidiBindings) return;
+    const binds = this.inputMap.getMidiBindings() || {};
+    const byTarget = {};
+    for (const key in binds) {
+      const a = binds[key];
+      if (a && a.type === 'continuous' && typeof a.target === 'string' && a.target.startsWith('patch.')) {
+        byTarget[a.target.slice(6)] = key.split(':')[1];
+      }
+    }
+    this.overlay.querySelectorAll('[data-pk-knob]').forEach(k => {
+      const cc = byTarget[k.dataset.pkKnob];
+      k.classList.toggle('pk-bound', !!cc);
+      let b = k.querySelector('.pk-cc');
+      if (cc) {
+        if (!b) { b = document.createElement('span'); b.className = 'pk-cc'; k.appendChild(b); }
+        b.textContent = 'CC' + cc;
+      } else if (b) { b.remove(); }
+    });
   }
 
   _endDrag() {

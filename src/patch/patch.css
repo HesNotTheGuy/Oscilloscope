@@ -87,6 +87,12 @@
 }
 .pk-knob.pk-mini { width: 27px; height: 27px; }
 .pk-knob.pk-mini .pk-ptr { height: 8px; top: 2px; transform-origin: 50% 11.5px; }
+.pk-knob.pk-learning { animation: pk-pulse .7s ease-in-out infinite; }
+.pk-knob.pk-bound { box-shadow: 0 0 0 2px var(--pk-cv), 0 2px 5px rgba(0,0,0,.6); }
+.pk-cc {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: -11px;
+  font-size: 7.5px; letter-spacing: .04em; color: var(--pk-cv); pointer-events: none;
+}
 .pk-kwrap label { font-size: 8.5px; letter-spacing: .12em; color: var(--pk-ink-dim); text-transform: uppercase; }
 .pk-kwrap .pk-val { font-size: 9px; color: var(--pk-audio); min-height: 11px; font-weight: 500; }
 

@@ -1,6 +1,6 @@
 'use strict';
 
-import { PatchRack } from '../patch/patch-rack.js';
+import { PatchRack, patchKnobIds } from '../patch/patch-rack.js';
 
 // ─────────────────────────────────────────────────────────────
 //  PatchController — owns the PATCH button and the rack overlay.
@@ -11,6 +11,7 @@ export class PatchController {
   constructor(ctx) {
     this.engine = ctx.engine;
     this.ensureAudio = ctx.ensureAudio;
+    this.inputMap = ctx.inputMap || null;
     this.rack = null;
   }
 
@@ -18,6 +19,18 @@ export class PatchController {
     this.btn = document.getElementById('btn-patch');
     if (!this.btn) return;
     this.btn.addEventListener('click', () => this.toggle());
+
+    // Register every rack knob as a MIDI target up front. Bindings are saved
+    // to localStorage by the mapper, so a CC learned last session must still
+    // resolve at startup — before the rack has ever been built.
+    if (this.inputMap && this.inputMap.registerContinuous) {
+      for (const k of patchKnobIds()) {
+        this.inputMap.registerContinuous('patch.' + k.id, {
+          min: 0, max: 1,
+          apply: v => { if (this.rack) this.rack.setKnob(k.id, v); },
+        });
+      }
+    }
 
     // Recording started while patched must capture the processed signal:
     // _recDest is lazily created and wired to the dry master by default.
@@ -45,7 +58,7 @@ export class PatchController {
   async toggle() {
     await this.ensureAudio();
     if (!this.rack) {
-      this.rack = new PatchRack(this.engine);
+      this.rack = new PatchRack(this.engine, this.inputMap);
       this.rack.onClose = () => this.toggle();
       // Debug hook for automated verification (same shape as the prototype's).
       window._patchRack = this.rack;
