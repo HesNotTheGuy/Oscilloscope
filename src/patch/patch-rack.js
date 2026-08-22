@@ -1,6 +1,7 @@
 'use strict';
 
 import { BeatDetector } from '../beat-detector.js';
+import { LightsBridge } from './lights-bridge.js';
 
 // ─────────────────────────────────────────────────────────────
 //  PatchRack — modular patch bay inserted between the engine's
@@ -34,6 +35,7 @@ const DEST_PHRASE = {
   'echo.in': 'into the echo', 'drive.in': 'into the drive',
   'tracer.in': 'the tracer', 'ghost.in': 'into the ghost', 'fold.in': 'into the fold', 'fold.cv': 'the fold',
   'divide.in': 'the divider', 'bounce.trig': 'the bounce',
+  'lights.c1': 'light 1', 'lights.c2': 'light 2', 'lights.c3': 'light 3', 'lights.c4': 'light 4',
   'vector.x': 'the scope\u2019s X', 'vector.y': 'the scope\u2019s Y',
   'env.trig': 'the envelope', 'vcaa.cv': 'voice A', 'vcab.cv': 'voice B',
   'vcaa.in': 'into voice A', 'vcab.in': 'into voice B',
@@ -128,6 +130,11 @@ const ROWS = [
     { id: 'bounce', name: 'Bounce', sub: 'drop it, watch it settle', subDyn: 'bounce', w: 168,
       knobs: [['bounce.decay', 'Bounce', 0.5]],
       jacks: [['bounce.trig', 'in', 'cv', '\u25b8 Trig'], ['bounce.out', 'out', 'cv', 'Out']] },
+    { id: 'lights', name: 'Lights', sub: 'patch your stage rig', w: 210,
+      knobs: [['lights.dim', 'Master', 0.8]],
+      jacks: [['lights.c1', 'in', 'cv', '▸ 1'], ['lights.c2', 'in', 'cv', '▸ 2'],
+              ['lights.c3', 'in', 'cv', '▸ 3'], ['lights.c4', 'in', 'cv', '▸ 4']],
+      led: 'pk-led-dmx' },
     { id: 'vector', name: 'Vector', sub: 'draws on the XY scope', w: 176,
       knobs: [['vector.gain', 'Gain', 0.5]],
       jacks: [['vector.x', 'in', 'cv', '\u25b8 X'], ['vector.y', 'in', 'cv', '\u25b8 Y']] },
@@ -347,6 +354,7 @@ export class PatchRack {
       case 'bounce.decay': return Math.round(v * 100) + '%';
       case 'vector.gain': return (0.25 + v * 1.75).toFixed(2) + 'x';
       case 'clock.bpm': return Math.round(60 + v * 140) + ' BPM';
+      case 'lights.dim': return Math.round(v * 100) + '%';
       case 'env.attack': return (1000 * (0.002 + v * 0.4)).toFixed(0) + ' ms';
       case 'env.decay': return (0.02 + v * 1.5).toFixed(2) + ' s';
       case 'noise.tone': return (200 * Math.pow(60, v)).toFixed(0) + ' Hz';
@@ -483,6 +491,18 @@ export class PatchRack {
     // the speakers as DC.
     a.vecL = new GainNode(actx, { gain: 1 });
     a.vecR = new GainNode(actx, { gain: 1 });
+    // LIGHTS: four CV inputs sampled once per frame and sent as DMX.
+    // Analyser taps, not a ScriptProcessor: a lighting rig needs a level
+    // per frame, not per sample.
+    a.dmxIn = []; a.dmxAn = [];
+    for (let i = 0; i < 4; i++) {
+      const g = new GainNode(actx, { gain: 1 });
+      const an = actx.createAnalyser();
+      an.fftSize = 256;
+      g.connect(an);
+      a.dmxIn.push(g); a.dmxAn.push(an);
+    }
+    this._dmxBuf = new Float32Array(256);
     // CLOCK: free-running square gate, so the rack can play with no input
     a.clockSrc = new ConstantSourceNode(actx, { offset: 0 });
     // ENV: gate in -> attack/decay contour out
@@ -558,6 +578,8 @@ export class PatchRack {
       'bounce.trig': a.bounceIn,
       'vector.x': a.vecL,
       'vector.y': a.vecR,
+      'lights.c1': a.dmxIn[0], 'lights.c2': a.dmxIn[1],
+      'lights.c3': a.dmxIn[2], 'lights.c4': a.dmxIn[3],
       'env.trig': a.envIn,
       'vcaa.in': a.vcaA, 'vcaa.cv': a.vcaA.gain,
       'vcab.in': a.vcaB, 'vcab.cv': a.vcaB.gain,
@@ -776,6 +798,45 @@ export class PatchRack {
   // The rack's modulators run on timers, not on the render loop, so they
   // must be stopped explicitly — otherwise closing PATCH mode would leave
   // nine loops (two at 16 ms) running for the rest of the session.
+  // Sample the four LIGHTS inputs and hand them to the DMX bridge. Cheap
+  // enough to run per frame; the bridge throttles the wire itself.
+  _pumpLights() {
+    const a = this.audio;
+    if (!a || !this._lights || !this._lights.running) return;
+    const master = this.knobs['lights.dim'] ?? 0.8;
+    for (let i = 0; i < 4; i++) {
+      a.dmxAn[i].getFloatTimeDomainData(this._dmxBuf);
+      let peak = 0;
+      for (let j = 0; j < this._dmxBuf.length; j += 4) {
+        const v = Math.abs(this._dmxBuf[j]);
+        if (v > peak) peak = v;
+      }
+      this._lights.setChannel(i, peak * master);
+    }
+  }
+
+  // Start/stop DMX output. Nothing goes on the wire until the user turns it
+  // on, so someone with no lighting rig never opens a socket.
+  toggleLights(opts = {}) {
+    const led = this.overlay.querySelector('#pk-led-dmx');
+    if (this._lights && this._lights.running) {
+      this._lights.stop();
+      if (window.electronAPI && window.electronAPI.artnetStop) window.electronAPI.artnetStop();
+      if (led) led.className = 'pk-led';
+      return false;
+    }
+    if (!window.electronAPI || !window.electronAPI.artnetSend) return false;
+    if (!this._lights) {
+      this._lights = new LightsBridge((universe, bytes) =>
+        window.electronAPI.artnetSend(universe, Array.from(bytes)));
+    }
+    this._lights.configure(opts);
+    if (window.electronAPI.artnetConfigure) window.electronAPI.artnetConfigure(opts);
+    this._lights.start();
+    if (led) led.className = 'pk-led pk-on-amber';
+    return true;
+  }
+
   _startTicks() {
     if (this._ticking || !this.audio) return;
     this._ticking = true;
@@ -1002,6 +1063,7 @@ export class PatchRack {
     e.visBusL.connect(e.analyserL);
     e.visBusR.connect(e.analyserR);
     e.gainNode.connect(e.actx.destination);
+    if (this._lights && this._lights.running) this.toggleLights();
     this.overlay.classList.add('pk-hidden');
     this._stopLoop();
   }
@@ -1343,6 +1405,7 @@ export class PatchRack {
         this.cctx.globalAlpha = 1;
       }
       this._drawMini();
+      this._pumpLights();
       if (!this._warnNext || performance.now() > this._warnNext) {   // time-based: frame rate varies
         this._warnNext = performance.now() + 800;
         const w = this.overlay.querySelector('#pk-warn');

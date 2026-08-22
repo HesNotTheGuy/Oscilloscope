@@ -3,6 +3,8 @@
 const { app, BrowserWindow, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
+const { installArtnetIpc } = require('./src/main/artnet-ipc.js');
+const { installStreamServer, pushFrame, stopServer } = require('./src/main/stream-server.js');
 
 let win;
 let displayWin = null;
@@ -208,14 +210,23 @@ ipcMain.on('display-frame', (_event, dataURL) => {
   if (displayWin && !displayWin.isDestroyed()) {
     displayWin.webContents.send('display-frame-fwd', dataURL);
   }
+  // Same captured frame feeds the OBS/Resolume stream when it's running.
+  // pushFrame is a no-op with no server or no clients, so this costs nothing
+  // when the feature is off.
+  pushFrame(dataURL);
 });
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  installArtnetIpc(ipcMain);
+  installStreamServer(ipcMain);
   createSplash();
   createWindow();
 });
+
+// Release the stream's HTTP socket before the process goes away.
+app.on('before-quit', () => { stopServer().catch(() => {}); });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
