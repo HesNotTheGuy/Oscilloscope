@@ -223,6 +223,8 @@ export class PatchRack {
     this._lfoType = 'sine';
     this._seqStep = 0;
     this._built = false;
+    this._ticking = false;
+    this._tickCount = 0;   // exposed for perf verification
   }
 
   // ── DOM ─────────────────────────────────────────────────────
@@ -549,9 +551,6 @@ export class PatchRack {
       'out.in': a.master, 'out.cv': a.master.gain,
     };
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
-    this._seqTick(); this._shTick();
-    this._driftTick(); this._sweepTick(); this._memTick(); this._strangeTick();
-    this._orbitTick(); this._edgeTick(); this._clockTick();
 
     // Starter patch: whatever the app is playing, through a wobbling filter.
     this.connect('input.out', 'vcf.in');
@@ -585,7 +584,9 @@ export class PatchRack {
       this.audio.seqSrc.offset.setTargetAtTime(this.knobs['seq.s' + this._seqStep] || 0, this.engine.actx.currentTime, 0.004);
       this._seqStep = (this._seqStep + 1) % 8;
     }
-    setTimeout(() => this._seqTick(), 1000 / (0.5 * Math.pow(32, this.knobs['seq.rate'] ?? 0.5)));
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._seqTick(), 1000 / (0.5 * Math.pow(32, this.knobs['seq.rate'] ?? 0.5)));
+    else this._ticking = false;
   }
 
   _shTick() {
@@ -595,7 +596,9 @@ export class PatchRack {
       const led = this.overlay.querySelector('#pk-led-sh');
       if (led) led.className = 'pk-led' + (v > 0 ? ' pk-on-amber' : '');
     }
-    setTimeout(() => this._shTick(), 1000 / (0.5 * Math.pow(60, this.knobs['sh.rate'] ?? 0.5)));
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._shTick(), 1000 / (0.5 * Math.pow(60, this.knobs['sh.rate'] ?? 0.5)));
+    else this._ticking = false;
   }
 
   // DRIFT: glide to a new random target at RATE; SLEW sets how lazily.
@@ -604,7 +607,9 @@ export class PatchRack {
       const slew = 0.05 * Math.pow(40, this.knobs['drift.slew'] ?? 0.5);
       this.audio.driftSrc.offset.setTargetAtTime(Math.random() * 2 - 1, this.engine.actx.currentTime, slew);
     }
-    setTimeout(() => this._driftTick(), 1000 / (0.2 * Math.pow(40, this.knobs['drift.rate'] ?? 0.4)));
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._driftTick(), 1000 / (0.2 * Math.pow(40, this.knobs['drift.rate'] ?? 0.4)));
+    else this._ticking = false;
   }
 
   // SWEEP: looping rise/fall ramp with independent slopes (0..1 out).
@@ -619,7 +624,9 @@ export class PatchRack {
       if (st.v <= 0) { st.v = 0; st.up = true; }
       this.audio.sweepSrc.offset.setTargetAtTime(st.v, this.engine.actx.currentTime, 0.012);
     }
-    setTimeout(() => this._sweepTick(), 25);
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._sweepTick(), 25);
+    else this._ticking = false;
   }
 
   // MEMORY: 16-step Turing loop; LOCK morphs mutation -> frozen melody.
@@ -633,7 +640,9 @@ export class PatchRack {
       const led = this.overlay.querySelector('#pk-led-mem');
       if (led) led.className = 'pk-led' + (mutated ? ' pk-on-amber' : ' pk-on-green');
     }
-    setTimeout(() => this._memTick(), 1000 / (0.5 * Math.pow(32, this.knobs['memory.rate'] ?? 0.5)));
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._memTick(), 1000 / (0.5 * Math.pow(32, this.knobs['memory.rate'] ?? 0.5)));
+    else this._ticking = false;
   }
 
   // STRANGE: Lorenz attractor, X and Y outs normalized to ~±1.
@@ -652,7 +661,9 @@ export class PatchRack {
       this.audio.strangeX.offset.setTargetAtTime(Math.max(-1, Math.min(1, st.x / 20)), t, 0.02);
       this.audio.strangeY.offset.setTargetAtTime(Math.max(-1, Math.min(1, st.y / 25)), t, 0.02);
     }
-    setTimeout(() => this._strangeTick(), 25);
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._strangeTick(), 25);
+    else this._ticking = false;
   }
 
   // ORBIT: quadrature pair. PHASE morphs X/Y from a diagonal line (0\u00b0)
@@ -666,7 +677,9 @@ export class PatchRack {
       this.audio.orbitX.offset.setTargetAtTime(Math.sin(this._orbitPhase), t, 0.012);
       this.audio.orbitY.offset.setTargetAtTime(Math.sin(this._orbitPhase + ph), t, 0.012);
     }
-    setTimeout(() => this._orbitTick(), 16);
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._orbitTick(), 16);
+    else this._ticking = false;
   }
 
   // CLOCK: 50% duty gate. Square so it can open a VCA directly for organ
@@ -681,7 +694,9 @@ export class PatchRack {
       const led = this.overlay && this.overlay.querySelector('#pk-led-clock');
       if (led) led.className = 'pk-led' + (performance.now() < (this._clockLedUntil || 0) ? ' pk-on-amber' : '');
     }
-    setTimeout(() => this._clockTick(), half);
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._clockTick(), half);
+    else this._ticking = false;
   }
 
   // Rising-edge watcher for the trigger inputs. Hysteresis on 0.45 keeps
@@ -737,7 +752,19 @@ export class PatchRack {
       }
       this._envHigh = eHigh;
     }
-    setTimeout(() => this._edgeTick(), 16);
+    this._tickCount++;
+    if (this.enabled) setTimeout(() => this._edgeTick(), 16);
+    else this._ticking = false;
+  }
+
+  // The rack's modulators run on timers, not on the render loop, so they
+  // must be stopped explicitly — otherwise closing PATCH mode would leave
+  // nine loops (two at 16 ms) running for the rest of the session.
+  _startTicks() {
+    if (this._ticking || !this.audio) return;
+    this._ticking = true;
+    this._seqTick(); this._shTick(); this._driftTick(); this._sweepTick();
+    this._memTick(); this._strangeTick(); this._orbitTick(); this._edgeTick(); this._clockTick();
   }
 
   // ── Patching ────────────────────────────────────────────────
@@ -937,6 +964,7 @@ export class PatchRack {
     }
     this.enabled = true;
     this._refreshAnalyserFeed();
+    this._startTicks();
     this.overlay.classList.remove('pk-hidden');
     this._layout();
     this._startLoop();
