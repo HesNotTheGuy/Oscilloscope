@@ -19,12 +19,14 @@ import { BeatDetector } from '../beat-detector.js';
 //     silences delay-free cycles) — feedback is a feature
 // ─────────────────────────────────────────────────────────────
 
-const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35, 'fold.cv': 3 };
+const SENS = { 'vcf.cv': 3600, 'vco.fm': 120, 'echo.cv': 0.05, 'out.cv': 0.35, 'fold.cv': 3,
+  'vcaa.cv': 1, 'vcab.cv': 1 };
 
 const VERB = { 'lfo.out': 'wobbling', 'seq.out': 'stepping', 'sh.out': 'randomizing', 'tracer.out': 'riding', 'pulse.out': 'punching',
   'drift.out': 'drifting', 'sweep.out': 'sweeping', 'memory.out': 'looping', 'strange.x': 'entangling', 'strange.y': 'entangling',
   'orbit.x': 'circling', 'orbit.y': 'circling',
-  'divide.d2': 'clocking', 'divide.d4': 'clocking', 'divide.d8': 'clocking', 'bounce.out': 'bouncing' };
+  'divide.d2': 'clocking', 'divide.d4': 'clocking', 'divide.d8': 'clocking', 'bounce.out': 'bouncing',
+  'clock.out': 'driving', 'env.out': 'shaping' };
 const DEST_PHRASE = {
   'vcf.cv': 'the filter', 'vco.fm': 'the pitch', 'out.cv': 'the volume',
   'echo.cv': 'the echo time', 'vcf.in': 'into the filter', 'out.in': 'the speakers',
@@ -33,6 +35,8 @@ const DEST_PHRASE = {
   'tracer.in': 'the tracer', 'ghost.in': 'into the ghost', 'fold.in': 'into the fold', 'fold.cv': 'the fold',
   'divide.in': 'the divider', 'bounce.trig': 'the bounce',
   'vector.x': 'the scope\u2019s X', 'vector.y': 'the scope\u2019s Y',
+  'env.trig': 'the envelope', 'vcaa.cv': 'voice A', 'vcab.cv': 'voice B',
+  'vcaa.in': 'into voice A', 'vcab.in': 'into voice B',
 };
 const JACK_NAME = {
   'input.out': 'the source', 'vco.out': 'the synth', 'lfo.out': 'the LFO',
@@ -44,6 +48,8 @@ const JACK_NAME = {
   'orbit.x': 'orbit X', 'orbit.y': 'orbit Y',
   'divide.d2': 'the half-time', 'divide.d4': 'the quarter-time', 'divide.d8': 'the eighth-time',
   'bounce.out': 'the bounce',
+  'clock.out': 'the clock', 'env.out': 'the envelope',
+  'vcaa.out': 'voice A', 'vcab.out': 'voice B', 'noise.out': 'the noise',
 };
 
 // Declarative module layout. knobs: [id, label, default]; jacks: [id, dir, kind, label]
@@ -126,6 +132,23 @@ const ROWS = [
       knobs: [['vector.gain', 'Gain', 0.5]],
       jacks: [['vector.x', 'in', 'cv', '\u25b8 X'], ['vector.y', 'in', 'cv', '\u25b8 Y']] },
   ],
+  [
+    { id: 'clock', name: 'Clock', sub: 'the heartbeat', subDyn: 'clock', w: 150,
+      knobs: [['clock.bpm', 'Tempo', 0.5]],
+      jacks: [['clock.out', 'out', 'cv', 'Out']], led: 'pk-led-clock' },
+    { id: 'env', name: 'Env', sub: 'turns a gate into a note', subDyn: 'env', w: 166,
+      knobs: [['env.attack', 'Attack', 0.08], ['env.decay', 'Decay', 0.3]],
+      jacks: [['env.trig', 'in', 'cv', '\u25b8 Trig'], ['env.out', 'out', 'cv', 'Out']] },
+    { id: 'vcaa', name: 'Voice A', sub: 'sound \u00d7 control', w: 168,
+      knobs: [['vcaa.level', 'Level', 0]],
+      jacks: [['vcaa.in', 'in', 'audio', '\u25b8 In'], ['vcaa.cv', 'in', 'cv', '\u25b8 CV'], ['vcaa.out', 'out', 'audio', 'Out']] },
+    { id: 'vcab', name: 'Voice B', sub: 'sound \u00d7 control', w: 168,
+      knobs: [['vcab.level', 'Level', 0]],
+      jacks: [['vcab.in', 'in', 'audio', '\u25b8 In'], ['vcab.cv', 'in', 'cv', '\u25b8 CV'], ['vcab.out', 'out', 'audio', 'Out']] },
+    { id: 'noise', name: 'Noise', sub: 'hiss for hats & snares', w: 150,
+      knobs: [['noise.tone', 'Tone', 0.6]],
+      jacks: [['noise.out', 'out', 'audio', 'Out']] },
+  ],
 ];
 
 // The patch book: named starting points, the software version of the patch
@@ -153,6 +176,18 @@ const RECIPES = {
   'mutation': {
     knobs: { 'vco.level': 0.6, 'memory.rate': 0.5, 'memory.lock': 0.7, 'vcf.cutoff': 0.5, 'vcf.res': 0.4 },
     cables: [['memory.out', 'vco.fm'], ['vco.out', 'vcf.in'], ['sweep.out', 'vcf.cv'], ['vcf.out', 'out.in']] },
+  'groovebox': {
+    knobs: { 'clock.bpm': 0.5, 'seq.rate': 0.55, 'vco.level': 0.5, 'vco.freq': 0.32,
+             'env.attack': 0.03, 'env.decay': 0.28, 'vcaa.level': 0, 'vcab.level': 0,
+             'noise.tone': 0.75, 'bounce.decay': 0.45, 'vcf.cutoff': 0.55, 'vcf.res': 0.35,
+             'echo.time': 0.34, 'echo.fdbk': 0.42, 'mix.a': 0.75, 'mix.b': 0.5 },
+    cables: [
+      ['clock.out', 'divide.in'], ['divide.d2', 'env.trig'],
+      ['seq.out', 'vco.fm'], ['vco.out', 'vcaa.in'], ['env.out', 'vcaa.cv'],
+      ['clock.out', 'bounce.trig'], ['noise.out', 'vcab.in'], ['bounce.out', 'vcab.cv'],
+      ['vcaa.out', 'mix.a'], ['vcab.out', 'mix.b'],
+      ['mix.out', 'vcf.in'], ['vcf.out', 'echo.in'], ['echo.out', 'out.in'],
+    ] },
   'lissajous': {
     knobs: { 'orbit.rate': 0.5, 'orbit.phase': 0.5, 'vector.gain': 0.5, 'vcf.cutoff': 0.6 },
     cables: [['input.out', 'vcf.in'], ['vcf.out', 'out.in'],
@@ -293,6 +328,10 @@ export class PatchRack {
       case 'orbit.phase': return Math.round(v * 180) + '\u00b0';
       case 'bounce.decay': return Math.round(v * 100) + '%';
       case 'vector.gain': return (0.25 + v * 1.75).toFixed(2) + 'x';
+      case 'clock.bpm': return Math.round(60 + v * 140) + ' BPM';
+      case 'env.attack': return (1000 * (0.002 + v * 0.4)).toFixed(0) + ' ms';
+      case 'env.decay': return (0.02 + v * 1.5).toFixed(2) + ' s';
+      case 'noise.tone': return (200 * Math.pow(60, v)).toFixed(0) + ' Hz';
       default:          return Math.round(v * 100) + '%';
     }
   }
@@ -329,6 +368,9 @@ export class PatchRack {
         const g = 0.25 + v * 1.75;
         a.vecL.gain.setTargetAtTime(g, t, .02); a.vecR.gain.setTargetAtTime(g, t, .02); break;
       }
+      case 'vcaa.level': a.vcaA.gain.setTargetAtTime(v, t, .02); break;
+      case 'vcab.level': a.vcaB.gain.setTargetAtTime(v, t, .02); break;
+      case 'noise.tone': a.noiseLP.frequency.setTargetAtTime(200 * Math.pow(60, v), t, .02); break;
       case 'tracer.speed': a.tracerLP.frequency.setTargetAtTime(2 * Math.pow(25, v), t, .02); break;
       case 'tracer.gain': a.tracerGain.gain.setTargetAtTime(1 + v * 3, t, .02); break;
       case 'ghost.rate': a.ghostLfo.frequency.setTargetAtTime(0.1 * Math.pow(40, v), t, .02); break;
@@ -423,6 +465,25 @@ export class PatchRack {
     // the speakers as DC.
     a.vecL = new GainNode(actx, { gain: 1 });
     a.vecR = new GainNode(actx, { gain: 1 });
+    // CLOCK: free-running square gate, so the rack can play with no input
+    a.clockSrc = new ConstantSourceNode(actx, { offset: 0 });
+    // ENV: gate in -> attack/decay contour out
+    a.envIn = new GainNode(actx, { gain: 1 });
+    a.envAn = actx.createAnalyser(); a.envAn.fftSize = 256;
+    a.envIn.connect(a.envAn);
+    a.envSrc = new ConstantSourceNode(actx, { offset: 0 });
+    // VCAs: a gain node IS a voltage-controlled amplifier — the CV cable
+    // lands on .gain, so envelope x sound = a note instead of a drone
+    a.vcaA = new GainNode(actx, { gain: 0 });
+    a.vcaB = new GainNode(actx, { gain: 0 });
+    // NOISE: looping buffer through a tone lowpass
+    const nlen = actx.sampleRate * 2;
+    const nbuf = actx.createBuffer(1, nlen, actx.sampleRate);
+    const nd = nbuf.getChannelData(0);
+    for (let i = 0; i < nlen; i++) nd[i] = Math.random() * 2 - 1;
+    a.noiseSrc = new AudioBufferSourceNode(actx, { buffer: nbuf, loop: true });
+    a.noiseLP = new BiquadFilterNode(actx, { type: 'lowpass', frequency: 3000, Q: 0.7 });
+    a.noiseSrc.connect(a.noiseLP);
     this._beat = new BeatDetector();
     a.master = new GainNode(actx, { gain: 0 });
     // limiter so feedback patches and hot drives can't blast the speakers
@@ -432,6 +493,7 @@ export class PatchRack {
     a.pulseSrc.start(); a.ghostLfo.start();
     a.driftSrc.start(); a.sweepSrc.start(); a.memSrc.start(); a.strangeX.start(); a.strangeY.start();
     a.orbitX.start(); a.orbitY.start(); a.div2.start(); a.div4.start(); a.div8.start(); a.bounceSrc.start();
+    a.clockSrc.start(); a.envSrc.start(); a.noiseSrc.start();
 
     const tap = (id, node) => {
       const an = actx.createAnalyser();
@@ -463,6 +525,11 @@ export class PatchRack {
     tap('divide.d4', a.div4);
     tap('divide.d8', a.div8);
     tap('bounce.out', a.bounceSrc);
+    tap('clock.out', a.clockSrc);
+    tap('env.out', a.envSrc);
+    tap('vcaa.out', a.vcaA);
+    tap('vcab.out', a.vcaB);
+    tap('noise.out', a.noiseLP);
     this.inTargets = {
       'vcf.in': a.filter, 'vcf.cv': a.filter.frequency,
       'vco.fm': [a.osc1.frequency, a.osc2.frequency],
@@ -473,6 +540,9 @@ export class PatchRack {
       'bounce.trig': a.bounceIn,
       'vector.x': a.vecL,
       'vector.y': a.vecR,
+      'env.trig': a.envIn,
+      'vcaa.in': a.vcaA, 'vcaa.cv': a.vcaA.gain,
+      'vcab.in': a.vcaB, 'vcab.cv': a.vcaB.gain,
       'tracer.in': a.tracerIn,
       'ghost.in': a.ghostIn,
       'fold.in': a.foldPre, 'fold.cv': a.foldPre.gain,
@@ -481,7 +551,7 @@ export class PatchRack {
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
     this._seqTick(); this._shTick();
     this._driftTick(); this._sweepTick(); this._memTick(); this._strangeTick();
-    this._orbitTick(); this._edgeTick();
+    this._orbitTick(); this._edgeTick(); this._clockTick();
 
     // Starter patch: whatever the app is playing, through a wobbling filter.
     this.connect('input.out', 'vcf.in');
@@ -599,7 +669,22 @@ export class PatchRack {
     setTimeout(() => this._orbitTick(), 16);
   }
 
-  // Rising-edge watcher for the two trigger inputs. Hysteresis on 0.45 keeps
+  // CLOCK: 50% duty gate. Square so it can open a VCA directly for organ
+  // notes, and its rising edge drives DIVIDE / ENV / BOUNCE.
+  _clockTick() {
+    const bpm = 60 + (this.knobs['clock.bpm'] ?? 0.5) * 140;
+    const half = 30000 / bpm;
+    if (this.audio) {
+      this._clockHigh = !this._clockHigh;
+      this.audio.clockSrc.offset.setTargetAtTime(this._clockHigh ? 1 : 0, this.engine.actx.currentTime, 0.002);
+      if (this._clockHigh) this._clockLedUntil = performance.now() + Math.min(90, half * 0.8);
+      const led = this.overlay && this.overlay.querySelector('#pk-led-clock');
+      if (led) led.className = 'pk-led' + (performance.now() < (this._clockLedUntil || 0) ? ' pk-on-amber' : '');
+    }
+    setTimeout(() => this._clockTick(), half);
+  }
+
+  // Rising-edge watcher for the trigger inputs. Hysteresis on 0.45 keeps
   // a decaying envelope (PULSE, BOUNCE) from re-triggering on its own tail.
   _edgeTick() {
     if (this.audio) {
@@ -638,6 +723,19 @@ export class PatchRack {
         }
       }
       this._bounceHigh = bHigh;
+
+      // ENV: gate -> attack ramp, then decay. This is what turns a droning
+      // oscillator into notes once it drives a VCA.
+      const eHigh = peakOf(a.envAn) > 0.45;
+      if (eHigh && !this._envHigh) {
+        const atk = 0.002 + (this.knobs['env.attack'] ?? 0.08) * 0.4;
+        const dec = 0.02 + (this.knobs['env.decay'] ?? 0.3) * 1.5;
+        const o = a.envSrc.offset;
+        o.cancelScheduledValues(t);
+        o.setTargetAtTime(1, t, atk / 3);
+        o.setTargetAtTime(0, t + atk, dec / 3);
+      }
+      this._envHigh = eHigh;
     }
     setTimeout(() => this._edgeTick(), 16);
   }
@@ -751,7 +849,8 @@ export class PatchRack {
     const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps',
       tracer: 'the music moves the knobs', pulse: 'fires on the beat',
       drift: 'slow wander', sweep: 'rise & fall', memory: 'a melody that mutates', strange: 'chaos, but elegant',
-      orbit: 'two waves, one circle', divide: 'slower copies of a beat', bounce: 'drop it, watch it settle' };
+      orbit: 'two waves, one circle', divide: 'slower copies of a beat', bounce: 'drop it, watch it settle',
+      clock: 'the heartbeat', env: 'turns a gate into a note' };
     const byModule = {};
     for (const outId in VERB) {
       const mod = outId.split('.')[0];
