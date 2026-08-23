@@ -130,6 +130,8 @@
 .pk-jack.pk-lit-audio { box-shadow: 0 0 0 1.5px #060807, 0 0 9px rgba(0,255,65,.55); }
 .pk-jack.pk-lit-cv { box-shadow: 0 0 0 1.5px #060807, 0 0 9px rgba(255,179,0,.55); }
 .pk-jack.pk-probed { box-shadow: 0 0 0 2.5px var(--pk-ink), 0 0 12px rgba(232,228,216,.7); }
+/* The two ends of the demonstration cable, while it is being plugged in. */
+.pk-jack.pk-demo-end { animation: pk-pulse .7s ease-in-out infinite; }
 /* Keyboard patching: the picked source reads like a held cable end. */
 .pk-jack.pk-kb-source { box-shadow: 0 0 0 2.5px var(--pk-cv), 0 0 14px rgba(255,179,0,.8); }
 .pk-jack:focus-visible, .pk-knob:focus-visible {

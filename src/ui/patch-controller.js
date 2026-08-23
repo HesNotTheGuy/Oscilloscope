@@ -75,6 +75,15 @@ export class PatchController {
       this.rack = new PatchRack(this.engine, this.inputMap);
       this.rack.onClose = () => this.toggle();
       this.rack.onTour = (id) => { if (this.ctx.tour) this.ctx.tour.start(id); };
+      if (this.ctx.tour && this.ctx.tour.registerAction) {
+        this.ctx.tour.registerAction('patchDemo', () => {
+          // Make sure the LFO is actually moving, or the demo lands and
+          // nothing visibly happens.
+          this.rack.setKnob('lfo.rate', 0.45);
+          this.rack.setKnob('lfo.depth', 0.7);
+          this.rack.demoPatch('lfo.out', 'out.cv');
+        });
+      }
       this.rack.onLightsError = (msg) => {
         if (this.ctx.notify) this.ctx.notify.error('DMX stopped — ' + msg + '. Check the target address.');
       };
@@ -102,6 +111,11 @@ export class PatchController {
       // First time in the rack, offer the patch tour once the DOM has settled.
       if (!TourController.seen('patch') && this.ctx.tour) {
         setTimeout(() => {
+          // Don't stack two teaching surfaces: a first-time user can click
+          // PATCH before dismissing the welcome card, and the tour would then
+          // dim the app underneath a card that is still asking to be read.
+          // Skipping leaves 'patch' unseen, so it opens on the next visit.
+          if (document.querySelector('.first-run-hint')) return;
           if (this.rack && this.rack.enabled && !this.ctx.tour.running) this.ctx.tour.start('patch');
         }, 500);
       }

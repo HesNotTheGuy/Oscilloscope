@@ -39,12 +39,18 @@ export const TOURS = {
       place: 'bottom' },
   ],
   patch: [
-    { sel: '#pk-book', title: 'Start from a recipe',
+    // The first step DOES the thing instead of describing it: a cable flies
+    // from the LFO into the output's tremolo input and the trace starts
+    // pulsing. One cable, one effect, no jargon required.
+    { sel: '[data-pk-jack="lfo.out"]', title: 'Watch — one cable',
+      body: 'This is the whole idea. A cable is about to run from the LFO into the output, and the volume will start moving on its own. Nothing else to learn.',
+      place: 'top', run: 'patchDemo' },
+    { sel: '[data-pk-jack="lfo.out"]', title: 'Now you do it',
+      body: 'Drag from any OUT and drop it on a port that pulses. Direction does not matter. Green cables carry sound, dashed amber ones carry movement.',
+      place: 'top' },
+    { sel: '#pk-book', title: 'Or start from a recipe',
       body: 'The patch book has working starting points. Try "wobble" with a song playing, or "groovebox" — that one plays itself with no input at all.',
       place: 'bottom' },
-    { sel: '[data-pk-jack="lfo.out"]', title: 'Drag jack to jack to patch',
-      body: 'Grab an OUT and drop it on any pulsing IN. Direction does not matter. Green cables carry sound, dashed amber ones carry modulation.',
-      place: 'top' },
     { sel: '[data-pk-jack="vcf.out"]', title: 'Click a jack to probe it',
       body: 'A plain click puts that point of the circuit on the scope — like touching a real probe to a test point. Click again to release.',
       place: 'top' },
@@ -59,6 +65,8 @@ export const TOURS = {
 
 export class TourController {
   constructor(_ctx) {
+    this._actions = {};      // name -> fn, for steps that demonstrate
+    this._ranStep = -1;
     this._els = null;
     this._steps = [];
     this._i = 0;
@@ -75,8 +83,12 @@ export class TourController {
 
   get running() { return !!this._els; }
 
+  // Register something a tour step can perform (see the `run` field).
+  registerAction(name, fn) { this._actions[name] = fn; }
+
   start(id) {
     if (this._els) this._end();
+    this._ranStep = -1;
     const steps = (TOURS[id] || []).filter(s => {
       const el = document.querySelector(s.sel);
       return el && el.getBoundingClientRect().width > 0;
@@ -151,6 +163,11 @@ export class TourController {
     spot.style.width = (r.width + pad * 2) + 'px';
     spot.style.height = (r.height + pad * 2) + 'px';
 
+    // A step may perform the gesture it is teaching.
+    if (s.run && this._actions[s.run] && this._ranStep !== this._i) {
+      this._ranStep = this._i;
+      try { this._actions[s.run](); } catch (_) {}
+    }
     card.querySelector('.tour-step').textContent = (this._i + 1) + ' / ' + this._steps.length;
     card.querySelector('.tour-title').textContent = s.title;
     card.querySelector('.tour-body').textContent = s.body;

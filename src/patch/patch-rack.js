@@ -1631,6 +1631,37 @@ export class PatchRack {
     this._refreshJacks();
   }
 
+  // Plug a cable in, visibly, so the first thing anyone sees is the gesture
+  // being performed rather than described. One cable, one effect, and a result
+  // you can watch on the scope: the LFO taking hold of the volume.
+  demoPatch(fromId, toId, onDone) {
+    if (!this.enabled || !this.jackPos[fromId] || !this.jackPos[toId]) { if (onDone) onDone(false); return false; }
+    if (this.cables.some(c => c.to === toId)) { if (onDone) onDone(false); return false; }
+    this._demo = { from: fromId, to: toId, t0: performance.now(), dur: 1500, onDone };
+    this.jackEls[fromId].classList.add('pk-demo-end');
+    this.jackEls[toId].classList.add('pk-demo-end');
+    return true;
+  }
+
+  _tickDemo() {
+    const d = this._demo;
+    if (!d) return;
+    const p = Math.min(1, (performance.now() - d.t0) / d.dur);
+    // ease-out so the plug decelerates into the socket like a hand would
+    const e = 1 - Math.pow(1 - p, 3);
+    const a = this.jackPos[d.from], b = this.jackPos[d.to];
+    d.tip = { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e };
+    if (p >= 1) {
+      this.jackEls[d.from].classList.remove('pk-demo-end');
+      this.jackEls[d.to].classList.remove('pk-demo-end');
+      this._demo = null;
+      this._pushUndo();                       // Ctrl+Z takes the demo back out
+      this.connect(d.from, d.to);
+      this._flashHint('that is all a patch is \u2014 Ctrl+Z removes it');
+      if (d.onDone) d.onDone(true);
+    }
+  }
+
   _endDrag() {
     this.rack.classList.remove('pk-dragging');
     for (const id in this.jackEls) this.jackEls[id].classList.remove('pk-target', 'pk-drag-src');
@@ -1729,7 +1760,16 @@ export class PatchRack {
       const r = this.rack.getBoundingClientRect();
       this.cctx.clearRect(0, 0, r.width, r.height);
       this.cables.forEach((c, i) => this._drawCable(this.jackPos[c.from], this.jackPos[c.to], c.kind, this.taps[c.from], i, i === this._hoverIdx));
-      if (this._drag && !this.playMode) {
+      if (this._demo) {
+      this._tickDemo();
+      if (this._demo) {
+        const from = this.jackPos[this._demo.from];
+        this.cctx.globalAlpha = 0.9;
+        this._drawCable(from, this._demo.tip, this.jackEls[this._demo.from].dataset.kind, null, -1, true);
+        this.cctx.globalAlpha = 1;
+      }
+    }
+    if (this._drag && !this.playMode) {
         const from = this.jackPos[this._drag.fromId];
         this.cctx.globalAlpha = 0.6;
         this._drawCable(from, { x: this._drag.x, y: this._drag.y }, this.jackEls[this._drag.fromId].dataset.kind, null, -1, false);
