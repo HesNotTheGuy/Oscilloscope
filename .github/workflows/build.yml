@@ -23,9 +23,9 @@ jobs:
             glob: 'dist/*.dmg dist/*.zip'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -41,7 +41,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dso1-${{ matrix.artifact }}
           path: |
@@ -58,11 +58,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
+      # Deliberately left at v2: it is the one step workflow_dispatch cannot
+      # exercise (the release job is tag-gated), so bumping it blind would
+      # only be discovered by a broken release.
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
