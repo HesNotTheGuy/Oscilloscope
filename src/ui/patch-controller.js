@@ -53,7 +53,8 @@ export class PatchController {
     const origVol = this.engine.setVolume.bind(this.engine);
     this.engine.setVolume = v => {
       origVol(v);
-      if (this.rack && this.rack.enabled) this.rack.setKnob('out.monitor', Math.min(1, Math.max(0, v)));
+      // sqrt so the squared knob curve lands back on the app's linear volume
+      if (this.rack && this.rack.enabled) this.rack.setKnob('out.monitor', Math.sqrt(Math.min(1, Math.max(0, v))));
     };
   }
 
@@ -85,7 +86,7 @@ export class PatchController {
       }
       // entering patch mode keeps the current loudness
       const g = this.engine.gainNode ? this.engine.gainNode.gain.value : 0.8;
-      this.rack.setKnob('out.monitor', Math.min(1, Math.max(0, g)));
+      this.rack.setKnob('out.monitor', Math.sqrt(Math.min(1, Math.max(0, g))));
       this.btn.classList.add('active');
     }
   }

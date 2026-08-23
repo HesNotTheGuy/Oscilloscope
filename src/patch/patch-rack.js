@@ -58,7 +58,7 @@ const JACK_NAME = {
 const ROWS = [
   [
     { id: 'input', name: 'Input', sub: 'what the app is playing', w: 150,
-      knobs: [['input.level', 'Level', 0.9]],
+      knobs: [['input.level', 'Level', 1]],
       jacks: [['input.out', 'out', 'audio', 'Out']], led: 'pk-led-input' },
     { id: 'vco', name: 'VCO', sub: 'test tone', w: 158,
       knobs: [['vco.freq', 'Freq', 0.5], ['vco.level', 'Level', 0]],
@@ -75,7 +75,7 @@ const ROWS = [
   ],
   [
     { id: 'vcf', name: 'VCF', sub: 'tone filter', w: 176,
-      knobs: [['vcf.cutoff', 'Cutoff', 0.62], ['vcf.res', 'Res', 0.2]],
+      knobs: [['vcf.cutoff', 'Cutoff', 0.62], ['vcf.res', 'Res', 0.08]],
       jacks: [['vcf.in', 'in', 'audio', '▸ In'], ['vcf.cv', 'in', 'cv', '▸ CV'], ['vcf.out', 'out', 'audio', 'Out']] },
     { id: 'mix', name: 'Mix', sub: 'blend two sounds', w: 150,
       knobs: [['mix.a', 'A', 0.7], ['mix.b', 'B', 0.7]],
@@ -509,7 +509,7 @@ export class PatchRack {
     if (!a) return;
     const t = this.engine.actx.currentTime;
     switch (id) {
-      case 'input.level': a.inputGain.gain.setTargetAtTime(v, t, .02); break;
+      case 'input.level': a.inputGain.gain.setTargetAtTime(v, t, .02); break;   // 100% = unity
       case 'vco.freq': { const f = 27.5 * Math.pow(16, v);
         a.osc1.frequency.setTargetAtTime(f, t, .02); a.osc2.frequency.setTargetAtTime(f * 1.004, t, .02); break; }
       case 'vco.level': a.vcoOut.gain.setTargetAtTime(0.5 * v, t, .02); break;
@@ -546,7 +546,12 @@ export class PatchRack {
     if (this.audio) return;
     const actx = this.engine.actx;
     const a = this.audio = {};
-    a.inputGain = new GainNode(actx, { gain: 0.9 });
+    // visBusL and visBusR both land here, so sum them at 0.5 each: feeding
+    // one mono node from two buses at unity was a silent +6 dB that drove the
+    // limiter and made simply OPENING the rack distort.
+    a.inputSum = new GainNode(actx, { gain: 0.5 });
+    a.inputGain = new GainNode(actx, { gain: 1 });
+    a.inputSum.connect(a.inputGain);
     a.osc1 = new OscillatorNode(actx, { type: 'sawtooth' });
     a.osc2 = new OscillatorNode(actx, { type: 'sawtooth' });
     a.vcoOut = new GainNode(actx, { gain: 0 });
@@ -659,9 +664,20 @@ export class PatchRack {
     a.noiseLP = new BiquadFilterNode(actx, { type: 'lowpass', frequency: 3000, Q: 0.7 });
     a.noiseSrc.connect(a.noiseLP);
     this._beat = new BeatDetector();
+    // outBus is what the patch produced; master is only how loud you are
+    // monitoring it. The analysers tap outBus, so turning the volume down
+    // does not shrink the trace — and the scope stays identical to the dry
+    // path when the rack is just passing audio through.
+    a.outBus = new GainNode(actx, { gain: 1 });
     a.master = new GainNode(actx, { gain: 0 });
+    a.outBus.connect(a.master);
     // limiter so feedback patches and hot drives can't blast the speakers
-    a.limiter = new DynamicsCompressorNode(actx, { threshold: -6, ratio: 12 });
+    // Safety net for feedback patches and hot drive settings only. At -6 dB
+    // and 12:1 this was compressing ordinary programme material and pumping;
+    // a fast, high-ratio limiter near 0 dBFS stays out of the way instead.
+    a.limiter = new DynamicsCompressorNode(actx, {
+      threshold: -1.5, ratio: 20, knee: 0, attack: 0.002, release: 0.08,
+    });
     a.master.connect(a.limiter);
     a.osc1.start(); a.osc2.start(); a.lfo.start(); a.seqSrc.start(); a.shSrc.start();
     a.pulseSrc.start(); a.ghostLfo.start();
@@ -722,14 +738,15 @@ export class PatchRack {
       'tracer.in': a.tracerIn,
       'ghost.in': a.ghostIn,
       'fold.in': a.foldPre, 'fold.cv': a.foldPre.gain,
-      'out.in': a.master, 'out.cv': a.master.gain,
+      'out.in': a.outBus, 'out.cv': a.outBus.gain,
     };
     for (const id in this.knobs) this.setKnob(id, this.knobs[id]);
 
-    // Starter patch: whatever the app is playing, through a wobbling filter.
-    this.connect('input.out', 'vcf.in');
-    this.connect('lfo.out', 'vcf.cv');
-    this.connect('vcf.out', 'out.in');
+    // Straight through, nothing in the way. Opening the rack is a thing you
+    // do to LOOK at the patch, and it must not change how anything sounds —
+    // arriving inside a resonant sweeping filter made the app feel broken.
+    // The old starter patch is the "wobble" recipe, one click away.
+    this.connect('input.out', 'out.in');
   }
 
   _foldCurve(v) {
@@ -1132,8 +1149,8 @@ export class PatchRack {
       return { L: n, R: n };
     }
     return {
-      L: this.cables.some(c => c.to === 'vector.x') ? a.vecL : a.master,
-      R: this.cables.some(c => c.to === 'vector.y') ? a.vecR : a.master,
+      L: this.cables.some(c => c.to === 'vector.x') ? a.vecL : a.outBus,
+      R: this.cables.some(c => c.to === 'vector.y') ? a.vecR : a.outBus,
     };
   }
   // Reconcile actual wiring with _desiredFeed(). One place, so probe,
@@ -1178,8 +1195,8 @@ export class PatchRack {
     // visual buses: analysers now hear the rack's master instead
     try { e.visBusL.disconnect(e.analyserL); } catch (_) {}
     try { e.visBusR.disconnect(e.analyserR); } catch (_) {}
-    e.visBusL.connect(a.inputGain);
-    e.visBusR.connect(a.inputGain);
+    e.visBusL.connect(a.inputSum);
+    e.visBusR.connect(a.inputSum);
     // audible path: master gain no longer feeds the speakers directly
     try { e.gainNode.disconnect(e.actx.destination); } catch (_) {}
     a.limiter.connect(e.actx.destination);
@@ -1191,6 +1208,7 @@ export class PatchRack {
     this.enabled = true;
     this._refreshAnalyserFeed();
     this._startTicks();
+    setTimeout(() => this._flashHint('patched straight through \u2014 open the PATCH BOOK to add effects'), 60);
     this.overlay.classList.remove('pk-hidden');
     this._layout();
     this._startLoop();
@@ -1202,8 +1220,8 @@ export class PatchRack {
     this.probeId = null;
     this.enabled = false;
     this._refreshAnalyserFeed();                        // detaches both channels
-    try { e.visBusL.disconnect(a.inputGain); } catch (_) {}
-    try { e.visBusR.disconnect(a.inputGain); } catch (_) {}
+    try { e.visBusL.disconnect(a.inputSum); } catch (_) {}
+    try { e.visBusR.disconnect(a.inputSum); } catch (_) {}
     try { a.limiter.disconnect(e.actx.destination); } catch (_) {}
     if (e._recDest) {
       try { a.limiter.disconnect(e._recDest); } catch (_) {}
