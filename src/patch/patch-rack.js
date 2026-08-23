@@ -982,8 +982,26 @@ export class PatchRack {
     }
     if (!window.electronAPI || !window.electronAPI.artnetSend) return false;
     if (!this._lights) {
-      this._lights = new LightsBridge((universe, bytes) =>
-        window.electronAPI.artnetSend(universe, Array.from(bytes)));
+      this._dmxFails = 0;
+      this._lights = new LightsBridge(async (universe, bytes) => {
+        const res = await window.electronAPI.artnetSend(universe, Array.from(bytes));
+        // A resolved promise carrying { ok:false } is still a failure. The
+        // bridge only counted rejections, so a bad host showed "SENDING" with
+        // an amber LED while nothing reached the wire.
+        if (res && res.ok === false) {
+          // Give up rather than retry forever: a rig we cannot reach will
+          // never start working on its own, and a failure repeating at frame
+          // rate drowns out every other message the app needs to show.
+          if (++this._dmxFails >= 40) {
+            const why = res.error || 'send failed';
+            this.toggleLights();                       // stops, resets the button and LED
+            if (this.onLightsError) this.onLightsError(why);
+          }
+          throw new Error(res.error || 'artnet send failed');
+        }
+        this._dmxFails = 0;
+        return res;
+      });
     }
     this._lights.configure(opts);
     if (window.electronAPI.artnetConfigure) window.electronAPI.artnetConfigure(opts);

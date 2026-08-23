@@ -12,6 +12,7 @@ export class AudioController {
     this.recorder    = ctx.recorder;
     this.store       = ctx.store;
     this.ensureAudio = ctx.ensureAudio;
+    this.notify      = ctx.notify || null;
   }
 
   init() {
@@ -74,7 +75,10 @@ export class AudioController {
           document.getElementById('btn-sysaudio').classList.remove('active');
         }
         try { await e.startMic(); btn.classList.add('active'); stSrc.textContent = 'Microphone'; }
-        catch (_) { alert('Mic denied.'); }
+        catch (err) {
+          if (this.notify) this.notify.error('Microphone blocked \u2014 allow mic access and try again');
+          else alert('Mic denied.');
+        }
       }
     });
 
@@ -100,8 +104,17 @@ export class AudioController {
               clearInterval(checkGone);
             }
           }, 500);
-        } catch (_) {
-          // Picker canceled or permission denied — leave button inactive, no crash.
+        } catch (err) {
+          // Was a silent no-op: the button just didn't light and nobody knew
+          // whether the click registered, the picker was cancelled, or the
+          // platform refused. Cancelling is normal; anything else is worth
+          // saying out loud.
+          const name = (err && err.name) || '';
+          if (name !== 'AbortError' && name !== 'NotAllowedError' && this.notify) {
+            this.notify.error('System audio unavailable: ' + ((err && err.message) || name || 'unknown'));
+          } else if (name === 'NotAllowedError' && this.notify) {
+            this.notify.warn('System audio was blocked — nothing is being captured');
+          }
         }
       }
     });

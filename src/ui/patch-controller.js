@@ -50,6 +50,17 @@ export class PatchController {
     // The app's volume control targets the dry master, which is out of the
     // audible path while patched — forward it to the rack's Monitor so the
     // volume knob never mysteriously stops working.
+    // Recording taps the master gain, so a muted app records silence. Say so
+    // BEFORE the user records several minutes of nothing.
+    const origRec = this.engine.getRecordingStream.bind(this.engine);
+    this.engine.getRecordingStream = () => {
+      const g = this.engine.gainNode ? this.engine.gainNode.gain.value : 1;
+      if (g < 0.01 && this.ctx.notify) {
+        this.ctx.notify.warn('Volume is at zero \u2014 this recording will be silent');
+      }
+      return origRec();
+    };
+
     const origVol = this.engine.setVolume.bind(this.engine);
     this.engine.setVolume = v => {
       origVol(v);
@@ -64,6 +75,9 @@ export class PatchController {
       this.rack = new PatchRack(this.engine, this.inputMap);
       this.rack.onClose = () => this.toggle();
       this.rack.onTour = (id) => { if (this.ctx.tour) this.ctx.tour.start(id); };
+      this.rack.onLightsError = (msg) => {
+        if (this.ctx.notify) this.ctx.notify.error('DMX stopped — ' + msg + '. Check the target address.');
+      };
       // The frame pump lives in the popout controller; the stream needs it
       // running even when no display window is open.
       this.rack.onFramesWanted = (on) => {
@@ -80,6 +94,11 @@ export class PatchController {
     } else {
       this.rack.enable();
       document.querySelector('.app').classList.add('patch-open');
+      // The rack is mono internally. A producer measured his stereo mix
+      // collapsing to one channel and had no way to know it happened.
+      if (this.ctx.notify) {
+        this.ctx.notify.say('Patch rack open \u2014 audio runs through it in mono while it is', 'info', 6000);
+      }
       // First time in the rack, offer the patch tour once the DOM has settled.
       if (!TourController.seen('patch') && this.ctx.tour) {
         setTimeout(() => {

@@ -20,6 +20,7 @@ import { BpmDisplay } from './ui/bpm-display.js';
 import { FirstRunHint } from './ui/first-run-hint.js';
 import { PatchController } from './ui/patch-controller.js';
 import { TourController } from './ui/tour-controller.js';
+import { Notifier } from './ui/notifier.js';
 
 // ─────────────────────────────────────────────────────────────
 //  UIController — thin orchestrator that delegates to domain
@@ -54,6 +55,7 @@ export class UIController {
     const ctx = {
       ui:          this,      // lets a controller reach a sibling (patch -> popout)
       tour:        this._tour = new TourController(),
+      notify:      this._notifier = new Notifier(),
       engine:      this.engine,
       scope:       this.scope,
       sigGen:      this.sigGen,
@@ -114,6 +116,7 @@ export class UIController {
     this._ctxMenu.init();
     this._bpmDisplay.init();
     this._firstRun.init();
+    this._notifier.init();
     this._patch.init();
 
     // Tooltip system — initialized after all controls exist

@@ -39,3 +39,25 @@
 @media (prefers-reduced-motion: reduce) {
   .tour-spot, .tour-card { transition: none; }
 }
+
+/* ── App notices ──────────────────────────────────────────────────────
+   One status line, bottom-centre, out of the way of the scope and the
+   rack. role="status" on the element makes every message here the app's
+   first and only screen-reader announcement channel. */
+#app-notice {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 995; max-width: min(560px, 88vw);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 11.5px; line-height: 1.5; letter-spacing: .02em;
+  padding: 9px 14px; border-radius: 5px;
+  background: #141715; color: #e8e4d8;
+  border: 1px solid #2c322e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
+  opacity: 1; transition: opacity .25s;
+  pointer-events: none;
+}
+#app-notice.nt-hidden { opacity: 0; }
+#app-notice.nt-info  { border-color: #2c322e; }
+#app-notice.nt-warn  { border-color: #ffb300; color: #ffd980; }
+#app-notice.nt-error { border-color: #ff3b30; color: #ff9c96; }
+@media (prefers-reduced-motion: reduce) { #app-notice { transition: none; } }

@@ -8,6 +8,7 @@ import { resetPhosphor } from './ui-utils.js';
 // ─────────────────────────────────────────────────────────────
 export class SignalGenController {
   constructor(ctx) {
+    this.notify = ctx.notify || null;
     this.scope       = ctx.scope;
     this.engine      = ctx.engine;
     this.sigGen      = ctx.sigGen;
@@ -123,13 +124,12 @@ export class SignalGenController {
       sg.init(e.actx); sg.start(e.visBusL, e.visBusR);
       btnGenStart.disabled = true;  btnGenStop.disabled = false;
       btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
-      if (s.mode !== 'XY') {
-        s.mode = 'XY';
-        document.getElementById('btn-xy').classList.add('active');
-        document.getElementById('btn-yt').classList.remove('active');
-        document.getElementById('btn-vs').classList.remove('active');
-        document.getElementById('btn-fs').classList.remove('active');
-        resetPhosphor(s);
+      // Do NOT silently change the display mode. Someone measuring a signal
+      // in YT lost their measurements to a mode switch they never asked for.
+      // Offer it instead: the generator is most interesting in XY, but that is
+      // the user's call.
+      if (s.mode !== 'XY' && this.notify) {
+        this.notify.say('Signal generator running \u2014 switch to XY to see Lissajous figures', 'info', 6000);
       }
       document.getElementById('st-src').textContent = 'Signal Gen';
     });
