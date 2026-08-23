@@ -263,6 +263,7 @@ export class PatchRack {
         <button class="pk-btn pk-active" id="pk-mode">PATCHING</button>
         <select class="pk-btn" id="pk-book" title="Patch book — starting points and your saved patches"></select>
         <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
+        <button class="pk-btn" id="pk-stream" title="Serve the visuals to OBS / Resolume over localhost">STREAM</button>
         <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
         <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
         <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
@@ -304,6 +305,9 @@ export class PatchRack {
     let html = `<div class="pk-name">${m.name}</div>` +
       `<div class="pk-sub"${m.subDyn ? ` data-pk-sub="${m.subDyn}"` : ''}${m.id === 'input' ? ' data-pk-sub-input' : ''}>${m.sub}</div>`;
     if (m.led) html += `<div class="pk-led" id="${m.led}"></div>`;
+    if (m.id === 'lights') html +=
+      `<input class="pk-input" id="pk-dmx-host" value="2.255.255.255" spellcheck="false" title="Art-Net target: a node IP, or a broadcast address">` +
+      `<button class="pk-btn" id="pk-dmx-btn">SEND DMX</button>`;
     if (m.waves) html += `<div class="pk-waves">` +
       ['sine', 'triangle', 'square', 'sawtooth'].map((w, i) =>
         `<button class="pk-btn pk-wave${i === 0 ? ' pk-active' : ''}" data-pk-wave="${w}">${['SIN', 'TRI', 'SQR', 'SAW'][i]}</button>`).join('') + `</div>`;
@@ -1132,6 +1136,46 @@ export class PatchRack {
       this.overlay.querySelector('#pk-book').value = 's:' + name;
       this._flashHint('saved as \u201c' + name + '\u201d');
     });
+
+    // STREAM: start/stop the localhost MJPEG server for OBS / Resolume.
+    const streamBtn = this.overlay.querySelector('#pk-stream');
+    streamBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const api = window.electronAPI;
+      if (!api || !api.streamStart) { this._flashHint('streaming needs the desktop app'); return; }
+      if (this._streamUrl) {
+        await api.streamStop();
+        this._streamUrl = null;
+        streamBtn.classList.remove('pk-active');
+        streamBtn.textContent = 'STREAM';
+        if (this.onFramesWanted) this.onFramesWanted(false);
+        this._flashHint('stream stopped');
+        return;
+      }
+      const res = await api.streamStart({});
+      if (!res || !res.ok) { this._flashHint('stream failed: ' + ((res && res.error) || 'unknown')); return; }
+      this._streamUrl = res.url;
+      streamBtn.classList.add('pk-active');
+      streamBtn.textContent = 'STREAMING';
+      if (this.onFramesWanted) this.onFramesWanted(true);
+      this._flashHint('add a Browser source in OBS: ' + res.url);
+    });
+
+    // LIGHTS: DMX output toggle lives on the module faceplate.
+    const dmxBtn = this.overlay.querySelector('#pk-dmx-btn');
+    if (dmxBtn) {
+      dmxBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const hostEl = this.overlay.querySelector('#pk-dmx-host');
+        const on = this.toggleLights({ host: (hostEl && hostEl.value.trim()) || '2.255.255.255', universe: 0 });
+        dmxBtn.classList.toggle('pk-active', on);
+        dmxBtn.textContent = on ? 'SENDING' : 'SEND DMX';
+        this._flashHint(on ? 'Art-Net going to ' + ((hostEl && hostEl.value.trim()) || '2.255.255.255')
+                           : 'DMX output stopped');
+      });
+      const hostEl = this.overlay.querySelector('#pk-dmx-host');
+      if (hostEl) hostEl.addEventListener('pointerdown', e => e.stopPropagation());
+    }
 
     // mode toggle + close
     const modeBtn = this.overlay.querySelector('#pk-mode');

@@ -126,6 +126,12 @@
 .pk-led.pk-on-amber { background: var(--pk-cv); box-shadow: 0 0 6px var(--pk-cv); }
 
 .pk-waves { display: flex; gap: 4px; }
+.pk-input {
+  font-family: var(--pk-mono); font-size: 9px; letter-spacing: .04em;
+  background: #101312; color: var(--pk-ink); border: 1px solid #2c322e;
+  border-radius: 3px; padding: 3px 5px; width: 92%; text-align: center;
+}
+.pk-input:focus-visible { outline: 1px solid var(--pk-cv); outline-offset: 1px; }
 #pk-cables { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .pk-mini {
   border: 2px solid #060807; background: #020604; border-radius: 4px;

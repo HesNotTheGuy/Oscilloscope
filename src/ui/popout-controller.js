@@ -23,6 +23,7 @@ export class PopOutController {
     let _open     = false;
     let _rafId    = null;
     let _lastSent = 0;
+    let _wanted   = false;   // an external sink (the OBS stream) wants frames
 
     const _refreshDisplays = async () => {
       const displays = await window.electronAPI.getDisplays();
@@ -39,7 +40,7 @@ export class PopOutController {
     _refreshDisplays();
 
     const _streamLoop = () => {
-      if (!_open) return;
+      if (!_open && !_wanted) return;
       _rafId = requestAnimationFrame(_streamLoop);
       const now = performance.now();
       if (now - _lastSent < 33) return;
@@ -62,8 +63,17 @@ export class PopOutController {
       _streamLoop();
     };
 
+    // Called by the stream server toggle. Frames are captured once and fanned
+    // out in main, so the display window and the stream share this one pump.
+    this.setFramesWanted = (on) => {
+      _wanted = !!on;
+      if (_wanted && !_rafId) _streamLoop();
+      if (!_wanted && !_open && _rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+    };
+
     const _closeDisplay = () => {
       _open = false;
+      if (_wanted) return _keepPumping();
       if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
       btn.textContent = '⤢ POP OUT';
       btn.classList.remove('accent');
@@ -72,9 +82,18 @@ export class PopOutController {
       window.electronAPI.closeDisplay();
     };
 
+    // Closing the display while streaming must not kill the pump.
+    const _keepPumping = () => {
+      btn.textContent = '\u2922 POP OUT';
+      btn.classList.remove('accent');
+      btnFs.textContent = '\u26f6 FULLSCREEN';
+      btnFs.classList.remove('accent');
+      window.electronAPI.closeDisplay();
+    };
+
     const _reset = () => {
       _open = false;
-      if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+      if (_rafId && !_wanted) { cancelAnimationFrame(_rafId); _rafId = null; }
       btn.textContent = '⤢ POP OUT';
       btn.classList.remove('accent');
       btnFs.textContent = '⛶ FULLSCREEN';

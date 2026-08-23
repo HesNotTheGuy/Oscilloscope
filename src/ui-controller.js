@@ -51,6 +51,7 @@ export class UIController {
 
     // Shared context passed to every domain controller
     const ctx = {
+      ui:          this,      // lets a controller reach a sibling (patch -> popout)
       engine:      this.engine,
       scope:       this.scope,
       sigGen:      this.sigGen,

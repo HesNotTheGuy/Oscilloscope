@@ -9,6 +9,7 @@ import { PatchRack, patchKnobIds } from '../patch/patch-rack.js';
 // ─────────────────────────────────────────────────────────────
 export class PatchController {
   constructor(ctx) {
+    this.ctx = ctx;
     this.engine = ctx.engine;
     this.ensureAudio = ctx.ensureAudio;
     this.inputMap = ctx.inputMap || null;
@@ -60,6 +61,12 @@ export class PatchController {
     if (!this.rack) {
       this.rack = new PatchRack(this.engine, this.inputMap);
       this.rack.onClose = () => this.toggle();
+      // The frame pump lives in the popout controller; the stream needs it
+      // running even when no display window is open.
+      this.rack.onFramesWanted = (on) => {
+        const po = this.ctx.ui && this.ctx.ui._popout;
+        if (po && po.setFramesWanted) po.setFramesWanted(on);
+      };
       // Debug hook for automated verification (same shape as the prototype's).
       window._patchRack = this.rack;
     }
