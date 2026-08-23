@@ -268,8 +268,7 @@ export class PatchRack {
         <select class="pk-btn" id="pk-board" title="Your board: restore a hidden module, or reset the layout"></select>
         <button class="pk-btn" id="pk-tour" title="Replay the patch tour">?</button>
         <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
-        <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
-        <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
+        <button class="pk-btn pk-close" id="pk-close" title="Collapse the rack (Esc)">✕ CLOSE</button>
       </div>
       <div class="pk-legend">
         <span><span class="pk-swatch pk-sw-audio"></span>sound</span>
@@ -278,14 +277,17 @@ export class PatchRack {
         <span class="pk-warn" id="pk-warn">live input is audible through the patch &mdash; headphones recommended</span>
       </div>
       <div class="pk-rack" id="pk-rack"><canvas id="pk-cables"></canvas></div>`;
-    document.body.appendChild(el);
+    // Dock under the scope rather than covering it. A rack you can only see
+    // by hiding the instrument it is patching is the wrong shape: people
+    // reasonably expect the controls to sit with the oscilloscope, not on a
+    // second screen. zone-bottom is full width, which is the rack's shape,
+    // and the rig system only manages .fp-section nodes so this is safe here.
+    (document.getElementById('patch-dock') || document.body).appendChild(el);
     this.overlay = el;
     this.rack = el.querySelector('#pk-rack');
     this.cablesCv = el.querySelector('#pk-cables');
     this.cctx = this.cablesCv.getContext('2d');
     this.hintEl = el.querySelector('#pk-hint');
-    this.miniCv = el.querySelector('#pk-mini');
-    this.miniCtx = this.miniCv.getContext('2d');
     this._hintIdle = this.hintEl.innerHTML;
     this._hintLocked = 'cables locked &mdash; drag knobs, click jacks to probe';
 
@@ -1702,34 +1704,6 @@ export class PatchRack {
     }
   }
 
-  _drawMini() {
-    if (!this.miniCtx || !this.engine.analyserL) return;
-    const mc = this.miniCtx, W = this.miniCv.width, H = this.miniCv.height;
-    mc.setTransform(1, 0, 0, 1, 0, 0);
-    mc.fillStyle = '#020604'; mc.fillRect(0, 0, W, H);
-    mc.strokeStyle = 'rgba(0,255,65,0.10)'; mc.lineWidth = 1;
-    mc.beginPath();
-    for (let i = 1; i < 8; i++) { mc.moveTo(i * W / 8, 0); mc.lineTo(i * W / 8, H); }
-    mc.moveTo(0, H / 2); mc.lineTo(W, H / 2);
-    mc.stroke();
-    const buf = this.engine.getDataL();
-    const isCv = this.probeId && this.jackEls[this.probeId] && this.jackEls[this.probeId].dataset.kind === 'cv';
-    const col = isCv ? '#ffb300' : '#00ff41';
-    const span = 2048;
-    let start = 0;
-    for (let i = 1; i < span; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { start = i; break; }
-    mc.strokeStyle = col; mc.lineWidth = 2; mc.shadowColor = col; mc.shadowBlur = 6;
-    mc.beginPath();
-    for (let x = 0; x < W; x++) {
-      const v = buf[start + Math.floor(x / W * span)] || 0;
-      const y = H / 2 - v * H * 0.44;
-      x ? mc.lineTo(x, y) : mc.moveTo(x, y);
-    }
-    mc.stroke(); mc.shadowBlur = 0;
-    mc.fillStyle = col; mc.font = '600 15px "IBM Plex Mono", monospace';
-    mc.fillText(this.probeId ? 'PROBE ' + this.probeId : 'OUT', 8, 18);
-  }
-
   _startLoop() {
     this._reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = () => {
@@ -1743,7 +1717,6 @@ export class PatchRack {
         this._drawCable(from, { x: this._drag.x, y: this._drag.y }, this.jackEls[this._drag.fromId].dataset.kind, null, -1, false);
         this.cctx.globalAlpha = 1;
       }
-      this._drawMini();
       this._pumpLights();
       if (!this._warnNext || performance.now() > this._warnNext) {   // time-based: frame rate varies
         this._warnNext = performance.now() + 800;

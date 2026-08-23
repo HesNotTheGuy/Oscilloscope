@@ -108,6 +108,11 @@
 
   </div><!-- /layout-body -->
 
+  <!-- PATCH rack dock. Its own element rather than a panel zone: zone-bottom
+       is a 4-column panel flow and is hidden outright in tabbed rig mode,
+       either of which would break or disappear the rack. -->
+  <div id="patch-dock"></div>
+
   <!-- BOTTOM zone (full width) -->
   <div class="panel-zone zone-bottom" id="zone-bottom" data-zone="bottom"></div>
 

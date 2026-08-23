@@ -75,9 +75,11 @@ export class PatchController {
     }
     if (this.rack.enabled) {
       this.rack.disable();
+      document.querySelector('.app').classList.remove('patch-open');
       this.btn.classList.remove('active');
     } else {
       this.rack.enable();
+      document.querySelector('.app').classList.add('patch-open');
       // First time in the rack, offer the patch tour once the DOM has settled.
       if (!TourController.seen('patch') && this.ctx.tour) {
         setTimeout(() => {

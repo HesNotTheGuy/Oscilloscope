@@ -1,3 +1,16 @@
+#patch-dock { width: 100%; }
+
+/* With the rack open both halves have to fit the window, otherwise opening it
+   just pushes the scope below the fold and you scroll to see the thing you are
+   patching.
+
+   Constrain the BEZEL, not the canvas. The trace canvas has a fixed 1800x1000
+   backing store scaled by CSS, while the grid/measurement overlay is sized to
+   its parent at 100% — shrink the canvas alone and the two desync, leaving a
+   full-width grid with a narrow trace floating in the middle of it. Capping the
+   container scales both together. 68vh wide is 38vh tall at the scope's 9:5. */
+.app.patch-open .crt-bezel { max-width: 68vh; }
+
 /* ── PATCH mode rack ──────────────────────────────────────────────────
    Self-contained palette (matches the PATCH-1 prototype), all classes
    pk- prefixed so nothing collides with the app's global styles. */
@@ -11,12 +24,15 @@
   --pk-cv: #ffb300;
   --pk-red: #ff3b30;
   --pk-mono: 'IBM Plex Mono', Consolas, monospace;
-  position: fixed; inset: 0; z-index: 950;
-  background: var(--pk-room);
+  /* Docked panel under the scope, not a fullscreen mode. */
+  position: relative; z-index: 1;
+  width: 100%; box-sizing: border-box;
+  max-height: 44vh; overflow: auto;
+  background: #0c0f0d;
+  border: 1px solid #232a25; border-radius: 6px;
   font-family: var(--pk-mono);
   color: var(--pk-ink);
   display: flex; flex-direction: column; align-items: center;
-  overflow: auto;
 }
 #pk-overlay.pk-hidden { display: none; }
 
@@ -27,7 +43,7 @@
   /* The rack is taller than the viewport now — keep the mini scope, mode
      toggle and patch book pinned instead of letting them scroll away. */
   position: sticky; top: 0; z-index: 10;
-  background: var(--pk-room);
+  background: #0c0f0d;
 }
 .pk-title { font-size: 17px; font-weight: 600; letter-spacing: .18em; }
 .pk-title em { font-style: normal; color: var(--pk-audio); }
@@ -142,9 +158,5 @@
 }
 .pk-input:focus-visible { outline: 1px solid var(--pk-cv); outline-offset: 1px; }
 #pk-cables { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-.pk-mini {
-  border: 2px solid #060807; background: #020604; border-radius: 4px;
-  box-shadow: 0 0 10px rgba(0,255,65,.12) inset; flex: 0 0 auto;
-}
 .pk-warn { display: none; color: var(--pk-cv); font-size: 9.5px; letter-spacing: .05em; }
 .pk-warn.pk-show { display: inline; }
