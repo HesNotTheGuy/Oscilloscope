@@ -117,8 +117,15 @@ export class TourController {
     // (Escape closes the rack, K opens the synth) don't fire mid-tour.
     this._onKey = e => {
       if (!this._els) return;
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this._end(); }
-      else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); this._advance(); }
+      // Escape always leaves. Arrows and Enter only drive the tour when the
+      // user isn't focused on a control — otherwise the tour swallows the very
+      // keystrokes it is teaching (arrows on a knob, Enter on a jack).
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this._end(); return; }
+      const t = e.target;
+      const onControl = t && t.closest && t.closest(
+        '[data-pk-knob],[data-pk-jack],input,select,textarea,button,[tabindex]:not([tabindex="-1"])');
+      if (onControl) return;
+      if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); this._advance(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); this._i = Math.max(0, this._i - 1); this._render(); }
     };
     document.addEventListener('keydown', this._onKey, true);

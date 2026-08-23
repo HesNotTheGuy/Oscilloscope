@@ -33,6 +33,27 @@ export class AudioController {
     });
     fileInput.addEventListener('change', ev => { const f = ev.target.files[0]; if (f) loadFile(e, f); });
 
+    // The welcome card tells people to drop a file "anywhere on the scope",
+    // and the drop zone itself is 0x0 until the SOURCE tab is open — so honour
+    // the instruction: accept an audio drop anywhere in the window.
+    const scopeEl = document.getElementById('scope');
+    const dropAnywhere = ev => {
+      const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (!f) return;
+      if (!/^audio\//.test(f.type) && !/\.(wav|mp3|ogg|flac|aac|m4a|opus|aiff?)$/i.test(f.name)) return;
+      ev.preventDefault();
+      if (scopeEl) scopeEl.classList.remove('drag-over');
+      loadFile(e, f);
+    };
+    window.addEventListener('dragover', ev => {
+      if (ev.dataTransfer && [...(ev.dataTransfer.types || [])].includes('Files')) {
+        ev.preventDefault();
+        if (scopeEl) scopeEl.classList.add('drag-over');
+      }
+    });
+    window.addEventListener('dragleave', () => { if (scopeEl) scopeEl.classList.remove('drag-over'); });
+    window.addEventListener('drop', dropAnywhere);
+
     // ── Playback ──
     btnPlay.addEventListener('click', () => {
       if (!e.buffer) return;

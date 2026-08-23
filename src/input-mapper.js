@@ -1,5 +1,12 @@
 'use strict';
 
+// Keys the browser owns for navigation and assistive tech. Binding or
+// preventDefault-ing these breaks keyboard access for the entire app.
+const RESERVED_KEYS = new Set(['tab', 'f6', 'f7']);
+// Where an action goes when its old binding turns out to be reserved.
+const RESERVED_REHOME = { 'd': 'scene.switchMode' };
+
+
 // ─────────────────────────────────────────────────────────────
 //  InputMapper — unified mapping from input sources (keyboard,
 //  MIDI, Stream Deck, scenes) to abstract actions.
@@ -112,6 +119,8 @@ export class InputMapper {
    * @param {string} action – action name
    */
   bindKey(key, action) {
+    // Reserved navigation keys are not bindable — see RESERVED_KEYS.
+    if (RESERVED_KEYS.has(String(key).toLowerCase())) return false;
     this._keyMap.set(key.toLowerCase(), action);
     this._saveMappings();
   }
@@ -150,8 +159,14 @@ export class InputMapper {
     this._kbHandler = ev => {
       const tag = ev.target.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (ev.target.isContentEditable) return;
 
       const key = ev.key.toLowerCase();
+      // Never intercept the keys the browser needs for navigation. Tab was
+      // bound to an action AND preventDefault'd here, which silently made the
+      // whole app unreachable by keyboard: focus could never leave <body>.
+      if (RESERVED_KEYS.has(key)) return;
+
       const action = this._keyMap.get(key);
       if (action) {
         ev.preventDefault();
@@ -326,9 +341,25 @@ export class InputMapper {
       if (!raw) return;
       const data = JSON.parse(raw);
       if (data.keys) {
+        // Migration: a saved map from before Tab became reserved still holds
+        // 'tab', and installDefaults() is skipped whenever ANY map exists — so
+        // returning users would keep a dead binding and never receive its
+        // replacement. Drop reserved keys, then re-home any action that lost
+        // its only binding, without disturbing genuine customizations.
+        let migrated = false;
+        const orphaned = new Set();
         for (const [k, v] of Object.entries(data.keys)) {
+          if (RESERVED_KEYS.has(k.toLowerCase())) { orphaned.add(v); migrated = true; continue; }
           this._keyMap.set(k, v);
         }
+        const bound = new Set(this._keyMap.values());
+        for (const [k, v] of Object.entries(RESERVED_REHOME)) {
+          if (orphaned.has(v) && !bound.has(v) && !this._keyMap.has(k)) {
+            this._keyMap.set(k, v);
+            migrated = true;
+          }
+        }
+        if (migrated) this._saveMappings();
       }
       if (data.midi) {
         for (const [k, v] of Object.entries(data.midi)) {
@@ -363,7 +394,7 @@ export class InputMapper {
       'r':   'scope.runStop',
       's':   'scope.single',
       '3':   'scene.toggle',
-      'tab': 'scene.switchMode',
+      'd':   'scene.switchMode',   // was Tab, which broke all keyboard access
       '?':   'help.toggle',
     };
 

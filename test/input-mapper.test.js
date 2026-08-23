@@ -163,6 +163,15 @@ describe('InputMapper', () => {
       expect(actions).toContain('scene.switchMode');
       expect(actions).toContain('help.toggle');
     });
+
+    it('never binds Tab, which would make the app keyboard-unreachable', () => {
+      mapper.installDefaults();
+      const bindings = mapper.getKeyBindings();
+      expect(Object.keys(bindings)).not.toContain('tab');
+      // and it must refuse a custom binding too
+      mapper.bindKey('tab', 'scene.switchMode');
+      expect(mapper.getKeyAction('tab')).toBeUndefined();
+    });
   });
 
   // ── resetToDefaults ───────────────────────────────────────
