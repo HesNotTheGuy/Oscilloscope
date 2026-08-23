@@ -56,7 +56,11 @@
   border-radius: 3px; margin: 0 4px; position: relative;
   box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 -1px 0 rgba(0,0,0,.6) inset;
 }
-.pk-row { display: flex; gap: 5px; padding: 5px 8px; }
+.pk-row { display: flex; gap: 5px; padding: 5px 8px; min-height: 8px; }
+.pk-name { cursor: grab; user-select: none; }
+.pk-module.pk-moving { opacity: .75; cursor: grabbing; box-shadow: 0 0 0 1px var(--pk-cv), 0 10px 24px rgba(0,0,0,.7); }
+.pk-module.pk-moving .pk-name { cursor: grabbing; }
+.pk-rack.pk-arranging .pk-module:not(.pk-moving) { transition: transform .12s ease; }
 .pk-module {
   background: linear-gradient(178deg, var(--pk-panel-hi), var(--pk-panel) 30%, #101312);
   border: 1px solid #060807; border-radius: 4px;

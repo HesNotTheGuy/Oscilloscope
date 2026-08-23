@@ -223,6 +223,7 @@ const RECIPES = {
              ['lfo.out', 'vcf.cv'], ['echo.out', 'out.in']] },
 };
 const STORE_KEY = 'dso1.patches';
+const BOARD_KEY = 'dso1.board';
 
 export class PatchRack {
   constructor(engine, inputMap = null) {
@@ -264,6 +265,7 @@ export class PatchRack {
         <select class="pk-btn" id="pk-book" title="Patch book — starting points and your saved patches"></select>
         <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
         <button class="pk-btn" id="pk-stream" title="Serve the visuals to OBS / Resolume over localhost">STREAM</button>
+        <select class="pk-btn" id="pk-board" title="Your board: restore a hidden module, or reset the layout"></select>
         <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
         <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
         <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
@@ -295,12 +297,129 @@ export class PatchRack {
       this.rack.insertBefore(rowEl, this.cablesCv);
       this.rack.insertBefore(rail(), this.cablesCv);
     }
+    this.rowEls = [...this.rack.querySelectorAll('.pk-row')];
+    this.moduleEls = {};
+    this.rack.querySelectorAll('[data-pk-module]').forEach(el => { this.moduleEls[el.dataset.pkModule] = el; });
     this._bindUI();
+    this._loadBoard();
+    this._applyBoard();
+  }
+
+  // ── The board: which modules exist, in what order, on which rail ──
+  // Spatial memory is the whole point of a rack — you stop reading labels and
+  // just reach for where the thing lives. That only works if YOUR arrangement
+  // is the one that persists, so the layout is saved on every change.
+  _defaultBoard() {
+    return { rows: ROWS.map(row => row.map(m => m.id)), hidden: [] };
+  }
+
+  _loadBoard() {
+    let b = null;
+    try { b = JSON.parse(localStorage.getItem(BOARD_KEY) || 'null'); } catch (_) {}
+    const def = this._defaultBoard();
+    if (!b || !Array.isArray(b.rows)) { this.board = def; return; }
+    // Reconcile with the modules that actually exist: drop unknown ids (a
+    // module removed since the layout was saved) and append genuinely new
+    // ones, so an app update never strands a module off the board.
+    const known = new Set(Object.keys(this.moduleEls));
+    const placed = new Set();
+    const rows = b.rows.map(r => r.filter(id => {
+      if (!known.has(id) || placed.has(id)) return false;
+      placed.add(id); return true;
+    }));
+    while (rows.length < def.rows.length) rows.push([]);
+    for (const row of def.rows) {
+      for (const id of row) {
+        if (placed.has(id)) continue;
+        placed.add(id);
+        rows[rows.length - 1].push(id);     // new modules land on the last rail
+      }
+    }
+    this.board = { rows, hidden: (b.hidden || []).filter(id => known.has(id)) };
+  }
+
+  _saveBoard() {
+    try { localStorage.setItem(BOARD_KEY, JSON.stringify(this.board)); } catch (_) {}
+  }
+
+  // Move the existing elements rather than rebuilding them: every knob, jack
+  // and MIDI badge keeps its listeners and its state.
+  _applyBoard() {
+    const hidden = new Set(this.board.hidden);
+    this.board.rows.forEach((ids, i) => {
+      const rowEl = this.rowEls[i];
+      if (!rowEl) return;
+      for (const id of ids) {
+        const el = this.moduleEls[id];
+        if (el) rowEl.appendChild(el);       // appendChild MOVES a live node
+      }
+    });
+    for (const id in this.moduleEls) {
+      this.moduleEls[id].style.display = hidden.has(id) ? 'none' : '';
+    }
+    // An empty rail is just a floating bar; fold it away.
+    this.rowEls.forEach((rowEl, i) => {
+      const visible = (this.board.rows[i] || []).some(id => !hidden.has(id));
+      rowEl.style.display = visible ? '' : 'none';
+      const rail = rowEl.previousElementSibling;
+      if (rail && rail.classList.contains('pk-rail')) rail.style.display = visible ? '' : 'none';
+    });
+    this._refreshBoardMenu();
+    this._layout();
+  }
+
+  _refreshBoardMenu() {
+    const sel = this.overlay.querySelector('#pk-board');
+    if (!sel) return;
+    const names = {};
+    for (const row of ROWS) for (const m of row) names[m.id] = m.name;
+    sel.innerHTML = '<option value="">BOARD</option>' +
+      (this.board.hidden.length
+        ? '<optgroup label="show again">' +
+          this.board.hidden.map(id => `<option value="show:${id}">${names[id] || id}</option>`).join('') +
+          '</optgroup>'
+        : '') +
+      '<optgroup label="layout"><option value="reset">reset to default</option></optgroup>';
+  }
+
+  hideModule(id) {
+    if (!this.moduleEls[id]) return false;               // unknown id never enters the board
+    // Refuse while patched: a hidden module's jacks have no position, so its
+    // cables would draw to nowhere. Non-destructive beats clever here.
+    if (this.cables.some(c => c.from.split('.')[0] === id || c.to.split('.')[0] === id)) {
+      this._flashHint('unplug that module first');
+      return false;
+    }
+    if (!this.board.hidden.includes(id)) this.board.hidden.push(id);
+    this._saveBoard();
+    this._applyBoard();
+    return true;
+  }
+
+  showModule(id) {
+    this.board.hidden = this.board.hidden.filter(x => x !== id);
+    this._saveBoard();
+    this._applyBoard();
+  }
+
+  resetBoard() {
+    this.board = this._defaultBoard();
+    this._saveBoard();
+    this._applyBoard();
+    this._flashHint('board reset');
+  }
+
+  // Read the live DOM back into the board model after a drag.
+  _captureOrder() {
+    this.board.rows = this.rowEls.map(rowEl =>
+      [...rowEl.querySelectorAll('[data-pk-module]')].map(el => el.dataset.pkModule));
+    this._saveBoard();
   }
 
   _buildModule(m) {
     const mod = document.createElement('div');
     mod.className = 'pk-module';
+    mod.dataset.pkModule = m.id;
     mod.style.width = m.w + 'px';
     let html = `<div class="pk-name">${m.name}</div>` +
       `<div class="pk-sub"${m.subDyn ? ` data-pk-sub="${m.subDyn}"` : ''}${m.id === 'input' ? ' data-pk-sub-input' : ''}>${m.sub}</div>`;
@@ -901,11 +1020,19 @@ export class PatchRack {
 
   serialize() {
     return { knobs: { ...this.knobs }, lfoType: this._lfoType,
-             cables: this.cables.map(c => [c.from, c.to]) };
+             cables: this.cables.map(c => [c.from, c.to]),
+             board: this.board ? JSON.parse(JSON.stringify(this.board)) : null };
   }
   applyPatch(data) {
     this._pushUndo();                                    // recipes are undoable too
     while (this.cables.length) this.removeCable(0);
+    // A saved patch restores the board it was built on; the shipped recipes
+    // carry no board and leave your arrangement alone.
+    if (data.board && Array.isArray(data.board.rows)) {
+      this.board = data.board;
+      this._saveBoard();
+      this._applyBoard();
+    }
     if (data.knobs) for (const id in data.knobs) this.setKnob(id, data.knobs[id]);
     if (data.lfoType) {
       this._lfoType = data.lfoType;
@@ -1076,6 +1203,64 @@ export class PatchRack {
   _bindUI() {
     const rack = this.rack;
     this.overlay.querySelectorAll('[data-pk-jack]').forEach(el => { this.jackEls[el.dataset.pkJack] = el; });
+
+    // Modules are dragged by the name plate — the body is full of knobs and
+    // jacks, and the plate is where you'd grab a real module anyway.
+    this.overlay.querySelectorAll('.pk-name').forEach(plate => {
+      const mod = plate.closest('[data-pk-module]');
+      if (!mod) return;
+      plate.addEventListener('pointerdown', e => {
+        if (this.playMode) return;                  // performing: board is locked
+        e.preventDefault(); e.stopPropagation();
+        try { plate.setPointerCapture(e.pointerId); } catch (_) {}
+        this._moveDrag = { el: mod, moved: false };
+        mod.classList.add('pk-moving');
+        this.rack.classList.add('pk-arranging');
+      });
+      // Double-click the plate to take a module off your board.
+      plate.addEventListener('dblclick', e => {
+        e.preventDefault(); e.stopPropagation();
+        this.hideModule(mod.dataset.pkModule);
+      });
+    });
+    addEventListener('pointermove', e => {
+      const d = this._moveDrag;
+      if (!d) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const overMod = el && el.closest ? el.closest('[data-pk-module]') : null;
+      const overRow = el && el.closest ? el.closest('.pk-row') : null;
+      if (overMod && overMod !== d.el) {
+        // Live reorder: insert before or after depending on which half of the
+        // neighbour we're over, so the board rearranges under the cursor.
+        const r = overMod.getBoundingClientRect();
+        const after = e.clientX > r.left + r.width / 2;
+        overMod.parentNode.insertBefore(d.el, after ? overMod.nextSibling : overMod);
+        d.moved = true;
+        this._layout();                             // cables follow the module live
+      } else if (overRow && !overMod && overRow !== d.el.parentNode) {
+        overRow.appendChild(d.el);                  // dropped onto an empty stretch of rail
+        d.moved = true;
+        this._layout();
+      }
+    });
+    addEventListener('pointerup', () => {
+      const d = this._moveDrag;
+      if (!d) return;
+      d.el.classList.remove('pk-moving');
+      this.rack.classList.remove('pk-arranging');
+      this._moveDrag = null;
+      if (d.moved) { this._captureOrder(); this._layout(); this._flashHint('board saved'); }
+    });
+
+    // board menu
+    const boardSel = this.overlay.querySelector('#pk-board');
+    boardSel.addEventListener('change', () => {
+      const v = boardSel.value;
+      boardSel.value = '';
+      if (v === 'reset') this.resetBoard();
+      else if (v.startsWith('show:')) this.showModule(v.slice(5));
+    });
+    boardSel.addEventListener('pointerdown', e => e.stopPropagation());
 
     // knobs
     this.overlay.querySelectorAll('[data-pk-knob]').forEach(k => {
