@@ -19,6 +19,7 @@ import { CanvasContextMenuController } from './ui/canvas-context-menu.js';
 import { BpmDisplay } from './ui/bpm-display.js';
 import { FirstRunHint } from './ui/first-run-hint.js';
 import { PatchController } from './ui/patch-controller.js';
+import { TourController } from './ui/tour-controller.js';
 
 // ─────────────────────────────────────────────────────────────
 //  UIController — thin orchestrator that delegates to domain
@@ -52,6 +53,7 @@ export class UIController {
     // Shared context passed to every domain controller
     const ctx = {
       ui:          this,      // lets a controller reach a sibling (patch -> popout)
+      tour:        this._tour = new TourController(),
       engine:      this.engine,
       scope:       this.scope,
       sigGen:      this.sigGen,

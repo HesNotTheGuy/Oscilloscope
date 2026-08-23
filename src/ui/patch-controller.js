@@ -1,6 +1,7 @@
 'use strict';
 
 import { PatchRack, patchKnobIds } from '../patch/patch-rack.js';
+import { TourController } from './tour-controller.js';
 
 // ─────────────────────────────────────────────────────────────
 //  PatchController — owns the PATCH button and the rack overlay.
@@ -61,6 +62,7 @@ export class PatchController {
     if (!this.rack) {
       this.rack = new PatchRack(this.engine, this.inputMap);
       this.rack.onClose = () => this.toggle();
+      this.rack.onTour = (id) => { if (this.ctx.tour) this.ctx.tour.start(id); };
       // The frame pump lives in the popout controller; the stream needs it
       // running even when no display window is open.
       this.rack.onFramesWanted = (on) => {
@@ -75,6 +77,12 @@ export class PatchController {
       this.btn.classList.remove('active');
     } else {
       this.rack.enable();
+      // First time in the rack, offer the patch tour once the DOM has settled.
+      if (!TourController.seen('patch') && this.ctx.tour) {
+        setTimeout(() => {
+          if (this.rack && this.rack.enabled && !this.ctx.tour.running) this.ctx.tour.start('patch');
+        }, 500);
+      }
       // entering patch mode keeps the current loudness
       const g = this.engine.gainNode ? this.engine.gainNode.gain.value : 0.8;
       this.rack.setKnob('out.monitor', Math.min(1, Math.max(0, g)));

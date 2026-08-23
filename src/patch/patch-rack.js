@@ -266,6 +266,7 @@ export class PatchRack {
         <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
         <button class="pk-btn" id="pk-stream" title="Serve the visuals to OBS / Resolume over localhost">STREAM</button>
         <select class="pk-btn" id="pk-board" title="Your board: restore a hidden module, or reset the layout"></select>
+        <button class="pk-btn" id="pk-tour" title="Replay the patch tour">?</button>
         <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
         <canvas class="pk-mini" id="pk-mini" width="560" height="132" style="width:280px;height:66px"></canvas>
         <button class="pk-btn pk-close" id="pk-close" title="Back to the scope (Esc)">✕ CLOSE</button>
@@ -1250,6 +1251,12 @@ export class PatchRack {
       this.rack.classList.remove('pk-arranging');
       this._moveDrag = null;
       if (d.moved) { this._captureOrder(); this._layout(); this._flashHint('board saved'); }
+    });
+
+    const tourBtn = this.overlay.querySelector('#pk-tour');
+    if (tourBtn) tourBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (this.onTour) this.onTour('patch');
     });
 
     // board menu

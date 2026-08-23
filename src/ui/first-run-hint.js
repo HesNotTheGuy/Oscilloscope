@@ -16,7 +16,8 @@ const HINTS = [
 ];
 
 export class FirstRunHint {
-  constructor(_ctx) {
+  constructor(ctx) {
+    this.tour = (ctx && ctx.tour) || null;
     this._card      = null;
     this._onKeyDown = null;
     this._onDrop    = null;
@@ -52,6 +53,19 @@ export class FirstRunHint {
       rows.appendChild(row);
     }
     card.appendChild(rows);
+
+    // Offered, never imposed: the tour is a button next to "Got it", not
+    // something that starts talking at you the moment the app opens.
+    if (this.tour) {
+      const tourBtn = document.createElement('button');
+      tourBtn.className = 'sys-btn frh-btn frh-tour-btn';
+      tourBtn.textContent = 'Take the tour';
+      tourBtn.addEventListener('click', () => {
+        this._dismiss();
+        setTimeout(() => this.tour.start('basics'), 350);   // let the card fade first
+      });
+      card.appendChild(tourBtn);
+    }
 
     const btn = document.createElement('button');
     btn.className = 'sys-btn frh-btn';
