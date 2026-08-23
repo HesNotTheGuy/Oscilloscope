@@ -33,6 +33,7 @@
 - [The Scope Display](#the-scope-display)
 - [Audio Input](#audio-input)
 - [Signal Generator & Lissajous](#signal-generator--lissajous)
+- [PATCH Mode](#patch-mode)
 - [Beam Effects](#beam-effects)
 - [Frequency Filter](#frequency-filter)
 - [3D / 2D Scene Mode](#3d--2d-scene-mode)
@@ -46,6 +47,7 @@
 - [Keyboard Synth](#keyboard-synth)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [MIDI Control](#midi-control)
+- [Lighting & Streaming Output](#lighting--streaming-output)
 - [Easter Eggs](#easter-eggs)
 - [Installation](#installation)
 - [Tech Stack](#tech-stack)
@@ -64,6 +66,8 @@ DSO-1 is a desktop oscilloscope visualizer that renders audio as real-time phosp
 
 It's a real oscilloscope first. Every control maps to something an actual oscilloscope does: dual channels, adjustable V/DIV, timebase, trigger system, AC/DC coupling, frequency measurements. Then it goes further with GPU shaders, beat detection, 3D models, image tracing, tiling grids, and generative motion effects.
 
+And in **[PATCH mode](#patch-mode)** it stops being only a visualizer and becomes an instrument: a modular rack of 28 modules you wire together with cables that show the signal travelling through them. Route a song through a filter and an echo, let the music modulate its own knobs, or unplug the input entirely and let the rack play a song by itself.
+
 ---
 
 ## Quick Start
@@ -77,7 +81,11 @@ npm start
 
 Or grab the installer from the [Releases](../../releases) page — no Node.js required.
 
-On first launch a one-time welcome card points you at the essentials: drag in an audio file, press **K** for the keyboard synth, or **?** for the full shortcut list.
+On first launch a welcome card points you at the essentials: drag in an audio file, press **K** for the keyboard synth, or **?** for the full shortcut list. It also offers a short **guided tour** that spotlights each control in turn — entirely optional, skippable at any step, and PATCH mode has its own tour the first time you open it (replay it any time from the **?** button in the rack header).
+
+<p align="center">
+  <img src="docs/screenshots/55-tour-basics.png" alt="The optional guided tour" width="860">
+</p>
 
 ---
 
@@ -208,6 +216,75 @@ Rather than hard-coded shape buttons, the generator panel includes a personal **
 | Chaos | 1:π/2 | 37° | Sawtooth |
 | Flower | 1:1.5 | 90° | Sine |
 | Bowtie | 1:0.5 | 0° | Sine |
+
+---
+
+## PATCH Mode
+
+<p align="center">
+  <img src="docs/screenshots/50-patch-mode.png" alt="PATCH mode rack" width="860">
+</p>
+
+Click **PATCH** in the top bar and the audio the app is playing gets routed through a modular
+rack. Everything downstream — the scope, spectrum, vectorscope, spectrogram, every theme and beam
+effect — then shows the *processed* signal.
+
+The signature idea: **cables show their own signal**. Green cables carry sound, dashed amber cables
+carry modulation, and each one ripples with the live waveform travelling through it, with a moving
+dot showing which way the signal flows. You can read a patch without touching anything.
+
+### Patching
+
+- **Drag jack to jack** to connect. Either direction works, and the drop is forgiving — release
+  near a compatible port and it snaps.
+- **Click a cable** to unplug it. **Ctrl+Z** undoes any patch change.
+- **Click a jack** to *probe* it: that point in the circuit goes on the scope, exactly like touching
+  a probe to a test point on a bench. Click again to release.
+- **PATCHING / PLAYING** modes: playing locks the cables and the layout so a live set can't snag a
+  wire. Knobs and probing still work.
+- Feedback loops are allowed on purpose — patch a filter's output back into its own cutoff and it
+  screams instead of going silent.
+
+<p align="center">
+  <img src="docs/screenshots/52-patch-probe.png" alt="Probing a point in the circuit" width="860">
+</p>
+
+### The modules
+
+| | |
+|---|---|
+| **Sources** | Input (whatever the app is playing), VCO, Noise |
+| **Shaping** | VCF filter, Mix, Echo (with CV-modulatable time), Drive, Ghost (chorus), Fold (wavefolder) |
+| **Modulators** | LFO, Seq (8-step), S&H, Tracer (envelope follower), Pulse (beat-triggered), Drift, Sweep, Memory (Turing machine), Strange (Lorenz chaos, X/Y), Orbit (quadrature, X/Y), Divide (clock divider), Bounce |
+| **Voicing** | Clock, Env, Voice A/B (VCAs) |
+| **Outputs** | Out, Vector (drives the XY scope), Lights (DMX) |
+
+Modulators are the interesting half. **Tracer** turns the music's own loudness into control voltage,
+so a song can open and close its own filter. **Pulse** fires on detected beats. **Strange** is a
+Lorenz attractor — patch its X and Y into the **Vector** module and the vectorscope draws the
+butterfly. Every modulator's subtitle rewrites itself to describe what it's currently doing:
+patch the LFO into the filter and it reads *"wobbling the filter"*.
+
+### Patch book
+
+<p align="center">
+  <img src="docs/screenshots/51-patch-groovebox.png" alt="The groovebox recipe" width="860">
+</p>
+
+The **PATCH BOOK** menu holds working starting points rather than a blank rack — *wobble*,
+*self-playing*, *tape ghost*, *scream*, *step melody*, *weather*, *mutation*, *bouncing*,
+*lissajous*, and *groovebox*. Loading one is undoable, so exploring never costs you your patch.
+**SAVE** stores your own, and saved patches persist across restarts.
+
+**groovebox** is the one to try: it wires a complete two-voice song — clock, sequencer, envelope,
+VCAs, noise percussion, filter and echo — that plays with **no audio input at all**.
+
+### Your board
+
+Drag a module by its **name plate** to move it along a rail or to another rail; the cables stay
+attached and follow it. **Double-click** a name plate to hide a module you never use, and the
+**BOARD** menu brings it back or resets the layout. Your arrangement is saved automatically — the
+point of a rack is that you stop reading labels and reach for where a thing lives.
 
 ---
 
@@ -648,7 +725,42 @@ Plug in any MIDI controller and drive the scope with real hardware knobs and but
 - Devices hot-plug — connect or disconnect at any time and the status updates.
 - Bindings persist in localStorage; remove any binding from the list with ✕.
 
+**In PATCH mode, right-click any rack knob to learn it directly** — move a control on your
+controller and it binds, no dropdown involved. Bound knobs show an amber ring and the CC number,
+so a board stays readable at a glance. All 46 rack knobs are available as targets, and bindings
+survive a restart.
+
 Keyboard shortcuts are also remappable through the same InputMapper.
+
+---
+
+## Lighting & Streaming Output
+
+<p align="center">
+  <img src="docs/screenshots/54-patch-lights.png" alt="Lights and stream output" width="860">
+</p>
+
+Two outputs for using DSO-1 in a live or production context. Both use only Node built-ins — no
+extra dependencies, nothing to install.
+
+### Stage lighting (Art-Net / DMX)
+
+The **Lights** module has four CV inputs that become DMX channels, with a master dimmer. Because
+DMX is control voltage over a network, patching a light works exactly like patching a sound: run
+**Tracer** into channel 1 for a dimmer that follows the music, **Pulse** into channel 2 for beat
+strobes, **Strange** into channel 3 for a colour wheel that never repeats.
+
+Set the target to your Art-Net node's IP (or a broadcast address) and click **SEND DMX**. Nothing
+opens a socket until you turn it on, and leaving patch mode stops transmission.
+
+### OBS / Resolume (MJPEG)
+
+Click **STREAM** in the rack header and the visuals are served as MJPEG over localhost. Add the
+URL it reports as a **Browser source** in OBS or Resolume. The server binds to `127.0.0.1` only,
+and drops frames for a slow consumer rather than growing a backlog.
+
+> Both outputs have been verified against a listening socket and a real HTTP client, but not yet
+> against physical lighting hardware — worth a dry run before showtime.
 
 ---
 
@@ -705,6 +817,9 @@ Outputs go to the `dist/` folder.
 | Themes | 11 built-in CSS themes plus JSON import/export |
 
 ---
+
+PATCH mode is plain Web Audio — a gain node whose `.gain` is the CV input is literally a VCA.
+Art-Net goes out over Node's built-in `dgram`, and the OBS stream over built-in `http`.
 
 ## Requirements
 
