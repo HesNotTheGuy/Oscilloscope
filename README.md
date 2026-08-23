@@ -242,6 +242,9 @@ dot showing which way the signal flows. You can read a patch without touching an
   a probe to a test point on a bench. Click again to release.
 - **PATCHING / PLAYING** modes: playing locks the cables and the layout so a live set can't snag a
   wire. Knobs and probing still work.
+- **Keyboard**: Tab reaches every knob and jack. Arrows turn a knob (Shift for fine, Home to
+  reset); on a jack, Enter picks it and Enter on a second jack lands the cable, **P** probes, and
+  Delete unplugs. Nothing in the rack requires a mouse.
 - Feedback loops are allowed on purpose — patch a filter's output back into its own cutoff and it
   screams instead of going silent.
 

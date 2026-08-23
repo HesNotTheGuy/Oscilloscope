@@ -302,6 +302,7 @@ export class PatchRack {
     this.moduleEls = {};
     this.rack.querySelectorAll('[data-pk-module]').forEach(el => { this.moduleEls[el.dataset.pkModule] = el; });
     this._bindUI();
+    this._bindKeyboard();
     this._loadBoard();
     this._applyBoard();
   }
@@ -433,20 +434,26 @@ export class PatchRack {
         `<button class="pk-btn pk-wave${i === 0 ? ' pk-active' : ''}" data-pk-wave="${w}">${['SIN', 'TRI', 'SQR', 'SAW'][i]}</button>`).join('') + `</div>`;
     html += `<div class="pk-knobs${m.seq ? ' pk-seq' : ''}">`;
     for (const [id, label, v] of m.knobs) {
-      html += `<div class="pk-kwrap"><div class="pk-knob" data-pk-knob="${id}" data-v="${v}"><div class="pk-ptr"></div></div>` +
+      html += `<div class="pk-kwrap"><div class="pk-knob" data-pk-knob="${id}" data-v="${v}" tabindex="0"` +
+        ` role="slider" aria-label="${m.name} ${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(v * 100)}">` +
+        `<div class="pk-ptr"></div></div>` +
         `<label>${label}</label><div class="pk-val" data-pk-val="${id}"></div></div>`;
     }
     if (m.seq) {
       const defs = [0, 0.25, 0.5, 0.35, 0.7, 0.5, 0.9, 0.6];
       for (let i = 0; i < 8; i++) {
         html += `<div class="pk-kwrap"><div class="pk-led pk-seq-led"></div>` +
-          `<div class="pk-knob pk-mini" data-pk-knob="seq.s${i}" data-v="${defs[i]}"><div class="pk-ptr"></div></div><label>${i + 1}</label></div>`;
+          `<div class="pk-knob pk-mini" data-pk-knob="seq.s${i}" data-v="${defs[i]}" tabindex="0"` +
+          ` role="slider" aria-label="Sequencer step ${i + 1}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(defs[i] * 100)}">` +
+          `<div class="pk-ptr"></div></div><label>${i + 1}</label></div>`;
       }
     }
     html += `</div><div class="pk-jacks">`;
     for (const [id, dir, kind, label] of m.jacks) {
+      const plain = String(label).replace(/[^\w\s]/g, '').trim() || (dir === 'out' ? 'out' : 'in');
       html += `<div class="pk-jwrap${dir === 'out' ? ' pk-out' : ''}">` +
-        `<div class="pk-jack" data-pk-jack="${id}" data-dir="${dir}" data-kind="${kind}"></div><label>${label}</label></div>`;
+        `<div class="pk-jack" data-pk-jack="${id}" data-dir="${dir}" data-kind="${kind}" tabindex="0" role="button"` +
+        ` aria-label="${m.name} ${plain} ${dir === 'out' ? 'output' : 'input'}, ${kind}"></div><label>${label}</label></div>`;
     }
     html += `</div>`;
     mod.innerHTML = html;
@@ -493,6 +500,11 @@ export class PatchRack {
     if (ptr) ptr.style.transform = `rotate(${-135 + v * 270}deg)`;
     const val = this.overlay.querySelector(`[data-pk-val="${id}"]`);
     if (val) val.textContent = this._fmt(id, v);
+    const knobEl = this.overlay.querySelector(`[data-pk-knob="${id}"]`);
+    if (knobEl) {
+      knobEl.setAttribute('aria-valuenow', String(Math.round(v * 100)));
+      knobEl.setAttribute('aria-valuetext', this._fmt(id, v));
+    }
     const a = this.audio;
     if (!a) return;
     const t = this.engine.actx.currentTime;
@@ -1079,8 +1091,13 @@ export class PatchRack {
 
   _refreshJacks() {
     for (const id in this.jackEls) {
+      const el = this.jackEls[id];
       const c = this.cables.find(cb => cb.from === id || cb.to === id);
-      this.jackEls[id].className = 'pk-jack' + (c ? ' pk-lit-' + c.kind : '') + (id === this.probeId ? ' pk-probed' : '');
+      el.className = 'pk-jack' + (c ? ' pk-lit-' + c.kind : '') + (id === this.probeId ? ' pk-probed' : '')
+                   + (id === this._kbSource ? ' pk-kb-source' : '');
+      const base = (el.getAttribute('aria-label') || '').split(' \u2014 ')[0];
+      const partner = c ? (c.from === id ? c.to : c.from) : null;
+      el.setAttribute('aria-label', base + (partner ? ' \u2014 patched to ' + partner : ' \u2014 not patched'));
     }
     const DEFAULTS = { lfo: 'slow wobble', seq: 'step melody', sh: 'random steps',
       tracer: 'the music moves the knobs', pulse: 'fires on the beat',
@@ -1388,6 +1405,7 @@ export class PatchRack {
       if (e.key === 'Escape') {
         e.stopPropagation();
         if (this._learningKnob) { this._cancelLearn(); this._flashHint('learn cancelled'); return; }
+        if (this._kbSource) { this._kbCancel(); this._flashHint('cancelled'); return; }
         this.onClose && this.onClose();
       }
       else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
@@ -1506,6 +1524,73 @@ export class PatchRack {
         b.textContent = 'CC' + cc;
       } else if (b) { b.remove(); }
     });
+  }
+
+  // ── Keyboard access ─────────────────────────────────────────
+  // The rack was mouse-only. Tab reaches every knob and jack; arrows turn a
+  // knob; Enter picks a jack then lands the cable on the next one. Patching
+  // is inherently a two-point gesture, so keyboard patching is two presses.
+  _bindKeyboard() {
+    this.overlay.querySelectorAll('[data-pk-knob]').forEach(k => {
+      const id = k.dataset.pkKnob;
+      k.addEventListener('keydown', e => {
+        const fine = e.shiftKey ? 0.002 : 0.02;
+        let d = 0;
+        if (e.key === 'ArrowUp' || e.key === 'ArrowRight') d = fine;
+        else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') d = -fine;
+        else if (e.key === 'PageUp') d = 0.1;
+        else if (e.key === 'PageDown') d = -0.1;
+        else if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); this.setKnob(id, parseFloat(k.dataset.v)); return; }
+        else return;
+        e.preventDefault(); e.stopPropagation();
+        this.setKnob(id, this.knobs[id] + d);
+      });
+    });
+
+    this.overlay.querySelectorAll('[data-pk-jack]').forEach(j => {
+      const id = j.dataset.pkJack;
+      j.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault(); e.stopPropagation();
+          this._kbPick(id);
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault(); e.stopPropagation();
+          const i = this.cables.findIndex(c => c.from === id || c.to === id);
+          if (i >= 0 && !this.playMode) {
+            this._pushUndo(); this.removeCable(i);
+            this._flashHint('unplugged \u2014 Ctrl+Z to undo');
+          }
+        } else if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault(); e.stopPropagation();
+          this.toggleProbe(id);
+        }
+      });
+    });
+  }
+
+  // First press picks a source, second press completes the patch.
+  _kbPick(id) {
+    if (this.playMode) { this.toggleProbe(id); return; }
+    if (!this._kbSource) {
+      this._kbSource = id;
+      this._refreshJacks();
+      this._flashHint('pick a matching port to patch, or Esc to cancel');
+      return;
+    }
+    if (this._kbSource === id) { this._kbCancel(); this.toggleProbe(id); return; }
+    const a = this._kbSource, b = id;
+    const da = this.jackEls[a].dataset.dir, db = this.jackEls[b].dataset.dir;
+    this._kbSource = null;
+    if (da === db) { this._refreshJacks(); this._flashHint('those are both ' + da + 'puts'); return; }
+    this._pushUndo();
+    this.connect(da === 'out' ? a : b, da === 'out' ? b : a);
+    this._flashHint('patched');
+  }
+
+  _kbCancel() {
+    if (!this._kbSource) return;
+    this._kbSource = null;
+    this._refreshJacks();
   }
 
   _endDrag() {
