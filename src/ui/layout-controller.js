@@ -112,7 +112,12 @@ export class LayoutController {
     zoneRight.prepend(searchWrap);
     zoneRight.prepend(tabBar);
 
-    let activeTab = 'scope';
+    // 'source' holds audio in, the signal generator and presets: the first
+    // thing almost everyone needs is a signal, not a volts-per-division knob.
+    // Six of seven crawl personas had to leave the default tab before they
+    // could start. The scope controls are one click away for the one persona
+    // who wants them first.
+    let activeTab = 'source';
     let tabbedMode = false;
 
     const showTab = (tabKey) => {

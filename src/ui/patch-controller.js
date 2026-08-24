@@ -99,10 +99,12 @@ export class PatchController {
     if (this.rack.enabled) {
       this.rack.disable();
       document.querySelector('.app').classList.remove('patch-open');
+      document.body.classList.remove('patch-open');
       this.btn.classList.remove('active');
     } else {
       this.rack.enable();
       document.querySelector('.app').classList.add('patch-open');
+      document.body.classList.add('patch-open');
       // The rack is mono internally. A producer measured his stereo mix
       // collapsing to one channel and had no way to know it happened.
       if (this.ctx.notify) {

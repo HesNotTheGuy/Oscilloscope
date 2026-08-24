@@ -1,4 +1,35 @@
-#patch-dock { width: 100%; }
+#patch-dock { width: 100%; flex: 0 0 auto; }
+
+/* Why the rack kept ending up below the fold:
+   .layout-body is a flex ROW, so its height is set by its TALLEST child — and
+   .zone-side is pinned to calc(100vh - 80px). Shrinking the scope therefore
+   bought nothing: the row stayed full height and the reclaimed space became a
+   400-600px void, with the rack pushed off the bottom at EVERY window size
+   tested. Capping the scope was treating the symptom.
+
+   So while the rack is open the app becomes a real vertical split: fixed
+   viewport height, layout-body takes what is left, the dock takes its share,
+   and the side rail is allowed to shrink with the row instead of dictating it. */
+/* The topbar is a SIBLING of .app, not a child, so pinning .app to 100vh
+   overflowed the page by exactly the topbar's height. Make the document the
+   flex column instead and let .app claim whatever is left — no magic number
+   for a chrome height that themes are free to change. */
+body.patch-open {
+  display: flex; flex-direction: column;
+  height: 100vh; overflow: hidden;
+}
+body.patch-open .app { flex: 1 1 0; min-height: 0; height: auto; box-sizing: border-box; }
+  /* basis 0, not auto: with `auto` the row still claims its CONTENT height
+     (the side rail's), so it plus the dock overflowed the viewport. */
+.app.patch-open .layout-body { flex: 1 1 0; min-height: 0; }
+.app.patch-open .zone-side { max-height: 100%; }
+.app.patch-open .scope-column { min-height: 0; }
+.app.patch-open #patch-dock { min-height: 0; }
+/* Let the scope use whatever height the split leaves it, instead of a
+   fixed vh cap that leaves dead space on tall windows. Sizing the BEZEL
+   by aspect keeps the trace canvas and the grid overlay in lockstep. */
+.app.patch-open .scope-wrap { flex: 1 1 auto; min-height: 0; align-items: center; }
+.app.patch-open .crt-bezel { max-height: 100%; box-sizing: border-box; }
 
 /* With the rack open both halves have to fit the window, otherwise opening it
    just pushes the scope below the fold and you scroll to see the thing you are
@@ -27,7 +58,7 @@
   /* Docked panel under the scope, not a fullscreen mode. */
   position: relative; z-index: 1;
   width: 100%; box-sizing: border-box;
-  max-height: 44vh; overflow: auto;
+  max-height: 46vh; overflow: auto;
   background: #0c0f0d;
   border: 1px solid #232a25; border-radius: 6px;
   font-family: var(--pk-mono);
@@ -83,7 +114,7 @@
   box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 6px 14px rgba(0,0,0,.5);
   padding: 10px 8px 12px; position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  min-height: 250px; box-sizing: border-box; flex: 0 0 auto;
+  min-height: 208px; box-sizing: border-box; flex: 0 0 auto;
 }
 .pk-name {
   font-size: 14px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;

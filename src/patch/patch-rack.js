@@ -313,8 +313,16 @@ export class PatchRack {
   // Spatial memory is the whole point of a rack — you stop reading labels and
   // just reach for where the thing lives. That only works if YOUR arrangement
   // is the one that persists, so the layout is saved on every change.
+  // Everything past this set is hidden on a fresh board. 28 modules crammed
+  // into a docked strip is a menu with extra steps — you scroll to find things
+  // instead of reaching for where they live, which is the entire advantage a
+  // rack has over menus. These eight cover a first patch; the BOARD menu adds
+  // any of the rest back, and loading a recipe un-hides whatever it needs.
   _defaultBoard() {
-    return { rows: ROWS.map(row => row.map(m => m.id)), hidden: [] };
+    const STARTER = new Set(['input', 'vco', 'lfo', 'vcf', 'mix', 'echo', 'drive', 'out']);
+    const hidden = [];
+    for (const row of ROWS) for (const m of row) if (!STARTER.has(m.id)) hidden.push(m.id);
+    return { rows: ROWS.map(row => row.map(m => m.id)), hidden };
   }
 
   _loadBoard() {
@@ -1090,6 +1098,17 @@ export class PatchRack {
       this.overlay.querySelectorAll('[data-pk-wave]').forEach(x =>
         x.classList.toggle('pk-active', x.dataset.pkWave === data.lfoType));
     }
+    // Un-hide anything this patch touches first: a cable into a hidden module
+    // has no on-screen position, so it would draw to nowhere.
+    const needed = new Set();
+    for (const [from, to] of (data.cables || [])) {
+      needed.add(from.split('.')[0]);
+      needed.add(to.split('.')[0]);
+    }
+    const wasHidden = this.board.hidden.length;
+    this.board.hidden = this.board.hidden.filter(id => !needed.has(id));
+    if (this.board.hidden.length !== wasHidden) { this._saveBoard(); this._applyBoard(); }
+
     for (const [from, to] of (data.cables || [])) {
       if (this.taps[from] && this.inTargets[to]) this.connect(from, to);
     }
