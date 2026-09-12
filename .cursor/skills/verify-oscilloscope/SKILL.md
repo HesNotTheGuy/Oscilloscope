@@ -113,7 +113,7 @@ Mocks are not available and not allowed. Do not treat `npm test` as UI proof. Do
 node .cursor/skills/verify-oscilloscope/scripts/verify-dso1.mjs cleanup
 ```
 
-Sends `SIGTERM` to the process group recorded at launch (`pid` / `pgid`), then `SIGKILL` if it is still alive. Then deletes `/tmp/dso1-verify/user-data` and `session.json`.
+Sends `SIGTERM` to the process group recorded at launch (`session.pgid`, same as the Electron pid on POSIX), then `SIGKILL` if that pid is still alive. Then deletes the whole run directory (`/tmp/dso1-verify` by default, including `user-data`, `session.json`, and `electron.log`).
 
 Never `pkill electron` or kill by process name. That can destroy a developer's own DSO-1 window. Never delete `evidence/`. After cleanup, `ls` the named evidence path and confirm the files are still there.
 

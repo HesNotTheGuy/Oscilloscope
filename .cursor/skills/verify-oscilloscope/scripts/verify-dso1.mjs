@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-'use strict';
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -58,6 +57,23 @@ function printJson(value) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function signalProcess(pid, signal) {
+  try {
+    process.kill(-pid, signal);
+    return;
+  } catch (err) {
+    if (err && err.code !== 'ESRCH' && err.code !== 'ENOSYS' && err.code !== 'EINVAL') {
+      throw err;
+    }
+  }
+  try {
+    process.kill(pid, signal);
+  } catch (err) {
+    if (err && err.code === 'ESRCH') return;
+    throw err;
+  }
 }
 
 function pidAlive(pid) {
@@ -168,7 +184,7 @@ function cdpCall(wsUrl, method, params = {}, timeoutMs = 15000) {
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      try { ws.close(); } catch { /* closed */ }
+      ws.close();
       reject(new Error(`CDP ${method} timed out`));
     }, timeoutMs);
 
@@ -176,7 +192,7 @@ function cdpCall(wsUrl, method, params = {}, timeoutMs = 15000) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try { ws.close(); } catch { /* closed */ }
+      ws.close();
       if (err) reject(err);
       else resolve(value);
     };
@@ -194,8 +210,9 @@ function cdpCall(wsUrl, method, params = {}, timeoutMs = 15000) {
       }
       finish(null, msg.result);
     });
-    ws.addEventListener('error', (err) => {
-      finish(err instanceof Error ? err : new Error(String(err)));
+    ws.addEventListener('error', (ev) => {
+      const text = (ev && ev.message) || (ev && ev.error && ev.error.message) || 'WebSocket error';
+      finish(new Error(text));
     });
   });
 }
@@ -586,28 +603,21 @@ async function cmdCleanup() {
     printJson({ ok: true, stopped: false, reason: 'no session file' });
     return;
   }
-  const pid = session.pid;
-  if (pidAlive(pid)) {
-    try { process.kill(-pid, 'SIGTERM'); } catch {
-      try { process.kill(pid, 'SIGTERM'); } catch { /* gone */ }
-    }
+  const pid = session.pgid || session.pid;
+  if (pidAlive(session.pid)) {
+    signalProcess(pid, 'SIGTERM');
     const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && pidAlive(pid)) await sleep(100);
-    if (pidAlive(pid)) {
-      try { process.kill(-pid, 'SIGKILL'); } catch {
-        try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
-      }
-    }
+    while (Date.now() < deadline && pidAlive(session.pid)) await sleep(100);
+    if (pidAlive(session.pid)) signalProcess(pid, 'SIGKILL');
   }
-  await rm(session.userDataDir, { recursive: true, force: true });
-  await rm(SESSION_PATH, { force: true });
+  await rm(DEFAULT_RUN_DIR, { recursive: true, force: true });
   printJson({
     ok: true,
     stopped: true,
-    pid,
-    pidStillAlive: pidAlive(pid),
+    pid: session.pid,
+    pidStillAlive: pidAlive(session.pid),
     evidenceRoot: EVIDENCE_ROOT,
-    note: 'user-data and session.json removed; evidence/ was not touched',
+    note: 'run dir removed; evidence/ was not touched',
   });
 }
 
