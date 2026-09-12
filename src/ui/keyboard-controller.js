@@ -204,7 +204,7 @@ export class KeyboardController {
 
     const hint = document.createElement('div');
     hint.className = 'kb-help-close-hint';
-    hint.textContent = 'Press ? or Esc to close · right-click the scope for screenshot and pop-out';
+    hint.textContent = '? or Esc to close · right-click the scope for screenshot / pop-out';
     footer.appendChild(hint);
     box.appendChild(footer);
     return box;

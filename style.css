@@ -447,7 +447,7 @@ body {
   border: 1px solid transparent;
   border-radius: 2px;
   color: var(--p);
-  opacity: 0.4;
+  opacity: 0.55;
   cursor: pointer;
 }
 .st-mode:hover { opacity: 0.85; }
@@ -1438,17 +1438,15 @@ input[type="checkbox"] { accent-color: var(--p); cursor: pointer; }
 .kb-help-footer {
   margin-top: 14px;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 .kb-help-tour { font-size: 10px; }
 .kb-help-close-hint {
   font-size: 10px;
   opacity: 0.5;
   letter-spacing: 0.3px;
-  flex: 1;
-  min-width: 180px;
 }
 
 /* ─── Presets Panel ─── */
@@ -4458,10 +4456,15 @@ body[data-theme="liquid-glass"] {
   line-height: 1.4;
 }
 .frh-btn {
-  align-self: flex-end;
   color: rgba(var(--p-rgb), 1);
   border-color: rgba(var(--p-rgb), 0.5);
 }
+.frh-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.frh-tour-btn { margin-right: 0; }
 .frh-btn:hover:not(:disabled) {
   background: rgba(var(--p-rgb), 0.08);
 }
