@@ -2,7 +2,7 @@
 
 import { Knob } from '../knob.js';
 import { TIMEBASE, VDIV, TB_DEFAULT, VD_DEFAULT } from '../constants.js';
-import { bindRange, updateStatus, resetPhosphor } from './ui-utils.js';
+import { bindRange, updateStatus, setScopeMode, syncModeButtons, SCOPE_MODES } from './ui-utils.js';
 
 // ─────────────────────────────────────────────────────────────
 //  ScopeController — channels, timebase, trigger, run/stop
@@ -71,53 +71,18 @@ export class ScopeController {
       }));
     });
 
-    // ── YT / XY / VS / FS mode ──
-    document.getElementById('btn-yt').addEventListener('click', () => {
-      s.mode = 'YT';
-      document.getElementById('btn-yt').classList.add('active');
-      document.getElementById('btn-xy').classList.remove('active');
-      document.getElementById('btn-vs').classList.remove('active');
-      document.getElementById('btn-fs').classList.remove('active');
-      document.getElementById('btn-sg').classList.remove('active');
-      resetPhosphor(s);
+    // ── YT / XY / VS / FS / SG — panel buttons and the status-strip ──
+    // Display mode used to live only in HORIZONTAL, on a tab the default
+    // layout does not show. The status strip is always visible, so the
+    // same five modes are clickable there too.
+    Object.keys(SCOPE_MODES).forEach(mode => {
+      const btn = document.getElementById(SCOPE_MODES[mode].btn);
+      if (btn) btn.addEventListener('click', () => setScopeMode(s, mode));
     });
-    document.getElementById('btn-xy').addEventListener('click', () => {
-      s.mode = 'XY';
-      document.getElementById('btn-xy').classList.add('active');
-      document.getElementById('btn-yt').classList.remove('active');
-      document.getElementById('btn-vs').classList.remove('active');
-      document.getElementById('btn-fs').classList.remove('active');
-      document.getElementById('btn-sg').classList.remove('active');
-      resetPhosphor(s);
+    document.querySelectorAll('[data-scope-mode]').forEach(btn => {
+      btn.addEventListener('click', () => setScopeMode(s, btn.dataset.scopeMode));
     });
-    document.getElementById('btn-vs').addEventListener('click', () => {
-      s.mode = 'VS';
-      document.getElementById('btn-vs').classList.add('active');
-      document.getElementById('btn-yt').classList.remove('active');
-      document.getElementById('btn-xy').classList.remove('active');
-      document.getElementById('btn-fs').classList.remove('active');
-      document.getElementById('btn-sg').classList.remove('active');
-      resetPhosphor(s);
-    });
-    document.getElementById('btn-fs').addEventListener('click', () => {
-      s.mode = 'FS';
-      document.getElementById('btn-fs').classList.add('active');
-      document.getElementById('btn-yt').classList.remove('active');
-      document.getElementById('btn-xy').classList.remove('active');
-      document.getElementById('btn-vs').classList.remove('active');
-      document.getElementById('btn-sg').classList.remove('active');
-      resetPhosphor(s);
-    });
-    document.getElementById('btn-sg').addEventListener('click', () => {
-      s.mode = 'SG';
-      document.getElementById('btn-sg').classList.add('active');
-      document.getElementById('btn-yt').classList.remove('active');
-      document.getElementById('btn-xy').classList.remove('active');
-      document.getElementById('btn-vs').classList.remove('active');
-      document.getElementById('btn-fs').classList.remove('active');
-      if (s._spectrogram) s._spectrogram.clear();
-      resetPhosphor(s);
-    });
+    syncModeButtons(s.mode || 'YT');
 
     // ── Trigger source / slope / mode ──
     document.getElementById('trig-source').addEventListener('change', e => {

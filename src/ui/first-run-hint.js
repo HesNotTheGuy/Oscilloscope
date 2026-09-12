@@ -11,8 +11,9 @@ const STORAGE_KEY = 'osc_firstRunSeen';
 
 const HINTS = [
   '🎵 Drop an audio file anywhere on the scope to visualize it',
+  '📂 Tabs on the right: Source (sound), Scope, Beam, Scene',
   '🎹 Press K to play the keyboard synth — chords draw Lissajous shapes',
-  '❓ Press ? for all shortcuts',
+  '❓ Press ? for shortcuts — you can take the tour again from there',
 ];
 
 export class FirstRunHint {

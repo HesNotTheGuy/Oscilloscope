@@ -265,9 +265,9 @@ export class PatchRack {
         <select class="pk-btn" id="pk-book" title="Patch book — starting points and your saved patches"></select>
         <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
         <button class="pk-btn" id="pk-stream" title="Serve the visuals to OBS / Resolume over localhost">STREAM</button>
-        <select class="pk-btn" id="pk-board" title="Your board: restore a hidden module, or reset the layout"></select>
+        <select class="pk-btn" id="pk-board" title="BOARD — restore a hidden module (Lights, sequencers, …) or reset the layout"></select>
         <button class="pk-btn" id="pk-tour" title="Replay the patch tour">?</button>
-        <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
+        <div class="pk-hint" id="pk-hint">jack → jack patches · click a jack to probe · click a cable to unplug · Ctrl+Z undoes</div>
         <button class="pk-btn pk-close" id="pk-close" title="Collapse the rack (Esc)">✕ CLOSE</button>
       </div>
       <div class="pk-legend">
@@ -385,7 +385,11 @@ export class PatchRack {
     if (!sel) return;
     const names = {};
     for (const row of ROWS) for (const m of row) names[m.id] = m.name;
-    sel.innerHTML = '<option value="">BOARD</option>' +
+    sel.innerHTML = '<option value="">' +
+      (this.board.hidden.length
+        ? 'BOARD · ' + this.board.hidden.length + ' hidden'
+        : 'BOARD') +
+      '</option>' +
       (this.board.hidden.length
         ? '<optgroup label="show again">' +
           this.board.hidden.map(id => `<option value="show:${id}">${names[id] || id}</option>`).join('') +
