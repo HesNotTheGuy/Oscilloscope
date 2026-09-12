@@ -59,6 +59,10 @@ body.patch-open .app { flex: 1 1 0; min-height: 0; height: auto; box-sizing: bor
   position: relative; z-index: 1;
   width: 100%; box-sizing: border-box;
   max-height: 46vh; overflow: auto;
+  /* A scrollbar appearing/disappearing at the 46vh edge used to shift the
+     rack a few pixels every frame, which made the cables look like they
+     were shaking. Reserve the gutter so the layout does not toggle. */
+  scrollbar-gutter: stable;
   background: #0c0f0d;
   border: 1px solid #232a25; border-radius: 6px;
   font-family: var(--pk-mono);
