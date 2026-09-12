@@ -2,6 +2,7 @@
 
 import { BeatDetector } from '../beat-detector.js';
 import { LightsBridge } from './lights-bridge.js';
+import { cableWaveOffsets } from './cable-wave.js';
 
 // ─────────────────────────────────────────────────────────────
 //  PatchRack — modular patch bay inserted between the engine's
@@ -249,6 +250,9 @@ export class PatchRack {
     this._built = false;
     this._ticking = false;
     this._tickCount = 0;   // exposed for perf verification
+    this._cableWave = [];
+    this._cssW = 0;
+    this._cssH = 0;
   }
 
   // ── DOM ─────────────────────────────────────────────────────
@@ -265,9 +269,9 @@ export class PatchRack {
         <select class="pk-btn" id="pk-book" title="Patch book — starting points and your saved patches"></select>
         <button class="pk-btn" id="pk-save" title="Save the current patch">SAVE</button>
         <button class="pk-btn" id="pk-stream" title="Serve the visuals to OBS / Resolume over localhost">STREAM</button>
-        <select class="pk-btn" id="pk-board" title="Your board: restore a hidden module, or reset the layout"></select>
+        <select class="pk-btn" id="pk-board" title="BOARD — restore a hidden module (Lights, sequencers, …) or reset the layout"></select>
         <button class="pk-btn" id="pk-tour" title="Replay the patch tour">?</button>
-        <div class="pk-hint" id="pk-hint">drag <b>jack → jack</b> to patch &middot; click a jack to <b>probe</b> it &middot; click a cable to unplug &middot; Ctrl+Z undoes</div>
+        <div class="pk-hint" id="pk-hint">jack → jack patches · click a jack to probe · click a cable to unplug · Ctrl+Z undoes</div>
         <button class="pk-btn pk-close" id="pk-close" title="Collapse the rack (Esc)">✕ CLOSE</button>
       </div>
       <div class="pk-legend">
@@ -307,6 +311,7 @@ export class PatchRack {
     this._bindKeyboard();
     this._loadBoard();
     this._applyBoard();
+    this._watchSize();
   }
 
   // ── The board: which modules exist, in what order, on which rail ──
@@ -385,7 +390,11 @@ export class PatchRack {
     if (!sel) return;
     const names = {};
     for (const row of ROWS) for (const m of row) names[m.id] = m.name;
-    sel.innerHTML = '<option value="">BOARD</option>' +
+    sel.innerHTML = '<option value="">' +
+      (this.board.hidden.length
+        ? 'BOARD · ' + this.board.hidden.length + ' hidden'
+        : 'BOARD') +
+      '</option>' +
       (this.board.hidden.length
         ? '<optgroup label="show again">' +
           this.board.hidden.map(id => `<option value="show:${id}">${names[id] || id}</option>`).join('') +
@@ -1061,6 +1070,7 @@ export class PatchRack {
     }
     [].concat(this.inTargets[toId]).forEach(t => tail.connect(t));
     this.cables.push({ from: fromId, to: toId, kind, gain, src, delay });
+    this._cableWave = [];
     this._refreshJacks();
   }
 
@@ -1070,6 +1080,7 @@ export class PatchRack {
     c.gain.disconnect();
     if (c.delay) c.delay.disconnect();
     this.cables.splice(i, 1);
+    this._cableWave.splice(i, 1);
     this._hoverIdx = -1; this.rack.style.cursor = '';
     this._refreshJacks();
   }
@@ -1251,6 +1262,9 @@ export class PatchRack {
     this.overlay.classList.remove('pk-hidden');
     this._layout();
     this._startLoop();
+    // Flex split (`patch-open`) lands on the body after enable(); one more
+    // pass after paint so the cables sit on the jacks' final positions.
+    requestAnimationFrame(() => { if (this.enabled) this._layout(); });
   }
 
   disable() {
@@ -1700,15 +1714,36 @@ export class PatchRack {
   }
 
   // ── Rendering ───────────────────────────────────────────────
+  relayout() { this._layout(); }
+
+  _watchSize() {
+    if (this._ro || typeof ResizeObserver === 'undefined') return;
+    this._ro = new ResizeObserver(() => { if (this.enabled) this._layout(); });
+    this._ro.observe(this.rack);
+  }
+
   _layout() {
     const r = this.rack.getBoundingClientRect();
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    this.cablesCv.style.width = r.width + 'px'; this.cablesCv.style.height = r.height + 'px';
-    this.cablesCv.width = Math.round(r.width * dpr); this.cablesCv.height = Math.round(r.height * dpr);
-    this.cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Let CSS `inset: 0` size the canvas; only the backing store is set here.
+    // Rewriting style width/height every pass fought the inset and stretched
+    // a stale bitmap whenever the dock flexed.
+    const cssW = Math.max(1, Math.round(this.rack.clientWidth));
+    const cssH = Math.max(1, Math.round(this.rack.clientHeight));
+    const bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr);
+    if (this.cablesCv.width !== bw || this.cablesCv.height !== bh) {
+      this.cablesCv.width = bw;
+      this.cablesCv.height = bh;
+      this.cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    this._cssW = cssW;
+    this._cssH = cssH;
     for (const id in this.jackEls) {
       const j = this.jackEls[id].getBoundingClientRect();
-      this.jackPos[id] = { x: j.left - r.left + j.width / 2, y: j.top - r.top + j.height / 2 };
+      this.jackPos[id] = {
+        x: Math.round(j.left - r.left + j.width / 2),
+        y: Math.round(j.top - r.top + j.height / 2),
+      };
     }
   }
 
@@ -1728,6 +1763,7 @@ export class PatchRack {
   }
 
   _drawCable(a, b, kind, tapRef, idx, hovered) {
+    if (!a || !b) return;
     const cctx = this.cctx;
     const N = 64, pts = this._cablePts(a, b, N);
     const col = kind === 'cv' ? '255,179,0' : '0,255,65';
@@ -1738,14 +1774,18 @@ export class PatchRack {
     cctx.stroke();
     let buf = null;
     if (tapRef) { tapRef.analyser.getFloatTimeDomainData(tapRef.buf); buf = tapRef.buf; }
+    const prev = idx >= 0 ? this._cableWave[idx] : null;
+    const wave = cableWaveOffsets(buf, N, prev, {
+      kind, now: performance.now(), seed: Math.max(idx, 0),
+      reducedMotion: this._reducedMotion,
+    });
+    if (idx >= 0) this._cableWave[idx] = wave;
+    const amp = kind === 'cv' ? 11 : 14;
     cctx.beginPath();
     for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const s = buf ? buf[Math.floor(t * (buf.length - 1))] : 0;
-      const amp = (kind === 'cv' ? 13 : 16) * Math.sin(Math.PI * t);
       const p = pts[i], q = pts[Math.min(i + 1, N)], pr = pts[Math.max(i - 1, 0)];
       const dx = q.x - pr.x, dy = q.y - pr.y, len = Math.hypot(dx, dy) || 1;
-      const off = s * amp;
+      const off = wave[i] * amp;
       const x = p.x + (-dy / len) * off, y = p.y + (dx / len) * off;
       i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
     }
@@ -1776,19 +1816,18 @@ export class PatchRack {
     this._reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = () => {
       if (!this.enabled) { this._raf = 0; return; }
-      const r = this.rack.getBoundingClientRect();
-      this.cctx.clearRect(0, 0, r.width, r.height);
+      this.cctx.clearRect(0, 0, this._cssW || this.rack.clientWidth, this._cssH || this.rack.clientHeight);
       this.cables.forEach((c, i) => this._drawCable(this.jackPos[c.from], this.jackPos[c.to], c.kind, this.taps[c.from], i, i === this._hoverIdx));
       if (this._demo) {
-      this._tickDemo();
-      if (this._demo) {
-        const from = this.jackPos[this._demo.from];
-        this.cctx.globalAlpha = 0.9;
-        this._drawCable(from, this._demo.tip, this.jackEls[this._demo.from].dataset.kind, null, -1, true);
-        this.cctx.globalAlpha = 1;
+        this._tickDemo();
+        if (this._demo) {
+          const from = this.jackPos[this._demo.from];
+          this.cctx.globalAlpha = 0.9;
+          this._drawCable(from, this._demo.tip, this.jackEls[this._demo.from].dataset.kind, null, -1, true);
+          this.cctx.globalAlpha = 1;
+        }
       }
-    }
-    if (this._drag && !this.playMode) {
+      if (this._drag && !this.playMode) {
         const from = this.jackPos[this._drag.fromId];
         this.cctx.globalAlpha = 0.6;
         this._drawCable(from, { x: this._drag.x, y: this._drag.y }, this.jackEls[this._drag.fromId].dataset.kind, null, -1, false);

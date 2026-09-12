@@ -34,6 +34,33 @@ export function resetPhosphor(scope) {
   scope._phCtx.fillRect(0, 0, scope.canvas.width, scope.canvas.height);
 }
 
+export const SCOPE_MODES = {
+  YT: { btn: 'btn-yt', label: 'waveform (voltage vs time)' },
+  XY: { btn: 'btn-xy', label: 'lissajous (CH1 vs CH2)' },
+  VS: { btn: 'btn-vs', label: 'vectorscope (stereo correlation)' },
+  FS: { btn: 'btn-fs', label: 'spectrum analyzer' },
+  SG: { btn: 'btn-sg', label: 'spectrogram waterfall' },
+};
+
+/** Keep the HORIZONTAL buttons and the always-visible status-strip in sync. */
+export function syncModeButtons(mode) {
+  for (const [m, spec] of Object.entries(SCOPE_MODES)) {
+    const el = document.getElementById(spec.btn);
+    if (el) el.classList.toggle('active', m === mode);
+  }
+  document.querySelectorAll('[data-scope-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.scopeMode === mode);
+  });
+}
+
+export function setScopeMode(scope, mode) {
+  if (!scope || !SCOPE_MODES[mode]) return;
+  scope.mode = mode;
+  syncModeButtons(mode);
+  if (mode === 'SG' && scope._spectrogram) scope._spectrogram.clear();
+  resetPhosphor(scope);
+}
+
 /**
  * Load audio file and start playback, updating UI state.
  */

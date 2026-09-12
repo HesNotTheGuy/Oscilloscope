@@ -14,6 +14,7 @@ export class KeyboardSynthController {
     this.engine      = ctx.engine;
     this.ensureAudio = ctx.ensureAudio;
     this.inputMap    = ctx.inputMap;
+    this.notify      = ctx.notify || null;
     this._synth      = null;
   }
 
@@ -40,6 +41,9 @@ export class KeyboardSynthController {
         this._synth.enable();
         btnSynth?.classList.add('synth-active');
         this._showPanel(true);
+        if (this.notify) {
+          this.notify.say('Synth on \u2014 playing in XY so chords draw Lissajous figures', 'info', 5000);
+        }
       }
     };
 

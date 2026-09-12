@@ -590,10 +590,10 @@ Panels can be dragged between four drop zones and collapsed or expanded. Four bu
 
 | Rig | Description |
 |-----|-------------|
+| **Tabs** | Default. Panels stacked in a right-hand rail behind Source / Scope / Beam / Scene |
 | **Classic** | All panels in a horizontal strip below the scope |
 | **Studio** | Balanced split — channels left, effects right, audio centered |
 | **Perform** | Minimal controls, effects prominent, scope maximized |
-| **Minimal** | Everything collapsed to a narrow right sidebar |
 
 Rig controls live in a compact **⋯** dropdown menu in the topbar. The dropdown exposes: Save, Update, Delete, Edit Mode, and Toggle Layout. Built-in rigs cannot be updated or deleted — those actions are only available for custom rigs you save. All layout state (panel positions, collapsed state, active rig) persists in localStorage.
 
@@ -702,12 +702,12 @@ Anti-click envelopes (5ms attack, 40ms release) keep chord transitions smooth. E
 | `4` | Vectorscope mode |
 | `5` | Spectrum analyzer mode |
 | `6` | Spectrogram mode |
-| `Tab` | Switch OBJ / Image scene |
+| `D` | Switch OBJ / Image scene |
 | `R` | Run / Stop scope |
 | `S` | Single trigger |
 | `A` | Auto Set (auto-fit V/DIV + timebase) |
 | `K` | Toggle keyboard synth mode |
-| `?` | Show shortcut help overlay |
+| `?` | Show shortcut help overlay (Esc closes it; Take the tour lives here too) |
 
 Hover any knob, slider, or button for an inline tooltip showing its current value and what it does.
 

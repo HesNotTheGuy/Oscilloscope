@@ -105,10 +105,11 @@ export class PatchController {
       this.rack.enable();
       document.querySelector('.app').classList.add('patch-open');
       document.body.classList.add('patch-open');
+      this.rack.relayout();
       // The rack is mono internally. A producer measured his stereo mix
       // collapsing to one channel and had no way to know it happened.
       if (this.ctx.notify) {
-        this.ctx.notify.say('Patch rack open \u2014 audio runs through it in mono while it is', 'info', 6000);
+        this.ctx.notify.say('Patch rack open \u2014 audio is summed to mono until you close it', 'info', 6000);
       }
       // First time in the rack, offer the patch tour once the DOM has settled.
       if (!TourController.seen('patch') && this.ctx.tour) {
