@@ -35,6 +35,6 @@ Preconditions:
 
 - `#pk-book` and `#pk-stream` do not exist until the first successful PATCH open. Snapshot them after the click, not before.
 - First open on a fresh profile starts the patch tour after 500 ms unless the welcome card is still up. That tour dims the UI.
-- STREAM binds loopback only. It is not up at `npm start`. Two instances that both click STREAM must use the URL the app returned, not a hard-coded 8420.
+- STREAM binds loopback only. It is not up at `npm start`. Two instances that both click STREAM must use the URL the app returned, not a hard-coded 8420. Leaving PATCH stops DMX and does not call `streamStop`. Stop STREAM with a second click on `#pk-stream` before cleanup, or the HTTP server can outlive the rack.
 - SEND DMX opens a UDP socket to the address in `#pk-dmx-host` (default `2.255.255.255`). Leave it off unless the feature under test is lighting.
 - `window._patchRack` is a debug handle set in `patch-controller.js`. Reading it is not a user path.
