@@ -66,7 +66,8 @@ export class TooltipController {
 
   _onOver(e) {
     // Suppress during snake game
-    if (document.getElementById('kb-help-overlay')) { this._hide(); return; }
+    const help = document.getElementById('kb-help-overlay');
+    if (help && help.classList.contains('visible')) { this._hide(); return; }
 
     const el  = e.target;
     const text = this._resolve(el);
@@ -131,6 +132,18 @@ export class TooltipController {
     if (id === 'btn-fs')       return 'Spectrum analyzer — 64 log-spaced frequency bars (20 Hz – 20 kHz)';
     if (id === 'btn-sg')       return 'Spectrogram — scrolling frequency-over-time waterfall heatmap (20 Hz – 20 kHz)';
     if (id === 'btn-synth')    return 'Keyboard synth — press K to toggle, then play notes with your keyboard';
+    if (id === 'btn-patch')    return 'Patch mode — route audio through a modular rack of filters, echo, and modulators';
+    if (el.classList.contains('st-mode') || el.dataset.scopeMode) {
+      const mode = el.dataset.scopeMode;
+      const map = {
+        YT: 'YT — waveform (voltage vs time)',
+        XY: 'XY — lissajous (CH1 vs CH2)',
+        VS: 'VS — vectorscope (stereo correlation)',
+        FS: 'FS — spectrum analyzer',
+        SG: 'SG — spectrogram waterfall',
+      };
+      return map[mode] || null;
+    }
 
     // ── Transport / system buttons ──
     if (id === 'btn-record')    return 'Record video — audio is included. Use ▾ to choose Standard or Transparent';
@@ -168,12 +181,12 @@ export class TooltipController {
 
     // ── Theme select ──
     if (el.classList.contains('theme-select') || el.id === 'theme-select') {
-      return 'UI theme — affects panels and chrome only, not the wave display';
+      return 'UI theme — chrome plus a default beam colour. Visual packs change the look without changing the frame';
     }
 
     // ── Rig / layout select ──
     if (el.classList.contains('rig-select') || el.id === 'rig-select') {
-      return 'Workspace layout — rearranges panels. Use ⋯ menu to save custom rigs';
+      return 'Workspace layout — Tabs keeps panels in the right rail. Classic / Studio / Perform spread them around the scope';
     }
 
     // ── Preset slots ──
@@ -211,6 +224,7 @@ export class TooltipController {
     if (id === 'btn-play')       return 'Play loaded audio file';
     if (id === 'btn-stop-audio') return 'Stop audio playback';
     if (id === 'btn-mic')        return 'Use microphone as audio input';
+    if (id === 'btn-sysaudio')   return 'Capture whatever your computer is already playing (no echo)';
 
     // ── Display toggles ──
     if (el.id === 'show-grid')  return 'Show / hide graticule grid on scope display';

@@ -26,6 +26,27 @@ const RESERVED_REHOME = { 'd': 'scene.switchMode' };
 
 const STORAGE_KEY = 'osc_inputMap';
 
+export const DEFAULT_KEY_BINDINGS = {
+  ' ':   'playback.toggle',
+  'escape': 'playback.stop',
+  'g':   'display.toggleGrid',
+  'c':   'display.toggleCRT',
+  'm':   'display.toggleMeasure',
+  'f':   'display.toggleFullscreen',
+  'f11': 'display.toggleFullscreen',
+  '1':   'scope.modeYT',
+  '2':   'scope.modeXY',
+  '4':   'scope.modeVS',
+  '5':   'scope.modeFS',
+  '6':   'scope.modeSG',
+  'r':   'scope.runStop',
+  's':   'scope.single',
+  'a':   'scope.autoSet',
+  '3':   'scene.toggle',
+  'd':   'scene.switchMode',   // was Tab, which broke all keyboard access
+  '?':   'help.toggle',
+};
+
 export class InputMapper {
   constructor(store) {
     this.store = store;
@@ -375,33 +396,29 @@ export class InputMapper {
    * or when user resets to defaults).
    */
   installDefaults() {
-    // Only install if no custom mappings exist
-    if (this._keyMap.size > 0) return;
-
-    const defaults = {
-      ' ':   'playback.toggle',
-      'escape': 'playback.stop',
-      'g':   'display.toggleGrid',
-      'c':   'display.toggleCRT',
-      'm':   'display.toggleMeasure',
-      'f':   'display.toggleFullscreen',
-      'f11': 'display.toggleFullscreen',
-      '1':   'scope.modeYT',
-      '2':   'scope.modeXY',
-      '4':   'scope.modeVS',
-      '5':   'scope.modeFS',
-      '6':   'scope.modeSG',
-      'r':   'scope.runStop',
-      's':   'scope.single',
-      '3':   'scene.toggle',
-      'd':   'scene.switchMode',   // was Tab, which broke all keyboard access
-      '?':   'help.toggle',
-    };
-
-    for (const [key, action] of Object.entries(defaults)) {
-      this._keyMap.set(key, action);
+    if (this._keyMap.size === 0) {
+      for (const [key, action] of Object.entries(DEFAULT_KEY_BINDINGS)) {
+        this._keyMap.set(key, action);
+      }
+      this._saveMappings();
+      return;
     }
-    this._saveMappings();
+    // Returning users skip a full install so custom maps survive, but they
+    // would never receive a *new* default (A for auto-set, D after Tab was
+    // reserved) unless we fill keys that are still free.
+    this._fillMissingDefaults();
+  }
+
+  _fillMissingDefaults() {
+    const boundActions = new Set(this._keyMap.values());
+    let added = false;
+    for (const [key, action] of Object.entries(DEFAULT_KEY_BINDINGS)) {
+      if (this._keyMap.has(key) || boundActions.has(action)) continue;
+      this._keyMap.set(key, action);
+      boundActions.add(action);
+      added = true;
+    }
+    if (added) this._saveMappings();
   }
 
   /**

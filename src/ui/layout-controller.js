@@ -14,6 +14,14 @@ function lsParse(key, fallback) {
   }
 }
 
+/** Case-insensitive haystack match used by the control search box. */
+export function panelMatches(q, { id = '', title = '', aliases = '', body = '' } = {}) {
+  const n = String(q || '').trim().toLowerCase();
+  if (!n) return true;
+  const aliasStr = Array.isArray(aliases) ? aliases.join(' ') : String(aliases);
+  return `${id} ${title} ${aliasStr} ${body}`.toLowerCase().includes(n);
+}
+
 // ─────────────────────────────────────────────────────────────
 //  LayoutController — rig system, panels, tabs, search, drag-drop
 // ─────────────────────────────────────────────────────────────
@@ -75,15 +83,15 @@ export class LayoutController {
     const PANEL_ALIASES = {
       ch1:     ['channel 1', 'voltage', 'v/div', 'vdiv', 'probe', 'input 1', 'coupling', 'ac', 'dc'],
       ch2:     ['channel 2', 'voltage', 'v/div', 'vdiv', 'probe', 'input 2', 'coupling', 'ac', 'dc'],
-      horiz:   ['horizontal', 'timebase', 'time/div', 'time div', 'sweep', 'speed', 'yt', 'xy', 'lissajous'],
+      horiz:   ['horizontal', 'timebase', 'time/div', 'time div', 'sweep', 'speed', 'yt', 'xy', 'lissajous', 'vectorscope', 'spectrum', 'spectrogram', 'waterfall', 'fft', 'vs', 'fs', 'sg', 'waveform'],
       trig:    ['trigger', 'edge', 'rising', 'falling', 'slope', 'threshold', 'level'],
-      ctrl:    ['control', 'system', 'grid', 'crt', 'scanlines', 'screenshot', 'fullscreen', 'popout', 'measure', 'auto set'],
+      ctrl:    ['control', 'system', 'grid', 'crt', 'scanlines', 'screenshot', 'fullscreen', 'popout', 'measure', 'auto set', 'midi', 'learn', 'idle'],
       beamfx:  ['beam fx', 'beam effects', 'color', 'colour', 'phosphor', 'gradient', 'reactive', 'beat flash', 'bloom', 'halation', 'afterglow', 'invert'],
       sigfx:   ['signal fx', 'signal effects', 'mirror', 'rotation', 'rotate', 'smooth', 'filter', 'frequency', 'freq', 'bass', 'treble', 'mid', 'bandpass'],
       scene:   ['3d', '2d', 'obj', 'image', 'img', 'model', 'wireframe', 'geometry', 'tile', 'symmetry', 'motion', 'float', 'ripple', 'twist', 'explode', 'warp', 'scroll', 'spin', 'power'],
-      audio:   ['audio', 'input', 'mic', 'microphone', 'file', 'music', 'song', 'play', 'volume', 'mp3', 'wav'],
-      siggen:  ['signal generator', 'generator', 'sine', 'square', 'sawtooth', 'triangle', 'noise', 'waveform', 'oscillator', 'tone', 'frequency'],
-      presets: ['preset', 'save', 'load', 'export', 'import', 'slot'],
+      audio:   ['audio', 'input', 'mic', 'microphone', 'file', 'music', 'song', 'play', 'volume', 'mp3', 'wav', 'system audio', 'loopback'],
+      siggen:  ['signal generator', 'generator', 'sine', 'square', 'sawtooth', 'triangle', 'noise', 'waveform', 'oscillator', 'tone', 'frequency', 'lissajous'],
+      presets: ['preset', 'save', 'load', 'export', 'import', 'slot', 'pack', 'visual pack', 'look'],
       display: ['display', 'beam width', 'glow', 'persist', 'persistence', 'brightness', 'thickness'],
     };
 
@@ -107,6 +115,11 @@ export class LayoutController {
     searchInput.placeholder = 'Search controls…';
     searchInput.className = 'tab-search';
     searchWrap.appendChild(searchInput);
+    const searchEmpty = document.createElement('div');
+    searchEmpty.className = 'tab-search-empty';
+    searchEmpty.hidden = true;
+    searchEmpty.textContent = 'No controls match';
+    searchWrap.appendChild(searchEmpty);
 
     const zoneRight = zones.right;
     zoneRight.prepend(searchWrap);
@@ -123,6 +136,7 @@ export class LayoutController {
     const showTab = (tabKey) => {
       activeTab = tabKey;
       searchInput.value = '';
+      searchEmpty.hidden = true;
       tabBar.querySelectorAll('.tab-bar-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabKey));
       const visibleIds = TAB_GROUPS[tabKey].ids;
       allSections.forEach(sec => {
@@ -142,13 +156,18 @@ export class LayoutController {
       const q = searchInput.value.trim().toLowerCase();
       if (!q) { showTab(activeTab); return; }
       tabBar.querySelectorAll('.tab-bar-btn').forEach(b => b.classList.remove('active'));
+      let hits = 0;
       allSections.forEach(sec => {
         const id = sec.dataset.panelId;
         const title = (sec.querySelector('.fp-title')?.textContent || '').toLowerCase();
         const aliases = (PANEL_ALIASES[id] || []).join(' ');
-        const match = title.includes(q) || id.includes(q) || aliases.includes(q);
+        const body = [...sec.querySelectorAll('.fp-section-divider')]
+          .map(d => d.textContent).join(' ').toLowerCase();
+        const match = panelMatches(q, { id, title, aliases, body });
+        if (match) hits++;
         sec.classList.toggle('tab-hidden', !match);
       });
+      searchEmpty.hidden = hits > 0;
     });
     searchInput.addEventListener('keydown', e => {
       if (e.key === 'Escape') { searchInput.value = ''; showTab(activeTab); searchInput.blur(); }

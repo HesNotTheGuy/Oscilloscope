@@ -1,6 +1,7 @@
 'use strict';
 
 import { getPresetPack } from './preset-packs.js';
+import { syncModeButtons } from './ui/ui-utils.js';
 
 export class PresetManager {
   constructor(scope) {
@@ -508,15 +509,10 @@ export class PresetManager {
     s.fx.rotation       = fx.rotation;
     s.fx.rotSpeed       = fx.rotSpeed       ?? 0.003;
 
-    // 5. Apply mode (YT / XY / VS)
+    // 5. Apply mode (YT / XY / VS / FS / SG)
     if (sc.mode) {
       s.mode = sc.mode;
-      const btnYT = document.getElementById('btn-yt');
-      const btnXY = document.getElementById('btn-xy');
-      const btnVS = document.getElementById('btn-vs');
-      if (btnYT) btnYT.classList.toggle('active', sc.mode === 'YT');
-      if (btnXY) btnXY.classList.toggle('active', sc.mode === 'XY');
-      if (btnVS) btnVS.classList.toggle('active', sc.mode === 'VS');
+      syncModeButtons(sc.mode);
     }
 
     // 6. Signal generator

@@ -1,5 +1,7 @@
 'use strict';
 
+import { syncModeButtons } from './ui/ui-utils.js';
+
 // ─────────────────────────────────────────────────────────────
 //  KeyboardSynth — polyphonic synth driven by computer keyboard.
 //  Manages its own per-voice OscillatorNodes (one pair per held
@@ -367,15 +369,7 @@ export class KeyboardSynth {
   }
 
   _syncModeButtons(mode) {
-    const ytBtn = document.getElementById('btn-yt');
-    const xyBtn = document.getElementById('btn-xy');
-    const vsBtn = document.getElementById('btn-vs');
-    const fsBtn = document.getElementById('btn-fs');
-    if (!ytBtn) return;
-    ytBtn.classList.toggle('active', mode === 'YT');
-    xyBtn.classList.toggle('active', mode === 'XY');
-    if (vsBtn) vsBtn.classList.toggle('active', mode === 'VS');
-    if (fsBtn) fsBtn.classList.toggle('active', mode === 'FS');
+    syncModeButtons(mode);
   }
 
   _notify() {

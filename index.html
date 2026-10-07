@@ -33,7 +33,7 @@
     </div>
     <div class="rig-picker" id="rig-picker" title="Layout rig">
       <select id="rig-select" class="rig-select">
-        <option value="default">Default</option>
+        <option value="default">Tabs</option>
         <option value="classic">Classic</option>
         <option value="studio">Studio</option>
         <option value="perform">Perform</option>
@@ -92,6 +92,13 @@
       </div>
       <!-- Scope status strip -->
       <div class="scope-status">
+        <div class="st-modes" role="group" aria-label="Display mode">
+          <button type="button" class="st-mode active" data-scope-mode="YT" title="YT — waveform (voltage vs time)">YT</button>
+          <button type="button" class="st-mode" data-scope-mode="XY" title="XY — lissajous (CH1 vs CH2)">XY</button>
+          <button type="button" class="st-mode" data-scope-mode="VS" title="VS — vectorscope (stereo correlation)">VS</button>
+          <button type="button" class="st-mode" data-scope-mode="FS" title="FS — spectrum analyzer">FS</button>
+          <button type="button" class="st-mode" data-scope-mode="SG" title="SG — spectrogram waterfall">SG</button>
+        </div>
         <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
         <span class="st-item" id="st-tb">1ms/div</span>
         <span class="st-item" id="st-trig">TRIG: AUTO CH1 ↑ 0.00V</span>
@@ -189,12 +196,13 @@
         </div>
       </div>
       <div class="mode-row">
-        <button class="mode-btn active" id="btn-yt">YT</button>
-        <button class="mode-btn" id="btn-xy">XY</button>
-        <button class="mode-btn" id="btn-vs">VS</button>
-        <button class="mode-btn" id="btn-fs">FS</button>
-        <button class="mode-btn" id="btn-sg">SG</button>
+        <button class="mode-btn active" id="btn-yt" aria-label="YT waveform, voltage versus time">YT</button>
+        <button class="mode-btn" id="btn-xy" aria-label="XY lissajous, CH1 versus CH2">XY</button>
+        <button class="mode-btn" id="btn-vs" aria-label="Vectorscope, stereo correlation">VS</button>
+        <button class="mode-btn" id="btn-fs" aria-label="Spectrum analyzer">FS</button>
+        <button class="mode-btn" id="btn-sg" aria-label="Spectrogram waterfall">SG</button>
       </div>
+      <div class="mode-legend">wave · xy · vector · spec · spectrogram</div>
     </div>
 
     <!-- Trigger -->
@@ -682,6 +690,7 @@
     <!-- Presets -->
     <div class="fp-section fp-presets" data-panel-id="presets">
       <div class="fp-title">PRESETS</div>
+      <div class="fp-lede">Full setup — channels, beam, scene</div>
       <div class="preset-slot-grid" id="preset-slots"></div>
       <div class="preset-actions">
         <button class="sys-btn" id="btn-preset-save">SAVE</button>
@@ -691,6 +700,7 @@
       </div>
 
       <div class="fp-section-divider">VISUAL PACKS</div>
+      <div class="fp-lede">Looks only — colour, glow, FX</div>
       <div class="preset-pack-grid">
         <button class="preset-pack-btn" data-pack-id="synthwave-demo"   title="Neon pink glow with bloom and reactive response">Synthwave</button>
         <button class="preset-pack-btn" data-pack-id="vintage-crt"      title="Warm amber phosphor with slow decay">Vintage CRT</button>

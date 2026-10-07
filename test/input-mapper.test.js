@@ -159,9 +159,20 @@ describe('InputMapper', () => {
       expect(actions).toContain('scope.modeXY');
       expect(actions).toContain('scope.runStop');
       expect(actions).toContain('scope.single');
+      expect(actions).toContain('scope.autoSet');
       expect(actions).toContain('scene.toggle');
       expect(actions).toContain('scene.switchMode');
       expect(actions).toContain('help.toggle');
+      expect(mapper.getKeyAction('a')).toBe('scope.autoSet');
+      expect(mapper.getKeyAction('d')).toBe('scene.switchMode');
+    });
+
+    it('fills new default keys into an existing saved map without overwriting', () => {
+      mapper.bindKey('g', 'custom.action');
+      mapper.installDefaults();
+      expect(mapper.getKeyAction('g')).toBe('custom.action');
+      expect(mapper.getKeyAction('a')).toBe('scope.autoSet');
+      expect(mapper.getKeyAction('1')).toBe('scope.modeYT');
     });
 
     it('never binds Tab, which would make the app keyboard-unreachable', () => {
