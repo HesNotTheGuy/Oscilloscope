@@ -1,0 +1,40 @@
+{
+  "feature": "scope-modes",
+  "action": "click #btn-xy after opening the Scope tab",
+  "passed": true,
+  "before": {
+    "modes": {
+      "yt": true,
+      "xy": false,
+      "vs": false,
+      "fs": false,
+      "sg": false
+    },
+    "scopeMode": "YT",
+    "firstRun": false
+  },
+  "after": {
+    "modes": {
+      "yt": false,
+      "xy": true,
+      "vs": false,
+      "fs": false,
+      "sg": false
+    },
+    "scopeMode": "XY",
+    "firstRun": false
+  },
+  "click": {
+    "ok": true,
+    "id": "btn-xy",
+    "className": "mode-btn active",
+    "text": "XY",
+    "disabled": false,
+    "hidden": false
+  },
+  "evidence": {
+    "before": "/workspace/.cursor/skills/verify-oscilloscope/evidence/scope-modes/before.json",
+    "after": "/workspace/.cursor/skills/verify-oscilloscope/evidence/scope-modes/after.json",
+    "screenshot": "/workspace/.cursor/skills/verify-oscilloscope/evidence/scope-modes/after-xy.png"
+  }
+}
