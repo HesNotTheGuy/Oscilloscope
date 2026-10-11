@@ -3,7 +3,7 @@
 const MIN_N = 8;
 const MAX_N = 32;
 const CLAMP = 4;
-const MAX_C2 = 0.45;
+const CFL_C2_MAX = 0.45;
 
 export function clampGrid(n) {
   const r = Math.round(Number(n));
@@ -52,7 +52,7 @@ export class WaveField {
     const u = this.u;
     const v = this.v;
     const s = Number(speed);
-    const c2 = Math.min(MAX_C2, Number.isFinite(s) ? s * s : 0);
+    const c2 = Math.min(CFL_C2_MAX, Number.isFinite(s) ? s * s : 0);
     let d = Number(damping);
     if (!Number.isFinite(d)) d = 1;
     if (d < 0) d = 0;

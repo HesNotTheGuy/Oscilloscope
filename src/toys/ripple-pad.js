@@ -5,6 +5,9 @@ import { midiForCell, frequencyForMidi } from './scale.js';
 
 const TRIGGER_LEVEL = 0.12;
 const CELL_QUIET_MS = 120;
+const RING_COUNT_LO = 12;
+const RING_COUNT_HI = 20;
+const RING_COUNT_AIM = 16;
 const GREEN = [124, 255, 74];
 const YELLOW = [245, 225, 75];
 
@@ -15,8 +18,8 @@ function triggerStride(n) {
   for (let k = 1; k <= hi; k++) {
     const along = Math.floor((hi - 1) / k) + 1;
     const count = along * along;
-    const outside = count < 12 || count > 20 ? 100 : 0;
-    const score = outside + Math.abs(count - 16);
+    const outside = count < RING_COUNT_LO || count > RING_COUNT_HI ? 100 : 0;
+    const score = outside + Math.abs(count - RING_COUNT_AIM);
     if (score < bestScore) {
       bestScore = score;
       bestK = k;

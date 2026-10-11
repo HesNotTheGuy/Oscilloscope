@@ -10,6 +10,9 @@ export const SCALES = {
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
 };
 
+const MIDI_C3 = 48;
+const CELL_LATTICE_Y = 2;
+
 function pitchClass(midi, tonicPc) {
   return ((midi - tonicPc) % 12 + 12) % 12;
 }
@@ -18,7 +21,7 @@ function inScale(midi, tonicPc, degrees) {
   return degrees.indexOf(pitchClass(midi, tonicPc)) !== -1;
 }
 
-export function midiInScale(midi, key, scaleId) {
+export function snapMidiNearestLowerTie(midi, key, scaleId) {
   const degrees = SCALES[scaleId] || SCALES.major;
   const tonic = KEYS.indexOf(key);
   const tonicPc = tonic < 0 ? 0 : tonic;
@@ -39,10 +42,10 @@ export function frequencyForMidi(midi) {
 export function midiForCell(x, y, key, scaleId) {
   const degrees = SCALES[scaleId] || SCALES.major;
   const span = degrees.length * 2;
-  const slot = ((x + 2 * y) % span + span) % span;
+  const slot = ((x + CELL_LATTICE_Y * y) % span + span) % span;
   const oct = Math.floor(slot / degrees.length);
   const degree = degrees[slot % degrees.length];
   const tonic = KEYS.indexOf(key);
   const tonicPc = tonic < 0 ? 0 : tonic;
-  return midiInScale(48 + tonicPc + oct * 12 + degree, key, scaleId);
+  return snapMidiNearestLowerTie(MIDI_C3 + tonicPc + oct * 12 + degree, key, scaleId);
 }
