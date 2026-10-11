@@ -90,6 +90,7 @@ body.toys-open #toys-dock:not([hidden]) {
 }
 
 .ty-stage {
+  position: relative;
   flex: 1 1 0;
   min-height: 0;
   margin: 6px 12px;
@@ -119,4 +120,74 @@ body.toys-open #toys-dock:not([hidden]) {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 4px;
+}
+
+.ty-wheel {
+  position: absolute;
+  inset: 0;
+  background: #05060a;
+}
+
+.ty-wheel-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #05060a;
+}
+
+.ty-wheel-readout {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 72%;
+  text-align: center;
+  pointer-events: none;
+  color: #f4f4f4;
+}
+
+#chord-wheel-title {
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+#chord-wheel-ratio {
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+#chord-wheel-speed,
+#chord-wheel-hz {
+  margin-top: 2px;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: #b7b7b7;
+}
+
+.ty-ratios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ty-ratio {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.6px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+  color: #888;
+  cursor: pointer;
+}
+
+.ty-ratio-on,
+.ty-ratio:hover {
+  color: var(--p);
+  border-color: var(--p);
 }

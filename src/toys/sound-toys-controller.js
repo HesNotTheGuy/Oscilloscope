@@ -2,6 +2,7 @@
 
 import { KEYS } from './scale.js';
 import { mountRipplePad } from './ripple-pad.js';
+import { mountChordWheel } from './chord-wheel.js';
 
 const TOYS = [
   {
@@ -9,6 +10,12 @@ const TOYS = [
     title: 'Ripple Pad',
     hint: 'Tap or drag the sheet. Rings play notes.',
     mount: mountRipplePad,
+  },
+  {
+    id: 'chord-wheel',
+    title: 'Chord Wheel',
+    hint: 'Turn speed. Pick a ratio.',
+    mount: mountChordWheel,
   },
 ];
 
