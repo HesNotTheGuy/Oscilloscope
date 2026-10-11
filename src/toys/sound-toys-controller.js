@@ -1,103 +1,31 @@
 'use strict';
 
-import { Knob } from '../knob.js';
 import { KEYS } from './scale.js';
-import { PluckPool } from './pluck-pool.js';
-import { RipplePad } from './ripple-pad.js';
+import { mountRipplePad } from './ripple-pad.js';
 
 const TOYS = [
   {
     id: 'ripple-pad',
     title: 'Ripple Pad',
-    mount(root, hooks) {
-      const canvas = document.createElement('canvas');
-      canvas.id = 'ripple-pad-canvas';
-      canvas.className = 'ty-pad';
-      canvas.setAttribute('aria-label', 'Ripple pad');
-      root.appendChild(canvas);
-      return new RipplePad(canvas, hooks);
-    },
+    hint: 'Tap or drag the sheet. Rings play notes.',
+    mount: mountRipplePad,
   },
 ];
-
-const KNOBS = [
-  {
-    id: 'scale',
-    label: 'SCALE',
-    index: 0,
-    steps: [
-      { value: 'major', label: 'Major' },
-      { value: 'minor', label: 'Minor' },
-      { value: 'pentatonic', label: 'Pentatonic' },
-      { value: 'dorian', label: 'Dorian' },
-      { value: 'mixolydian', label: 'Mixolydian' },
-    ],
-  },
-  {
-    id: 'key',
-    label: 'KEY',
-    index: 0,
-    steps: KEYS.map(name => ({ value: name, label: name })),
-  },
-  {
-    id: 'speed',
-    label: 'SPEED',
-    index: 2,
-    steps: [
-      { value: 0.18, label: 'Slow' },
-      { value: 0.28, label: 'Med' },
-      { value: 0.38, label: 'Fast' },
-      { value: 0.48, label: 'Rush' },
-    ],
-  },
-  {
-    id: 'damping',
-    label: 'RING',
-    index: 2,
-    steps: [
-      { value: 0.94, label: 'Short' },
-      { value: 0.97, label: 'Med' },
-      { value: 0.985, label: 'Long' },
-      { value: 0.995, label: 'Endless' },
-    ],
-  },
-  {
-    id: 'timbre',
-    label: 'TIMBRE',
-    index: 0,
-    steps: [
-      { value: 'pluck', label: 'Pluck' },
-      { value: 'glass', label: 'Glass' },
-      { value: 'mallet', label: 'Mallet' },
-    ],
-  },
-  {
-    id: 'density',
-    label: 'DENSITY',
-    index: 2,
-    steps: [8, 12, 16, 24, 32].map(n => ({ value: n, label: String(n) })),
-  },
-];
-
-function paramsFromKnobs() {
-  const params = {};
-  for (const k of KNOBS) params[k.id] = k.steps[k.index].value;
-  return params;
-}
 
 export class SoundToysController {
   constructor(ctx) {
     this.ctx = ctx;
     this.engine = ctx.engine;
     this.ensureAudio = ctx.ensureAudio;
-    this._params = paramsFromKnobs();
     this._open = false;
     this._epoch = 0;
-    this._pad = null;
-    this._pool = null;
+    this._handle = null;
     this._btn = null;
     this._dock = null;
     this._readout = null;
+    this._hint = null;
+    this._stage = null;
+    this._controls = null;
     this._toyId = TOYS[0].id;
   }
 
@@ -121,7 +49,7 @@ export class SoundToysController {
   }
 
   async open() {
-    if (this._open || !this._pad) return;
+    if (this._open || !this._handle) return;
     const epoch = ++this._epoch;
     try {
       if (this.ensureAudio) await this.ensureAudio();
@@ -131,29 +59,45 @@ export class SoundToysController {
     if (epoch !== this._epoch || this._open) return;
     this._closeOthers();
     if (epoch !== this._epoch) return;
-    this._ensurePool();
+    this._resumeAudio();
     this._applyChrome(true);
-    this._pad.setDensity(this._params.density);
-    this._pad.start();
+    this._handle.start();
     this._open = true;
   }
 
   close() {
     this._epoch++;
     this._open = false;
-    if (this._pad) this._pad.stop();
-    if (this._pool) this._pool.dispose();
+    if (this._handle) this._handle.stop();
     this._applyChrome(false);
   }
 
+  select(id) {
+    if (id === this._toyId) return;
+    const toy = TOYS.find(t => t.id === id);
+    if (!toy) return;
+    this._disposeHandle();
+    this._toyId = id;
+    this._mountCurrent();
+    if (this._open && this._handle) {
+      this._resumeAudio();
+      this._handle.start();
+    }
+  }
+
   get api() {
+    const self = this;
     return {
-      isOpen: () => this._open,
-      toyId: TOYS[0].id,
-      tap: (nx, ny, amp) => { if (this._pad) this._pad.pointerNorm(nx, ny, amp); },
-      noteLog: () => (this._pool ? this._pool.noteEvents.slice() : []),
-      voiceCount: () => (this._pool ? this._pool.activeCount() : 0),
-      energy: () => (this._pad ? this._pad.field.energy() : 0),
+      isOpen: () => self._open,
+      get toyId() { return self._toyId; },
+      tap: (nx, ny, amp) => { if (self._handle && self._handle.tap) self._handle.tap(nx, ny, amp); },
+      noteLog: () => (self._handle && self._handle.noteLog ? self._handle.noteLog() : []),
+      voiceCount: () => (self._handle && self._handle.voiceCount ? self._handle.voiceCount() : 0),
+      energy: () => (self._handle && self._handle.energy ? self._handle.energy() : 0),
+      title: () => (self._handle && self._handle.title ? self._handle.title() : ''),
+      hz: () => (self._handle && self._handle.hz ? self._handle.hz() : ''),
+      speed: () => (self._handle && self._handle.speed ? self._handle.speed() : null),
+      ratioId: () => (self._handle && self._handle.ratioId ? self._handle.ratioId() : ''),
     };
   }
 
@@ -167,14 +111,15 @@ export class SoundToysController {
     for (const toy of TOYS) {
       const tab = document.createElement('button');
       tab.type = 'button';
-      tab.className = 'ty-tab' + (toy.id === this._toyId ? ' ty-tab-on' : '');
+      tab.className = 'ty-tab';
+      tab.id = 'ty-tab-' + toy.id;
       tab.textContent = toy.title;
-      tab.addEventListener('click', () => { this._toyId = toy.id; });
+      tab.addEventListener('click', () => { this.select(toy.id); });
       bar.appendChild(tab);
     }
     const hint = document.createElement('div');
     hint.className = 'ty-hint';
-    hint.textContent = 'Tap or drag the sheet. Rings play notes.';
+    this._hint = hint;
     const readout = document.createElement('div');
     readout.className = 'ty-readout';
     readout.textContent = '';
@@ -183,43 +128,46 @@ export class SoundToysController {
 
     const stage = document.createElement('div');
     stage.className = 'ty-stage';
-    const toy = TOYS.find(t => t.id === this._toyId) || TOYS[0];
-    this._pad = toy.mount(stage, {
-      onNote: (ev) => this._showNote(ev),
-      getParams: () => this._params,
-    });
-    this._pad.setDensity(this._params.density);
+    this._stage = stage;
 
     const controls = document.createElement('div');
     controls.className = 'ty-controls';
-    for (const spec of KNOBS) {
-      const group = document.createElement('div');
-      group.className = 'knob-group';
-      const knob = document.createElement('div');
-      knob.className = 'knob';
-      knob.id = 'ty-knob-' + spec.id;
-      const mark = document.createElement('div');
-      mark.className = 'knob-mark';
-      knob.appendChild(mark);
-      const sub = document.createElement('div');
-      sub.className = 'knob-sub';
-      const label = document.createElement('div');
-      label.className = 'knob-label';
-      label.textContent = spec.label;
-      const value = document.createElement('div');
-      value.className = 'knob-value';
-      value.id = 'ty-val-' + spec.id;
-      value.textContent = spec.steps[spec.index].label;
-      sub.append(label, value);
-      group.append(knob, sub);
-      controls.appendChild(group);
-      new Knob(knob, spec.steps.map(s => s.value), spec.index, (v, index) => {
-        this._params[spec.id] = v;
-        value.textContent = spec.steps[index].label;
-      });
-    }
+    this._controls = controls;
 
     dock.append(bar, stage, controls);
+    this._mountCurrent();
+  }
+
+  _mountCurrent() {
+    const toy = TOYS.find(t => t.id === this._toyId) || TOYS[0];
+    this._stage.replaceChildren();
+    this._controls.replaceChildren();
+    this._hint.textContent = toy.hint || '';
+    if (this._readout) this._readout.textContent = '';
+    this._markTabs();
+    this._handle = toy.mount(this._stage, {
+      audio: () => this._audioNodes(),
+      readout: this._readout,
+      controls: this._controls,
+      onNote: (ev) => this._showNote(ev),
+    });
+  }
+
+  _disposeHandle() {
+    const handle = this._handle;
+    this._handle = null;
+    if (!handle) return;
+    handle.stop();
+    handle.dispose();
+  }
+
+  _markTabs() {
+    const tabs = this._dock.querySelectorAll('.ty-tab');
+    for (const tab of tabs) {
+      const on = tab.id === 'ty-tab-' + this._toyId;
+      tab.classList.toggle('ty-tab-on', on);
+      tab.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
   }
 
   _showNote(ev) {
@@ -238,17 +186,19 @@ export class SoundToysController {
     if (synth && synth.classList.contains('synth-active')) synth.click();
   }
 
-  _ensurePool() {
+  _audioNodes() {
     const engine = this.engine;
-    if (!this._pool && engine && engine.actx && engine.gainNode) {
-      this._pool = new PluckPool({
-        actx: engine.actx,
-        dest: engine.gainNode,
-        visL: engine.visBusL,
-        visR: engine.visBusR,
-      });
-    }
-    if (this._pad) this._pad.attach(this._pool);
+    if (!engine || !engine.actx || !engine.gainNode) return null;
+    return {
+      actx: engine.actx,
+      dest: engine.gainNode,
+      visL: engine.visBusL,
+      visR: engine.visBusR,
+    };
+  }
+
+  _resumeAudio() {
+    const engine = this.engine;
     if (engine && engine.actx && engine.actx.state === 'suspended') {
       engine.actx.resume().catch(() => {});
     }
