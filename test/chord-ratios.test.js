@@ -6,8 +6,10 @@ import {
   formatHz,
   formatSpeed,
   headline,
+  multiplierFromSlider,
   ratioById,
   ringRatesHz,
+  sliderFromMultiplier,
   slowestHz,
   voiceKind,
 } from '../src/toys/chord-ratios.js';
@@ -50,6 +52,15 @@ describe('chord ratios', () => {
     expect(formatSpeed(0.3), 'the slow endpoint').toBe('x0.3');
     expect(formatSpeed(1), 'unity speed').toBe('x1');
     expect(formatSpeed(100), 'the fast endpoint').toBe('x100');
+  });
+
+  it('maps the speed slider ends onto x0.3 and x100', () => {
+    expect(multiplierFromSlider(0), 'slider min is x0.3').toBe(0.3);
+    expect(multiplierFromSlider(1000), 'slider max is x100').toBe(100);
+    expect(multiplierFromSlider(-5), 'below min clamps to x0.3').toBe(0.3);
+    expect(multiplierFromSlider(5000), 'above max clamps to x100').toBe(100);
+    expect(sliderFromMultiplier(0.3), 'x0.3 is slider 0').toBe(0);
+    expect(sliderFromMultiplier(100), 'x100 is slider 1000').toBe(1000);
   });
 
   it('clamps speed at the knob and keeps the hand on the audio clock', () => {

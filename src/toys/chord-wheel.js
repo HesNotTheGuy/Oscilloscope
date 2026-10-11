@@ -1,17 +1,17 @@
 'use strict';
 
-import { Knob } from '../knob.js';
 import {
   RATIO_TABLE,
-  SPEED_MAX,
-  SPEED_MIN,
+  SLIDER_MAX,
   angleRadians,
   clampSpeed,
   formatHz,
   formatSpeed,
   headline,
+  multiplierFromSlider,
   ratioById,
   ringRatesHz,
+  sliderFromMultiplier,
   slowestHz,
   voiceKind,
 } from './chord-ratios.js';
@@ -22,39 +22,6 @@ const TAU = Math.PI * 2;
 const LOOK_AHEAD = 0.1;
 const PUMP_MS = 25;
 
-function speedSteps() {
-  const count = 33;
-  const steps = [];
-  const lo = Math.log(SPEED_MIN);
-  const hi = Math.log(SPEED_MAX);
-  for (let i = 0; i < count; i++) {
-    let value;
-    if (i === 0) value = SPEED_MIN;
-    else if (i === count - 1) value = SPEED_MAX;
-    else value = Math.round(Math.exp(lo + (hi - lo) * (i / (count - 1))) * 1000) / 1000;
-    if (value < SPEED_MIN || value > SPEED_MAX) continue;
-    if (steps.length && steps[steps.length - 1] === value) continue;
-    steps.push(value);
-  }
-  if (!steps.includes(1)) steps.push(1);
-  steps.sort((a, b) => a - b);
-  return steps;
-}
-
-function nearestIndex(steps, value) {
-  let best = 0;
-  let bestDist = Infinity;
-  const target = Math.log(value);
-  for (let i = 0; i < steps.length; i++) {
-    const dist = Math.abs(Math.log(steps[i]) - target);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = i;
-    }
-  }
-  return best;
-}
-
 function secondsSinceDot(now, origin, speed, pulses, dot) {
   const turn = 1 / speed;
   const first = origin + (dot / pulses) * turn;
@@ -64,10 +31,6 @@ function secondsSinceDot(now, origin, speed, pulses, dot) {
 }
 
 export function mountChordWheel(stage, hooks) {
-  const steps = speedSteps();
-  let speedIndex = steps.indexOf(1);
-  if (speedIndex < 0) speedIndex = nearestIndex(steps, 1);
-
   const wrap = document.createElement('div');
   wrap.className = 'ty-wheel';
   const canvas = document.createElement('canvas');
@@ -80,41 +43,38 @@ export function mountChordWheel(stage, hooks) {
   titleEl.id = 'chord-wheel-title';
   const ratioEl = document.createElement('div');
   ratioEl.id = 'chord-wheel-ratio';
-  const speedEl = document.createElement('div');
-  speedEl.id = 'chord-wheel-speed';
+  const speedText = document.createElement('div');
+  speedText.id = 'chord-wheel-center-speed';
   const hzEl = document.createElement('div');
   hzEl.id = 'chord-wheel-hz';
-  readout.append(titleEl, ratioEl, speedEl, hzEl);
+  readout.append(titleEl, ratioEl, speedText, hzEl);
   wrap.append(canvas, readout);
   stage.appendChild(wrap);
 
   const controls = hooks && hooks.controls;
-  const knobGroup = document.createElement('div');
-  knobGroup.className = 'knob-group';
-  const knobEl = document.createElement('div');
-  knobEl.className = 'knob';
-  knobEl.id = 'ty-knob-chord-speed';
-  const mark = document.createElement('div');
-  mark.className = 'knob-mark';
-  knobEl.appendChild(mark);
-  const sub = document.createElement('div');
-  sub.className = 'knob-sub';
-  const knobLabel = document.createElement('div');
-  knobLabel.className = 'knob-label';
-  knobLabel.textContent = 'SPEED';
-  const knobValue = document.createElement('div');
-  knobValue.className = 'knob-value';
-  knobValue.id = 'ty-val-chord-speed';
-  knobValue.textContent = formatSpeed(steps[speedIndex]);
-  sub.append(knobLabel, knobValue);
-  knobGroup.append(knobEl, sub);
+  const speedGroup = document.createElement('div');
+  speedGroup.className = 'ty-speed';
+  const speedLabel = document.createElement('div');
+  speedLabel.className = 'knob-label';
+  speedLabel.textContent = 'SPEED';
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.id = 'chord-wheel-speed';
+  slider.min = '0';
+  slider.max = String(SLIDER_MAX);
+  slider.step = '1';
+  slider.value = String(sliderFromMultiplier(1));
+  const speedValue = document.createElement('div');
+  speedValue.id = 'chord-wheel-speed-value';
+  speedValue.textContent = formatSpeed(1);
+  speedGroup.append(speedLabel, slider, speedValue);
 
   const ratios = document.createElement('div');
   ratios.className = 'ty-ratios';
-  if (controls) controls.append(knobGroup, ratios);
+  if (controls) controls.append(speedGroup, ratios);
 
   let ratio = ratioById('4:5:6');
-  let speed = steps[speedIndex];
+  let speed = 1;
   let origin = 0;
   let running = false;
   let voice = null;
@@ -147,9 +107,10 @@ export function mountChordWheel(stage, hooks) {
     const rates = ringRatesHz(ratio.pulses, speed);
     titleEl.textContent = headline(slowestHz(ratio.pulses, speed), ratio.name);
     ratioEl.textContent = ratio.id;
-    speedEl.textContent = formatSpeed(speed);
+    const shown = formatSpeed(speed);
+    speedText.textContent = shown;
+    speedValue.textContent = shown;
     hzEl.textContent = formatHz(rates);
-    knobValue.textContent = formatSpeed(speed);
   }
 
   function pushPattern() {
@@ -198,8 +159,8 @@ export function mountChordWheel(stage, hooks) {
   }
   markRatios();
 
-  const speedKnob = new Knob(knobEl, steps, speedIndex, (value) => {
-    applySpeed(value);
+  slider.addEventListener('input', () => {
+    applySpeed(multiplierFromSlider(slider.value));
   });
 
   function draw() {
@@ -337,7 +298,11 @@ export function mountChordWheel(stage, hooks) {
     start,
     stop,
     dispose,
-    setSpeed(raw) { speedKnob.setIndex(nearestIndex(steps, clampSpeed(raw))); },
+    setSpeed(raw) {
+      const next = clampSpeed(raw);
+      slider.value = String(sliderFromMultiplier(next));
+      applySpeed(next);
+    },
     setRatioId,
     title() { return titleEl.textContent; },
     hz() { return hzEl.textContent; },

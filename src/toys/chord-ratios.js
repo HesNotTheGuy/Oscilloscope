@@ -2,6 +2,7 @@
 
 export const SPEED_MIN = 0.3;
 export const SPEED_MAX = 100;
+export const SLIDER_MAX = 1000;
 export const FUSION_HZ = 20;
 export const LOW_TITLE = 'This polyrhythm is a chord';
 
@@ -62,6 +63,24 @@ export function clampSpeed(raw) {
   if (!Number.isFinite(n) || n < SPEED_MIN) return SPEED_MIN;
   if (n > SPEED_MAX) return SPEED_MAX;
   return n;
+}
+
+export function multiplierFromSlider(position) {
+  const p = Number(position);
+  if (!Number.isFinite(p) || p <= 0) return SPEED_MIN;
+  if (p >= SLIDER_MAX) return SPEED_MAX;
+  const lo = Math.log(SPEED_MIN);
+  const hi = Math.log(SPEED_MAX);
+  return Math.round(Math.exp(lo + (hi - lo) * (p / SLIDER_MAX)) * 1000) / 1000;
+}
+
+export function sliderFromMultiplier(speed) {
+  const s = clampSpeed(speed);
+  if (s <= SPEED_MIN) return 0;
+  if (s >= SPEED_MAX) return SLIDER_MAX;
+  const lo = Math.log(SPEED_MIN);
+  const hi = Math.log(SPEED_MAX);
+  return Math.round(SLIDER_MAX * (Math.log(s) - lo) / (hi - lo));
 }
 
 export function angleRadians(audioTime, origin, speed) {
