@@ -44,6 +44,18 @@ describe('look-ahead scheduler', () => {
     expect(rings[2], 'six pulses').toEqual([0, 1 / 6, 1 / 3, 0.5]);
   });
 
+  it('includes a hit that lands on now', () => {
+    const { clock, hits, sched } = scripted([4], 1, 0, 0.6);
+    clock.t = 0.25;
+    sched.setPattern({ pulses: [4], speed: 1, origin: 0 });
+    sched.tick();
+    expect(hits, 'the window is [0.25, 0.85)').toEqual([
+      [0, 0.25],
+      [0, 0.5],
+      [0, 0.75],
+    ]);
+  });
+
   it('reads clock.now after a jump and does not replay the gap', () => {
     const { clock, hits, sched } = scripted([4], 1, 0, 0.6);
     clock.t = 10;

@@ -48,8 +48,9 @@ export class LookAheadScheduler {
   }
 
   _firstK(n, now) {
-    if (now <= this._origin) return 0;
-    const interval = 1 / (n * this._speed);
-    return Math.ceil((now - this._origin) / interval - 1e-9);
+    let k = Math.floor((now - this._origin) * n * this._speed);
+    if (k < 0) k = 0;
+    while (this._time(n, k) < now) k += 1;
+    return k;
   }
 }

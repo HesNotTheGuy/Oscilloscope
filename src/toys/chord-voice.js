@@ -9,12 +9,18 @@ const TONE_GAIN = 0.06;
 const VIS_GAIN = 0.18;
 const CLICK_HZ = [680, 1320, 2460, 4700];
 
+function clickWhen(time, now) {
+  if (time < now - CLICK_SEC) return null;
+  return time < now ? now : time;
+}
+
 export class ChordVoice {
   constructor({ actx, dest, visL, visR }) {
     this._actx = actx;
     this._rates = [];
     this._oscs = [];
     this._noise = null;
+    this._dead = false;
     this._clickGain = actx.createGain();
     this._toneGain = actx.createGain();
     this._out = actx.createGain();
@@ -53,8 +59,8 @@ export class ChordVoice {
   scheduleClick(ring, time) {
     if (this._kind() === 'tone') return;
     const actx = this._actx;
-    const t0 = Math.max(time, actx.currentTime);
-    if (time < actx.currentTime - CLICK_SEC) return;
+    const t0 = clickWhen(time, actx.currentTime);
+    if (t0 == null) return;
     const src = actx.createBufferSource();
     src.buffer = this._noiseBuf();
     const filter = actx.createBiquadFilter();
@@ -73,9 +79,10 @@ export class ChordVoice {
   }
 
   dispose() {
-    const t = this._actx.currentTime;
-    this._stopOscs(t);
-    try { this._out.disconnect(); } catch (_) {}
+    if (this._dead) return;
+    this._dead = true;
+    this._stopOscs(this._actx.currentTime);
+    this._out.disconnect();
   }
 
   _kind() {
@@ -104,6 +111,7 @@ export class ChordVoice {
     osc.frequency.setValueAtTime(freq, t);
     osc.connect(this._toneGain);
     osc.start(t);
+    osc._stopped = false;
     return osc;
   }
 
@@ -111,7 +119,9 @@ export class ChordVoice {
     const oscs = this._oscs;
     this._oscs = [];
     for (const osc of oscs) {
-      try { osc.stop(when); } catch (_) {}
+      if (osc._stopped) continue;
+      osc._stopped = true;
+      osc.stop(when);
     }
   }
 

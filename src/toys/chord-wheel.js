@@ -26,7 +26,9 @@ function secondsSinceDot(now, origin, speed, pulses, dot) {
   const turn = 1 / speed;
   const first = origin + (dot / pulses) * turn;
   if (now < first) return Infinity;
-  const k = Math.floor((now - first) / turn + 1e-9);
+  let k = Math.floor((now - first) * speed);
+  if (k < 0) k = 0;
+  while (first + (k + 1) * turn <= now) k += 1;
   return now - (first + k * turn);
 }
 
@@ -251,7 +253,6 @@ export function mountChordWheel(stage, hooks) {
 
   function loop() {
     if (!running) return;
-    scheduler.tick();
     draw();
     raf = requestAnimationFrame(loop);
   }
