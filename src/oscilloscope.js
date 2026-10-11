@@ -461,6 +461,12 @@ export class Oscilloscope {
     return (span / 2) * this.getVoltScale(ch) * 4;
   }
 
+  // Shape traces are already peak-normalized to 0.72. Fit that into a
+  // square so a circle stays a circle on the wide canvas.
+  _shapeScale(w, h) {
+    return (Math.min(w, h) / 2) * (0.86 / 0.72);
+  }
+
   _buildShapePolylines(trace, cx, cy, sx, sy) {
     const sets = [];
     const n = trace.L.length;
@@ -492,8 +498,8 @@ export class Oscilloscope {
       const leftW = mid - pad * 2;
       const rightX0 = mid + pad;
       const rightW = W - rightX0 - pad;
-      const sx = this._xyScale(this.ch1, leftW);
-      const sy = this._xyScale(this.ch2, H);
+      const sx = trace ? this._shapeScale(leftW, H) : this._xyScale(this.ch1, leftW);
+      const sy = trace ? sx : this._xyScale(this.ch2, H);
       const cx = pad + leftW / 2;
       const cy = H / 2;
       const L = trace ? trace.L : dataL;
@@ -526,8 +532,8 @@ export class Oscilloscope {
       this._dualMidX = mid;
       return sets;
     }
-    const sx = this._xyScale(this.ch1, W);
-    const sy = this._xyScale(this.ch2, H);
+    const sx = trace ? this._shapeScale(W, H) : this._xyScale(this.ch1, W);
+    const sy = trace ? sx : this._xyScale(this.ch2, H);
     const cx = W / 2, cy = H / 2;
     if (trace) return this._buildShapePolylines(trace, cx, cy, sx, sy);
     const n = Math.min(dataL.length, dataR.length);
@@ -545,7 +551,7 @@ export class Oscilloscope {
     ctx.font = 'bold 18px Courier New';
     if (this.figureTitle) ctx.fillText(this.figureTitle, 20, 32);
     ctx.font = '13px Courier New';
-    const fy = this.showMeasure ? H - 36 : H - 16;
+    const fy = this.showMeasure ? H - 52 : H - 16;
     if (this.figureFormula) ctx.fillText(this.figureFormula, 20, fy);
     if (this.dualView && this._dualMidX) {
       ctx.strokeStyle = `rgba(${rgb},0.35)`;

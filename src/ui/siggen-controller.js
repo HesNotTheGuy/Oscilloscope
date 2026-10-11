@@ -94,7 +94,7 @@ export class SignalGenController {
       s.figureFormula = preset.formula;
       s.dualView = !!(shapeDual && shapeDual.checked);
       if (s.mode !== 'XY') setScopeMode(s, 'XY');
-      else resetPhosphor(s);
+      resetPhosphor(s);
       markRunning();
     };
 

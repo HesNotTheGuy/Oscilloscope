@@ -155,7 +155,7 @@ export const SHAPE_PRESETS = [
     id: 'joukowski', n: 20, title: 'Joukowski airfoil',
     formula: 'w = ζ + 1/ζ,  ζ = c + R e^{it}',
     family: 'conformal', closes: true,
-    params: { kind: 'joukowski', cx: -0.1, cy: 0.08, R: 1.12 },
+    params: { kind: 'joukowski', cx: -0.12, cy: 0.22, R: 1.18 },
   },
   {
     id: 'epicycle-phi', n: 21, title: 'AM epicycle',
