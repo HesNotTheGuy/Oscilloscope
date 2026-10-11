@@ -1,5 +1,5 @@
 /**
- * DSO-1 Automated Screenshot Script
+ * Sound Lab Automated Screenshot Script
  * Run:  node_modules\.bin\electron.cmd screenshot.js
  */
 'use strict';

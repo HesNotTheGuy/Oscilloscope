@@ -5,6 +5,12 @@ const path = require('path');
 const fs = require('fs/promises');
 const { installArtnetIpc } = require('./src/main/artnet-ipc.js');
 const { installStreamServer, pushFrame, stopServer } = require('./src/main/stream-server.js');
+const { resolveUserDataPath } = require('./src/user-data-path.js');
+
+// Pin the profile folder before ready. Changing package.json name or adding
+// a top-level productName would otherwise move localStorage off the existing
+// dso1-oscilloscope directory.
+app.setPath('userData', resolveUserDataPath(app.getPath('appData')));
 
 let win;
 let displayWin = null;
@@ -52,7 +58,7 @@ function createWindow() {
     show: false, // stay hidden until ready-to-show; splash covers the gap
     backgroundColor: '#080808',
     autoHideMenuBar: true,
-    title: 'DSO-1 Oscilloscope',
+    title: 'Sound Lab',
     icon: path.join(__dirname, isMac ? 'icon.png' : 'icon.ico'),
     // Native min/max/close controls remain, but the bar background and
     // button colors are themed to match the dark UI (win/linux only).
@@ -168,7 +174,7 @@ ipcMain.handle('open-display', (_event, opts = {}) => {
     y: targetBounds ? targetBounds.y : undefined,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
-    title: 'DSO-1 — Display',
+    title: 'Sound Lab — Display',
     icon: path.join(__dirname, process.platform === 'darwin' ? 'icon.png' : 'icon.ico'),
     frame: !fullscreen,
     fullscreen: fullscreen,

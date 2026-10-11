@@ -1,5 +1,5 @@
 /**
- * DSO-1 Social Media Screenshots
+ * Sound Lab Social Media Screenshots
  * Run:  node_modules\.bin\electron.cmd screenshot-social.js
  *
  * Captures visually striking shots optimized for X/Twitter posts.
