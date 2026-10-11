@@ -5,12 +5,15 @@ const path = require('path');
 const fs = require('fs/promises');
 const { installArtnetIpc } = require('./src/main/artnet-ipc.js');
 const { installStreamServer, pushFrame, stopServer } = require('./src/main/stream-server.js');
-const { resolveUserDataPath } = require('./src/user-data-path.js');
+const { resolveUserDataPath, shouldPinHistoricalUserData } = require('./src/user-data-path.js');
 
 // Pin the profile folder before ready. Changing package.json name or adding
 // a top-level productName would otherwise move localStorage off the existing
-// dso1-oscilloscope directory.
-app.setPath('userData', resolveUserDataPath(app.getPath('appData')));
+// dso1-oscilloscope directory. Leave --user-data-dir alone so verify runs
+// and disposable profiles do not write into the real folder.
+if (shouldPinHistoricalUserData(app.commandLine.hasSwitch('user-data-dir'))) {
+  app.setPath('userData', resolveUserDataPath(app.getPath('appData')));
+}
 
 let win;
 let displayWin = null;

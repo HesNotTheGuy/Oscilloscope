@@ -19,6 +19,7 @@ const result = spawnSync(
     '-g', '!*.png',
     '-g', '!*.ico',
     'Oscilloscope|DSO-1|DSO‑1|dso1|dso-1|dso1-oscilloscope',
+    '.',
   ],
   { encoding: 'utf8', cwd },
 );

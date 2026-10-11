@@ -12,4 +12,12 @@ function resolveUserDataPath(appDataDir) {
   return path.join(appDataDir, HISTORICAL_USER_DATA_DIR);
 }
 
-module.exports = { HISTORICAL_USER_DATA_DIR, resolveUserDataPath };
+function shouldPinHistoricalUserData(hasExplicitUserDataDir) {
+  return hasExplicitUserDataDir !== true;
+}
+
+module.exports = {
+  HISTORICAL_USER_DATA_DIR,
+  resolveUserDataPath,
+  shouldPinHistoricalUserData,
+};
