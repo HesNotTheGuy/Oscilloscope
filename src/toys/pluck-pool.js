@@ -127,7 +127,6 @@ export class PluckPool {
     filter.connect(env);
     env.connect(this._dest);
 
-    // Analysers are not on the speaker bus, so the scope only hears a quiet tap.
     if (this._visL || this._visR) {
       const tap = actx.createGain();
       tap.gain.value = VIS_GAIN;

@@ -3,7 +3,7 @@
 import { WaveField, clampGrid } from './wave-field.js';
 import { midiForCell, frequencyForMidi } from './scale.js';
 
-const TRIGGER_LEVEL = 0.18;
+const TRIGGER_LEVEL = 0.12;
 const CELL_QUIET_MS = 120;
 const GREEN = [124, 255, 74];
 const YELLOW = [245, 225, 75];

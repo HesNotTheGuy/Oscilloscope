@@ -260,6 +260,7 @@ export class SoundToysController {
     if (app) app.classList.toggle('toys-open', on);
     if (this._btn) {
       this._btn.classList.toggle('active', on);
+      this._btn.classList.toggle('synth-active', on);
       this._btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     if (this._dock) this._dock.hidden = !on;
