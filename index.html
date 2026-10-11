@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="src/patch/patch.css">
   <link rel="stylesheet" href="src/ui/tour.css">
+  <link rel="stylesheet" href="src/toys/toys.css">
 </head>
 <body>
 
@@ -60,6 +61,7 @@
 
     <!-- ── PATCH MODE TOGGLE — modular patch bay ── -->
     <button class="synth-toggle-btn" id="btn-patch" title="Patch Mode — route the audio through a modular patch bay">&#128736; PATCH</button>
+    <button class="synth-toggle-btn" id="btn-toys" title="Sound Toys — playable sheets">TOYS</button>
 
     <div class="rec-split" id="rec-split">
       <button class="rec-btn rec-main" id="btn-record">● REC</button>
@@ -119,6 +121,7 @@
        is a 4-column panel flow and is hidden outright in tabbed rig mode,
        either of which would break or disappear the rack. -->
   <div id="patch-dock"></div>
+  <div id="toys-dock" hidden></div>
 
   <!-- BOTTOM zone (full width) -->
   <div class="panel-zone zone-bottom" id="zone-bottom" data-zone="bottom"></div>

@@ -133,6 +133,7 @@ export class TooltipController {
     if (id === 'btn-sg')       return 'Spectrogram — scrolling frequency-over-time waterfall heatmap (20 Hz – 20 kHz)';
     if (id === 'btn-synth')    return 'Keyboard synth — press K to toggle, then play notes with your keyboard';
     if (id === 'btn-patch')    return 'Patch mode — route audio through a modular rack of filters, echo, and modulators';
+    if (id === 'btn-toys')     return 'Sound toys — ripple pad: tap the sheet to make waves and notes';
     if (el.classList.contains('st-mode') || el.dataset.scopeMode) {
       const mode = el.dataset.scopeMode;
       const map = {

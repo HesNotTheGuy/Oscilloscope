@@ -54,4 +54,5 @@ import { InputMapper } from './input-mapper.js';
   // Expose internals for screenshot automation (harmless on desktop)
   window._dso = { engine, scope, sigGen, recorder, ui, store, inputMap, ensureAudio,
                   tour: ui._tour };
+  if (ui._toys) window._dso.toys = ui._toys.api;
 })();

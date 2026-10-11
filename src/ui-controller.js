@@ -19,6 +19,7 @@ import { CanvasContextMenuController } from './ui/canvas-context-menu.js';
 import { BpmDisplay } from './ui/bpm-display.js';
 import { FirstRunHint } from './ui/first-run-hint.js';
 import { PatchController } from './ui/patch-controller.js';
+import { SoundToysController } from './toys/sound-toys-controller.js';
 import { TourController } from './ui/tour-controller.js';
 import { Notifier } from './ui/notifier.js';
 
@@ -85,6 +86,7 @@ export class UIController {
     this._bpmDisplay  = new BpmDisplay(ctx);
     this._firstRun    = new FirstRunHint(ctx);
     this._patch       = new PatchController(ctx);
+    this._toys        = new SoundToysController(ctx);
 
     // Initialize all domains
     this._scope.init();
@@ -118,6 +120,7 @@ export class UIController {
     this._firstRun.init();
     this._notifier.init();
     this._patch.init();
+    this._toys.init();
 
     // Tooltip system — initialized after all controls exist
     this._tooltip = new TooltipController();

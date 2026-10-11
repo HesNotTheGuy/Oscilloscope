@@ -6,7 +6,7 @@ const CLAMP = 4;
 // The 5-point stencil goes unstable once speed^2 passes about 0.5.
 const MAX_C2 = 0.45;
 
-function clampN(n) {
+export function clampGrid(n) {
   const r = Math.round(Number(n));
   if (!Number.isFinite(r)) return 16;
   return Math.max(MIN_N, Math.min(MAX_N, r));
@@ -31,7 +31,7 @@ export class WaveField {
   }
 
   resize(n) {
-    const next = clampN(n);
+    const next = clampGrid(n);
     this._n = next;
     this.u = new Float32Array(next * next);
     this.v = new Float32Array(next * next);
