@@ -1,7 +1,9 @@
 'use strict';
 
+import { Knob } from '../knob.js';
 import { WaveField, clampGrid } from './wave-field.js';
-import { midiForCell, frequencyForMidi } from './scale.js';
+import { midiForCell, frequencyForMidi, KEYS } from './scale.js';
+import { PluckPool } from './pluck-pool.js';
 
 const TRIGGER_LEVEL = 0.12;
 const CELL_QUIET_MS = 120;
@@ -56,10 +58,11 @@ function clamp01(v) {
 }
 
 export class RipplePad {
-  constructor(canvas, { onNote, getParams } = {}) {
+  constructor(canvas, { onNote, getParams, audio } = {}) {
     this._canvas = canvas;
     this._onNote = onNote || null;
     this._getParams = getParams || null;
+    this._audio = audio || null;
     this._g = canvas.getContext('2d', { alpha: false });
     this.field = new WaveField(16);
     this._pool = null;
@@ -73,8 +76,28 @@ export class RipplePad {
     this._bindPointer();
   }
 
-  attach(pool) {
-    this._pool = pool || null;
+  noteLog() {
+    return this._pool ? this._pool.noteEvents.slice() : [];
+  }
+
+  voiceCount() {
+    return this._pool ? this._pool.activeCount() : 0;
+  }
+
+  _ensurePool() {
+    if (this._pool || !this._audio) return;
+    const nodes = this._audio();
+    if (!nodes || !nodes.actx || !nodes.dest) return;
+    this._pool = new PluckPool({
+      actx: nodes.actx,
+      dest: nodes.dest,
+      visL: nodes.visL,
+      visR: nodes.visR,
+    });
+  }
+
+  dropPool() {
+    this._pool = null;
   }
 
   setDensity(n) {
@@ -96,6 +119,9 @@ export class RipplePad {
 
   start() {
     if (this._running) return;
+    const params = this._getParams ? this._getParams() : null;
+    if (params && params.density != null) this.setDensity(params.density);
+    this._ensurePool();
     this._running = true;
     const loop = (now) => {
       if (!this._running) return;
@@ -109,6 +135,7 @@ export class RipplePad {
     this._running = false;
     if (this._raf) cancelAnimationFrame(this._raf);
     this._raf = 0;
+    if (this._pool) this._pool.dispose();
   }
 
   snapshot() {
@@ -216,4 +243,127 @@ export class RipplePad {
       }
     }
   }
+}
+
+const KNOBS = [
+  {
+    id: 'scale',
+    label: 'SCALE',
+    index: 0,
+    steps: [
+      { value: 'major', label: 'Major' },
+      { value: 'minor', label: 'Minor' },
+      { value: 'pentatonic', label: 'Pentatonic' },
+      { value: 'dorian', label: 'Dorian' },
+      { value: 'mixolydian', label: 'Mixolydian' },
+    ],
+  },
+  {
+    id: 'key',
+    label: 'KEY',
+    index: 0,
+    steps: KEYS.map(name => ({ value: name, label: name })),
+  },
+  {
+    id: 'speed',
+    label: 'SPEED',
+    index: 2,
+    steps: [
+      { value: 0.18, label: 'Slow' },
+      { value: 0.28, label: 'Med' },
+      { value: 0.38, label: 'Fast' },
+      { value: 0.48, label: 'Rush' },
+    ],
+  },
+  {
+    id: 'damping',
+    label: 'RING',
+    index: 2,
+    steps: [
+      { value: 0.94, label: 'Short' },
+      { value: 0.97, label: 'Med' },
+      { value: 0.985, label: 'Long' },
+      { value: 0.995, label: 'Endless' },
+    ],
+  },
+  {
+    id: 'timbre',
+    label: 'TIMBRE',
+    index: 0,
+    steps: [
+      { value: 'pluck', label: 'Pluck' },
+      { value: 'glass', label: 'Glass' },
+      { value: 'mallet', label: 'Mallet' },
+    ],
+  },
+  {
+    id: 'density',
+    label: 'DENSITY',
+    index: 2,
+    steps: [8, 12, 16, 24, 32].map(n => ({ value: n, label: String(n) })),
+  },
+];
+
+function appendKnobs(controls, params) {
+  for (const spec of KNOBS) {
+    params[spec.id] = spec.steps[spec.index].value;
+    const group = document.createElement('div');
+    group.className = 'knob-group';
+    const knob = document.createElement('div');
+    knob.className = 'knob';
+    knob.id = 'ty-knob-' + spec.id;
+    const mark = document.createElement('div');
+    mark.className = 'knob-mark';
+    knob.appendChild(mark);
+    const sub = document.createElement('div');
+    sub.className = 'knob-sub';
+    const label = document.createElement('div');
+    label.className = 'knob-label';
+    label.textContent = spec.label;
+    const value = document.createElement('div');
+    value.className = 'knob-value';
+    value.id = 'ty-val-' + spec.id;
+    value.textContent = spec.steps[spec.index].label;
+    sub.append(label, value);
+    group.append(knob, sub);
+    controls.appendChild(group);
+    new Knob(knob, spec.steps.map(s => s.value), spec.index, (v, index) => {
+      params[spec.id] = v;
+      value.textContent = spec.steps[index].label;
+    });
+  }
+}
+
+export function mountRipplePad(stage, hooks) {
+  const canvas = document.createElement('canvas');
+  canvas.id = 'ripple-pad-canvas';
+  canvas.className = 'ty-pad';
+  canvas.setAttribute('aria-label', 'Ripple pad');
+  stage.appendChild(canvas);
+
+  const params = {};
+  const controls = hooks && hooks.controls;
+  if (controls) appendKnobs(controls, params);
+
+  const pad = new RipplePad(canvas, {
+    onNote: hooks && hooks.onNote,
+    getParams: () => params,
+    audio: hooks && hooks.audio,
+  });
+  if (params.density != null) pad.setDensity(params.density);
+
+  return {
+    start() { pad.start(); },
+    stop() { pad.stop(); },
+    dispose() {
+      pad.stop();
+      pad.dropPool();
+      canvas.remove();
+      if (controls) controls.replaceChildren();
+    },
+    tap(nx, ny, amp) { pad.pointerNorm(nx, ny, amp); },
+    noteLog() { return pad.noteLog(); },
+    voiceCount() { return pad.voiceCount(); },
+    energy() { return pad.field.energy(); },
+  };
 }
