@@ -18,7 +18,6 @@ function inScale(midi, tonicPc, degrees) {
   return degrees.indexOf(pitchClass(midi, tonicPc)) !== -1;
 }
 
-// Downward neighbor first, so a tie snaps to the lower midi.
 export function midiInScale(midi, key, scaleId) {
   const degrees = SCALES[scaleId] || SCALES.major;
   const tonic = KEYS.indexOf(key);
@@ -37,7 +36,6 @@ export function frequencyForMidi(midi) {
   return 440 * 2 ** ((Number(midi) - 69) / 12);
 }
 
-// Two octaves of scale degrees from C3, cell address x+2y.
 export function midiForCell(x, y, key, scaleId) {
   const degrees = SCALES[scaleId] || SCALES.major;
   const span = degrees.length * 2;

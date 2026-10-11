@@ -3,7 +3,6 @@
 const MIN_N = 8;
 const MAX_N = 32;
 const CLAMP = 4;
-// The 5-point stencil goes unstable once speed^2 passes about 0.5.
 const MAX_C2 = 0.45;
 
 export function clampGrid(n) {

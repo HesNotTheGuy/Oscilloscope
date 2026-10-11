@@ -8,7 +8,6 @@ const CELL_QUIET_MS = 120;
 const GREEN = [124, 255, 74];
 const YELLOW = [245, 225, 75];
 
-// Prefer a trigger count inside 12..20, then the count closest to 16.
 function triggerStride(n) {
   const hi = n - 2;
   let bestK = 1;
