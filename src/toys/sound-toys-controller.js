@@ -248,7 +248,7 @@ export class SoundToysController {
         visR: engine.visBusR,
       });
     }
-    if (this._pad) this._pad.attach(engine, this._pool);
+    if (this._pad) this._pad.attach(this._pool);
     if (engine && engine.actx && engine.actx.state === 'suspended') {
       engine.actx.resume().catch(() => {});
     }
@@ -260,7 +260,6 @@ export class SoundToysController {
     if (app) app.classList.toggle('toys-open', on);
     if (this._btn) {
       this._btn.classList.toggle('active', on);
-      this._btn.classList.toggle('synth-active', on);
       this._btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     if (this._dock) this._dock.hidden = !on;

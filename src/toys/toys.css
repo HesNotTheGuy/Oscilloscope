@@ -29,10 +29,10 @@ body.toys-open #patch-dock {
 }
 
 #toys-dock[hidden] {
-  display: none !important;
+  display: none;
 }
 
-body.toys-open #toys-dock {
+body.toys-open #toys-dock:not([hidden]) {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;

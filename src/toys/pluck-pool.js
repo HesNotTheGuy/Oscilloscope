@@ -3,6 +3,7 @@
 const MAX_EVENTS = 200;
 const PEAK = 0.12;
 const VIS_GAIN = 0.15;
+const EXP_RAMP_FLOOR = 0.0001;
 
 const TIMBRES = {
   pluck:  { type: 'triangle', filter: 'lowpass',  mul: 5,   q: 0.7, decay: 0.45, noise: 0.35 },
@@ -119,9 +120,9 @@ export class PluckPool {
     const env = actx.createGain();
     const attack = 0.004;
     const end = t0 + Math.max(spec.decay, attack + 0.02);
-    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.setValueAtTime(EXP_RAMP_FLOOR, t0);
     env.gain.exponentialRampToValueAtTime(PEAK, t0 + attack);
-    env.gain.exponentialRampToValueAtTime(0.0001, end);
+    env.gain.exponentialRampToValueAtTime(EXP_RAMP_FLOOR, end);
 
     mix.connect(filter);
     filter.connect(env);
@@ -149,7 +150,7 @@ export class PluckPool {
     const t = this._actx.currentTime;
     try {
       voice.env.gain.cancelScheduledValues(t);
-      voice.env.gain.setValueAtTime(0.0001, t);
+      voice.env.gain.setValueAtTime(EXP_RAMP_FLOOR, t);
     } catch (_) {}
     try { voice.osc.stop(t); } catch (_) {}
     try { if (voice.noise) voice.noise.stop(t); } catch (_) {}
