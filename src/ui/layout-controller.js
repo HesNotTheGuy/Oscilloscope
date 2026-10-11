@@ -90,7 +90,7 @@ export class LayoutController {
       sigfx:   ['signal fx', 'signal effects', 'mirror', 'rotation', 'rotate', 'smooth', 'filter', 'frequency', 'freq', 'bass', 'treble', 'mid', 'bandpass'],
       scene:   ['3d', '2d', 'obj', 'image', 'img', 'model', 'wireframe', 'geometry', 'tile', 'symmetry', 'motion', 'float', 'ripple', 'twist', 'explode', 'warp', 'scroll', 'spin', 'power'],
       audio:   ['audio', 'input', 'mic', 'microphone', 'file', 'music', 'song', 'play', 'volume', 'mp3', 'wav', 'system audio', 'loopback'],
-      siggen:  ['signal generator', 'generator', 'sine', 'square', 'sawtooth', 'triangle', 'noise', 'waveform', 'oscillator', 'tone', 'frequency', 'lissajous'],
+      siggen:  ['signal generator', 'generator', 'sine', 'square', 'sawtooth', 'triangle', 'noise', 'waveform', 'oscillator', 'tone', 'frequency', 'lissajous', 'reel', 'shape', 'gielis', 'epicycle'],
       presets: ['preset', 'save', 'load', 'export', 'import', 'slot', 'pack', 'visual pack', 'look'],
       display: ['display', 'beam width', 'glow', 'persist', 'persistence', 'brightness', 'thickness'],
     };

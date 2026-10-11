@@ -26,12 +26,16 @@ export function updateStatus(scope) {
 }
 
 /**
- * Clear phosphor canvas for mode switching (2D fallback only).
+ * Clear phosphor for mode switching and shape changes.
  */
 export function resetPhosphor(scope) {
-  if (!scope._phCtx) return;
-  scope._phCtx.fillStyle = '#000';
-  scope._phCtx.fillRect(0, 0, scope.canvas.width, scope.canvas.height);
+  if (scope._phCtx) {
+    scope._phCtx.fillStyle = '#000';
+    scope._phCtx.fillRect(0, 0, scope.canvas.width, scope.canvas.height);
+  }
+  if (scope._glr && typeof scope._glr.clearPhosphor === 'function') {
+    scope._glr.clearPhosphor();
+  }
 }
 
 export const SCOPE_MODES = {
