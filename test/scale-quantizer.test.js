@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { midiInScale, frequencyForMidi } from '../src/toys/scale.js';
+import { midiInScale, frequencyForMidi, midiForCell } from '../src/toys/scale.js';
 
 describe('scale quantizer', () => {
   it('leaves an in-scale note where it is', () => {
@@ -17,5 +17,14 @@ describe('scale quantizer', () => {
   it('maps midi to equal-tempered frequency from A4', () => {
     expect(frequencyForMidi(69), 'A4 is 440 Hz').toBe(440);
     expect(frequencyForMidi(81), 'A5 is 880 Hz').toBe(880);
+  });
+
+  it('packs a cell onto C3 through x plus twice y, then the named scale', () => {
+    expect(midiForCell(0, 0, 'C', 'major'), 'origin cell is C3').toBe(48);
+    expect(midiForCell(1, 0, 'C', 'major'), 'one step in x is D3').toBe(50);
+    expect(midiForCell(0, 1, 'C', 'major'), 'one step in y skips to E3').toBe(52);
+    expect(midiForCell(7, 0, 'C', 'major'), 'the next octave slot is C4').toBe(60);
+    expect(midiForCell(0, 0, 'D', 'major'), 'D major origin is D3').toBe(50);
+    expect(midiForCell(3, 0, 'C', 'pentatonic'), 'fourth pentatonic slot is G3').toBe(55);
   });
 });
