@@ -1,7 +1,7 @@
 'use strict';
 
 // ─────────────────────────────────────────────────────────────
-//  TooltipController — hover tooltips for all DSO-1 controls
+//  TooltipController — hover tooltips for all Sound Lab controls
 //  Single tooltip div, event-delegated, 400 ms delay.
 // ─────────────────────────────────────────────────────────────
 export class TooltipController {

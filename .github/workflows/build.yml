@@ -1,4 +1,4 @@
-name: Build Release
+name: Sound Lab Release
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: dso1-${{ matrix.artifact }}
+          name: sound-lab-${{ matrix.artifact }}
           path: |
             dist/*.exe
             dist/*.dmg

@@ -34,10 +34,10 @@ const CRLF = Buffer.from('\r\n', 'latin1');
 const PAGE = Buffer.from(
   '<!doctype html>\n' +
   '<meta charset="utf-8">\n' +
-  '<title>DSO-1 stream</title>\n' +
+  '<title>Sound Lab stream</title>\n' +
   '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
   'img{display:block;width:100%;height:100%;object-fit:contain}</style>\n' +
-  '<img src="' + STREAM_PATH + '" alt="DSO-1 stream">\n', 'utf8');
+  '<img src="' + STREAM_PATH + '" alt="Sound Lab stream">\n', 'utf8');
 
 // One server per app. null while stopped.
 let state = null;

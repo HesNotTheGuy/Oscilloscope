@@ -99,8 +99,8 @@
   <!-- Bottom panel area -->
   <rect x="64" y="408" width="384" height="56" rx="6" ry="6" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
 
-  <!-- DSO-1 text -->
-  <text x="256" y="445" text-anchor="middle" font-family="'Courier New', monospace" font-weight="bold" font-size="32" fill="#00ff41" filter="url(#glow)" letter-spacing="4">DSO-1</text>
+  <!-- Sound Lab text -->
+  <text x="256" y="445" text-anchor="middle" font-family="'Courier New', monospace" font-weight="bold" font-size="22" fill="#00ff41" filter="url(#glow)" letter-spacing="2">SOUND LAB</text>
 
   <!-- Small LED indicator -->
   <circle cx="88" cy="436" r="4" fill="#00ff41" filter="url(#glow)" opacity="0.9"/>

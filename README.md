@@ -1,12 +1,12 @@
-# DSO-1 Oscilloscope
+# Sound Lab
 
-<img src="docs/screenshots/01-overview.png" alt="DSO-1 in use, drawing a live waveform" width="900">
+<img src="docs/screenshots/01-overview.png" alt="Sound Lab in use, drawing a live waveform" width="900">
 
-DSO-1 is a desktop digital oscilloscope that draws audio in real time.
+A place to see and play with sound: scope, math shapes, sound toys.
 
 ## Install
 
-Download a built app from the [GitHub Releases page](https://github.com/HesNotTheGuy/Oscilloscope/releases).
+Download a built app from the [GitHub Releases page](https://github.com/HesNotTheGuy/sound-lab/releases).
 
 From source:
 

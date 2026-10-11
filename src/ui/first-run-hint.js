@@ -42,7 +42,7 @@ export class FirstRunHint {
 
     const title = document.createElement('div');
     title.className = 'frh-title';
-    title.textContent = 'Welcome to DSO-1';
+    title.textContent = 'Welcome to Sound Lab';
     card.appendChild(title);
 
     const rows = document.createElement('div');

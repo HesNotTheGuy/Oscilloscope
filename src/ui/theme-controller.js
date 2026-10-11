@@ -92,7 +92,7 @@ export class ThemeController {
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), {
       href:     url,
-      download: `dso1-theme-${themeId}.json`,
+      download: `sound-lab-theme-${themeId}.json`,
     });
     document.body.appendChild(a);
     a.click();

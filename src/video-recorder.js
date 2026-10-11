@@ -73,7 +73,7 @@ export class VideoRecorder {
     const suffix = this._transparent ? '_alpha' : '';
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `dso1_${Date.now()}${suffix}.webm`,
+      download: `sound-lab_${Date.now()}${suffix}.webm`,
     });
     document.body.appendChild(a);
     a.click();
