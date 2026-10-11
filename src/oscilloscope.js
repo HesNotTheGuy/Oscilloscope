@@ -46,6 +46,10 @@ export class Oscilloscope {
     this.isRunning  = true;
     this.frozenData = null;
     this.mode       = 'YT';
+    this.dualView   = false;
+    this.shapeTrace = null;
+    this.figureTitle = '';
+    this.figureFormula = '';
 
     // Channels
     this.ch1 = { coupling: 'AC', vdiv: VDIV[VD_DEFAULT], vdivIdx: VD_DEFAULT, pos: 0 };
@@ -453,26 +457,124 @@ export class Oscilloscope {
     return { trigIdx, sampPx };
   }
 
+  _xyScale(ch, span) {
+    return (span / 2) * this.getVoltScale(ch) * 4;
+  }
+
+  _buildShapePolylines(trace, cx, cy, sx, sy) {
+    const sets = [];
+    const n = trace.L.length;
+    if (trace.family === 'map') {
+      for (let i = 0; i < n; i++) {
+        const x = cx + trace.L[i] * sx;
+        const y = cy - trace.R[i] * sy;
+        sets.push([[x, y], [x + 1.5, y + 1.5]]);
+      }
+      return sets;
+    }
+    let cur = [];
+    for (let i = 0; i < n; i++) {
+      cur.push([cx + trace.L[i] * sx, cy - trace.R[i] * sy]);
+      if (trace.lift[i]) {
+        if (cur.length >= 2) sets.push(cur);
+        cur = [];
+      }
+    }
+    if (cur.length >= 2) sets.push(cur);
+    return sets;
+  }
+
+  _xyPolylines(dataL, dataR, W, H) {
+    const trace = this.shapeTrace;
+    if (this.dualView) {
+      const mid = Math.floor(W * 0.52);
+      const pad = 18;
+      const leftW = mid - pad * 2;
+      const rightX0 = mid + pad;
+      const rightW = W - rightX0 - pad;
+      const sx = this._xyScale(this.ch1, leftW);
+      const sy = this._xyScale(this.ch2, H);
+      const cx = pad + leftW / 2;
+      const cy = H / 2;
+      const L = trace ? trace.L : dataL;
+      const R = trace ? trace.R : dataR;
+      const n = Math.min(L.length, R.length);
+      const sets = [];
+      if (trace) sets.push(...this._buildShapePolylines(trace, cx, cy, sx, sy));
+      else {
+        const pts = [];
+        for (let i = 0; i < n; i++) pts.push([cx + L[i] * sx, cy - R[i] * sy]);
+        sets.push(pts);
+      }
+      const vs = this.getVoltScale(this.ch1);
+      const ytL = [], ytR = [];
+      const den = Math.max(1, n - 1);
+      for (let i = 0; i < n; i++) {
+        const x = rightX0 + (i / den) * rightW;
+        const yL = H * 0.28 - Math.max(-2, Math.min(2, L[i])) * vs * (H * 0.2);
+        const yR = H * 0.72 - Math.max(-2, Math.min(2, R[i])) * vs * (H * 0.2);
+        ytL.push([x, yL]);
+        ytR.push([x, yR]);
+      }
+      sets.push(ytL, ytR);
+      if (n > 1) {
+        const idx = Math.floor((performance.now() / 14) % n);
+        const xy = [cx + L[idx] * sx, cy - R[idx] * sy];
+        const ty = ytL[idx];
+        if (ty) sets.push([xy, ty]);
+      }
+      this._dualMidX = mid;
+      return sets;
+    }
+    const sx = this._xyScale(this.ch1, W);
+    const sy = this._xyScale(this.ch2, H);
+    const cx = W / 2, cy = H / 2;
+    if (trace) return this._buildShapePolylines(trace, cx, cy, sx, sy);
+    const n = Math.min(dataL.length, dataR.length);
+    const pts = [];
+    for (let i = 0; i < n; i++) pts.push([cx + dataL[i] * sx, cy - dataR[i] * sy]);
+    return [pts];
+  }
+
+  drawFigureLabels(ctx) {
+    if (!this.figureTitle && !this.figureFormula) return;
+    const W = this.canvas.width, H = this.canvas.height;
+    const rgb = this._hexToRgb(this._renderColor());
+    ctx.save();
+    ctx.fillStyle = `rgba(${rgb},0.9)`;
+    ctx.font = 'bold 18px Courier New';
+    if (this.figureTitle) ctx.fillText(this.figureTitle, 20, 32);
+    ctx.font = '13px Courier New';
+    const fy = this.showMeasure ? H - 36 : H - 16;
+    if (this.figureFormula) ctx.fillText(this.figureFormula, 20, fy);
+    if (this.dualView && this._dualMidX) {
+      ctx.strokeStyle = `rgba(${rgb},0.35)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(this._dualMidX, 8);
+      ctx.lineTo(this._dualMidX, H - 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ── Draw XY / Lissajous ──────────────────────────────────────────────
   drawXY(ctx, dataL, dataR) {
     const W = this.canvas.width, H = this.canvas.height;
-    const cx = W/2, cy = H/2;
-    const sx = (W/2) * this.getVoltScale(this.ch1) * 4;
-    const sy = (H/2) * this.getVoltScale(this.ch2) * 4;
-    const n  = Math.min(dataL.length, dataR.length);
     const color  = this._renderColor();
     const glow   = this._renderGlow();
     const bWidth = this._renderBeamWidth();
-
-    const pts = Array.from({ length: n }, (_, i) => [cx + dataL[i] * sx, cy - dataR[i] * sy]);
-
-    if (this.fx.bloom) {
-      this._drawBeamPath(ctx, pts, color, 0, bWidth * 12, 0.025);
-      this._drawBeamPath(ctx, pts, color, 0, bWidth * 6,  0.06);
-      this._drawBeamPath(ctx, pts, color, glow * 0.5, bWidth * 3, 0.12);
+    const sets = this._xyPolylines(dataL, dataR, W, H);
+    const bloom = this.fx.bloom && sets.length < 80;
+    for (const pts of sets) {
+      if (bloom) {
+        this._drawBeamPath(ctx, pts, color, 0, bWidth * 12, 0.025);
+        this._drawBeamPath(ctx, pts, color, 0, bWidth * 6,  0.06);
+        this._drawBeamPath(ctx, pts, color, glow * 0.5, bWidth * 3, 0.12);
+      }
+      this._drawBeamPath(ctx, pts, color, glow * 2, bWidth + 1.5, 0.22);
+      this._drawBeamPath(ctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
     }
-    this._drawBeamPath(ctx, pts, color, glow * 2, bWidth + 1.5, 0.22);
-    this._drawBeamPath(ctx, pts, color, glow * 0.6, bWidth * 0.65, 1.0);
   }
 
   // ── Draw VS / Vectorscope (2D fallback) ──────────────────────────────
@@ -719,17 +821,18 @@ export class Oscilloscope {
         if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
       }
     } else if (this.mode === 'XY') {
-      // XY / Lissajous
-      const sx = (W/2) * this.getVoltScale(this.ch1) * 4;
-      const sy = (H/2) * this.getVoltScale(this.ch2) * 4;
-      const cx = W/2, cy = H/2;
-      const n  = Math.min(dataL.length, dataR.length);
-      const pts = [];
-      for (let i = 0; i < n; i++) pts.push([cx + dataL[i]*sx, cy - dataR[i]*sy]);
-      allPts.push(pts);
-      if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
-      if (this.fx.mirrorY) allPts.push(this._mirrorPts(pts, 0, H,   1,-1, 'B'));
-      if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
+      const sets = this._xyPolylines(dataL, dataR, W, H);
+      for (const pts of sets) allPts.push(pts);
+      if (!this.dualView && sets.length === 1) {
+        const pts = sets[0];
+        if (this.fx.mirrorX) allPts.push(this._mirrorPts(pts, W, 0,  -1, 1, 'A'));
+        if (this.fx.mirrorY) allPts.push(this._mirrorPts(pts, 0, H,   1,-1, 'B'));
+        if (this.fx.mirrorX && this.fx.mirrorY) allPts.push(this._mirrorPts(pts, W, H, -1,-1, 'C'));
+      }
+      if (this.dualView) {
+        const src = this.shapeTrace ? this.shapeTrace.L : dataL;
+        measResult = { trigIdx: 0, sampPx: Math.max(0.01, src.length / W) };
+      }
     } else if (this.mode === 'VS') {
       // VS / Vectorscope
       const scale = this.getVoltScale(this.ch1) * 4;
@@ -839,6 +942,7 @@ export class Oscilloscope {
       this.measFreq = this.estimateFreq(dataL);
     }
     this.drawMeasurements(octx);
+    this.drawFigureLabels(octx);
   }
 
   // ── Canvas 2D fallback render path (original logic) ──────────────────
@@ -904,7 +1008,7 @@ export class Oscilloscope {
       this._drawMirrored(pctx, ctx => this.drawYT(ctx, dataL, this.ch1, 0));
     } else if (this.mode === 'XY') {
       this.drawXY(pctx, dataL, dataR);
-      this._drawMirrored(pctx, ctx => this.drawXY(ctx, dataL, dataR));
+      if (!this.dualView) this._drawMirrored(pctx, ctx => this.drawXY(ctx, dataL, dataR));
     } else if (this.mode === 'VS') {
       // VS / Vectorscope — render using 2D beam path
       this.drawVS(pctx, dataL, dataR);
@@ -968,6 +1072,7 @@ export class Oscilloscope {
     // ⑩ Post-effects
     if (this.crtCurve) this.applyCRTCurve();
     this.drawMeasurements(this.ctx);
+    this.drawFigureLabels(this.ctx);
 
     // ⑪ Image trace (2D fallback path) — draw phosphor dots for each trace point
     if (this.objMode && !this.obj3dMode && this._imgScene.loaded) {

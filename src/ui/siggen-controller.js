@@ -1,17 +1,29 @@
 'use strict';
 
-import { LISSAJOUS_RATIOS } from '../constants.js';
-import { resetPhosphor } from './ui-utils.js';
+import { resetPhosphor, setScopeMode } from './ui-utils.js';
+import { listShapes, getShape } from '../shapes/index.js';
 
-// ─────────────────────────────────────────────────────────────
-//  SignalGenController — oscillator, ratios, shape presets
-// ─────────────────────────────────────────────────────────────
+const FAMILY_LABEL = {
+  lissajous: 'Lissajous',
+  polar: 'Polar',
+  gielis: 'Gielis',
+  epicycle: 'Epicycle',
+  knot: 'Knot',
+  parametric: 'Parametric',
+  conformal: 'Conformal',
+  ode: 'ODE',
+  map: 'Map',
+  implicit: 'Implicit',
+  polylines: 'Polylines',
+};
+
 export class SignalGenController {
   constructor(ctx) {
     this.notify = ctx.notify || null;
     this.scope       = ctx.scope;
     this.engine      = ctx.engine;
     this.sigGen      = ctx.sigGen;
+    this.shapes      = ctx.shapes || null;
     this.store       = ctx.store;
     this.ensureAudio = ctx.ensureAudio;
   }
@@ -29,6 +41,8 @@ export class SignalGenController {
     const btnGenStart = document.getElementById('btn-gen-start');
     const btnGenStop  = document.getElementById('btn-gen-stop');
     const genRatioRow = document.getElementById('gen-ratio-row');
+    const shapeSelect = document.getElementById('shape-select');
+    const shapeDual   = document.getElementById('shape-dual');
 
     genFreqL.addEventListener('input', () => { sg.setFreqL(+genFreqL.value); this._syncRFreq(sg, genFreqR); });
     genFreqR.addEventListener('input', () => sg.setFreqR(+genFreqR.value));
@@ -42,7 +56,6 @@ export class SignalGenController {
       document.getElementById('gen-amp-val').textContent = (+genAmp.value).toFixed(2);
     });
 
-    // ── Ratio presets ──
     this._activeRatio = 1;
     genRatioRow.querySelectorAll('.ratio-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -54,94 +67,83 @@ export class SignalGenController {
       });
     });
 
-    // ── Shape presets ──
-    const SHAPE_PRESETS = {
-      circle:   { freqL: 200, ratio: 1,          phase: 90,  wave: 'sine'     },
-      figure8:  { freqL: 200, ratio: 2,          phase: 0,   wave: 'sine'     },
-      heart:    { freqL: 200, ratio: 2,          phase: 55,  wave: 'triangle' },
-      star:     { freqL: 100, ratio: 2.5,        phase: 90,  wave: 'sine'     },
-      spiral:   { freqL: 200, ratio: 1.007,      phase: 90,  wave: 'sine'     },
-      diamond:  { freqL: 200, ratio: 1,          phase: 90,  wave: 'triangle' },
-      web:      { freqL: 100, ratio: 1.75,       phase: 0,   wave: 'sine'     },
-      chaos:    { freqL: 317, ratio: Math.PI/2,  phase: 37,  wave: 'sawtooth' },
-      flower:   { freqL: 100, ratio: 1.5,        phase: 90,  wave: 'sine'     },
-      bowtie:   { freqL: 200, ratio: 0.5,        phase: 0,   wave: 'sine'     },
+    this._fillShapeSelect(shapeSelect);
+
+    const markRunning = () => {
+      btnGenStart.disabled = true;
+      btnGenStop.disabled = false;
+      btnGenStart.classList.remove('accent');
+      btnGenStop.classList.add('active');
+      document.getElementById('st-src').textContent = 'Signal Gen';
     };
 
-    const genPresetBtns = document.querySelectorAll('.gen-preset-btn');
-    const _applyGenPreset = async (name) => {
-      const p = SHAPE_PRESETS[name];
-      if (!p) return;
-
-      genFreqL.value = p.freqL;
-      genFreqR.value = Math.round(p.freqL * p.ratio);
-      genPhase.value = p.phase;
-      document.getElementById('gen-phase-val').textContent = p.phase + '°';
-      genWave.value = p.wave;
-      this._activeRatio = p.ratio;
-
-      sg.freqL = p.freqL;
-      sg.freqR = p.freqL * p.ratio;
-      sg.phase = p.phase;
-      sg.waveform = p.wave;
-
-      genRatioRow.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
-      genPresetBtns.forEach(b => b.classList.remove('active'));
-      const activeBtn = document.querySelector(`.gen-preset-btn[data-preset="${name}"]`);
-      if (activeBtn) activeBtn.classList.add('active');
-
-      if (!sg.active) {
-        await this.ensureAudio();
-        sg.init(e.actx);
-        sg.start(e.visBusL, e.visBusR);
-        btnGenStart.disabled = true;  btnGenStop.disabled = false;
-        btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
-        if (s.mode !== 'XY') {
-          s.mode = 'XY';
-          document.getElementById('btn-xy').classList.add('active');
-          document.getElementById('btn-yt').classList.remove('active');
-          document.getElementById('btn-vs').classList.remove('active');
-          document.getElementById('btn-fs').classList.remove('active');
-          document.getElementById('btn-sg').classList.remove('active');
-          resetPhosphor(s);
-        }
-        document.getElementById('st-src').textContent = 'Signal Gen';
-      } else {
-        sg.setFreqL(sg.freqL); sg.setFreqR(sg.freqR); sg.setWaveform(sg.waveform);
-        sg.stop(); sg.init(e.actx); sg.start(e.visBusL, e.visBusR);
+    const playShape = async (id) => {
+      const preset = getShape(id);
+      if (!preset || !this.shapes) return;
+      await this.ensureAudio();
+      if (e.idleActive) {
+        e._stopIdleSignal();
+        const idleBtn = document.getElementById('btn-idle-sig');
+        if (idleBtn) idleBtn.classList.remove('active');
       }
+      sg.stop();
+      this.shapes.init(e.actx);
+      this.shapes.start(preset, e.visBusL, e.visBusR);
+      s.shapeTrace = this.shapes.trace;
+      s.figureTitle = preset.title;
+      s.figureFormula = preset.formula;
+      s.dualView = !!(shapeDual && shapeDual.checked);
+      if (s.mode !== 'XY') setScopeMode(s, 'XY');
+      else resetPhosphor(s);
+      markRunning();
     };
 
-    genPresetBtns.forEach(btn => {
-      btn.addEventListener('click', () => _applyGenPreset(btn.dataset.preset));
-    });
+    const clearShape = () => {
+      if (this.shapes) this.shapes.stop();
+      s.shapeTrace = null;
+      s.figureTitle = '';
+      s.figureFormula = '';
+      s.dualView = false;
+    };
 
-    // ── Start / Stop ──
+    if (shapeSelect) {
+      shapeSelect.addEventListener('change', () => {
+        const id = shapeSelect.value;
+        if (!id) {
+          clearShape();
+          return;
+        }
+        playShape(id);
+      });
+    }
+    if (shapeDual) {
+      shapeDual.addEventListener('change', () => {
+        s.dualView = !!(shapeDual.checked && s.shapeTrace);
+      });
+    }
+
     btnGenStart.addEventListener('click', async () => {
       await this.ensureAudio();
+      clearShape();
+      if (shapeSelect) shapeSelect.value = '';
       sg.freqL = +genFreqL.value; sg.freqR = +genFreqR.value;
       sg.phase = +genPhase.value; sg.waveform = genWave.value;
       sg.init(e.actx); sg.start(e.visBusL, e.visBusR);
-      btnGenStart.disabled = true;  btnGenStop.disabled = false;
-      btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
-      // Do NOT silently change the display mode. Someone measuring a signal
-      // in YT lost their measurements to a mode switch they never asked for.
-      // Offer it instead: the generator is most interesting in XY, but that is
-      // the user's call.
+      markRunning();
       if (s.mode !== 'XY' && this.notify) {
-        this.notify.say('Signal generator running \u2014 switch to XY to see Lissajous figures', 'info', 6000);
+        this.notify.say('Signal generator running. Switch to XY to see Lissajous figures', 'info', 6000);
       }
-      document.getElementById('st-src').textContent = 'Signal Gen';
     });
 
     btnGenStop.addEventListener('click', () => {
       sg.stop();
+      clearShape();
+      if (shapeSelect) shapeSelect.value = '';
       btnGenStart.disabled = false; btnGenStop.disabled = true;
       btnGenStart.classList.add('accent'); btnGenStop.classList.remove('active');
       document.getElementById('st-src').textContent = 'No signal';
     });
 
-    // ── Help toggle ──
     const sgHelpBtn = document.getElementById('siggen-help-btn');
     const sgGuide   = document.getElementById('siggen-guide');
     if (sgHelpBtn && sgGuide) {
@@ -151,6 +153,32 @@ export class SignalGenController {
         sgGuide.style.display = vis ? '' : 'none';
         sgHelpBtn.classList.toggle('active', vis);
       });
+    }
+  }
+
+  _fillShapeSelect(select) {
+    if (!select) return;
+    const groups = new Map();
+    for (const p of listShapes()) {
+      const key = FAMILY_LABEL[p.family] || p.family;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    }
+    select.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = 'None';
+    select.appendChild(none);
+    for (const [label, items] of groups) {
+      const og = document.createElement('optgroup');
+      og.label = label;
+      for (const p of items) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.n}. ${p.title}`;
+        og.appendChild(opt);
+      }
+      select.appendChild(og);
     }
   }
 
