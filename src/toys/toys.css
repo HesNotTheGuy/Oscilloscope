@@ -214,3 +214,110 @@ body.toys-open #toys-dock:not([hidden]) {
   color: var(--p);
   border-color: var(--p);
 }
+
+#hear-image {
+  position: absolute;
+  inset: 0;
+}
+
+#hear-image-picture {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 96px;
+  width: 100%;
+  display: block;
+  background: #070807;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+#hear-image-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  width: 100%;
+  height: 64px;
+  display: block;
+  background: #05060a;
+}
+
+#hear-image-legend {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 22px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  overflow: hidden;
+  color: #d0d0d0;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+}
+
+#hear-image-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#hear-image-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+#hear-image-speed,
+#hear-image-brush {
+  flex: 1 1 120px;
+  min-width: 100px;
+}
+
+#hear-image-speed-value {
+  flex: 0 0 4.5em;
+  color: var(--p);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+#hear-image-file {
+  font-size: 11px;
+  color: #aaa;
+}
+
+[id^="hear-image-preset-"],
+[id^="hear-image-tool-"] {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+  color: #888;
+  cursor: pointer;
+}
+
+[id^="hear-image-swatch-"] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  cursor: pointer;
+}
+
+[id^="hear-image-preset-"][aria-pressed="true"],
+[id^="hear-image-tool-"][aria-pressed="true"],
+[id^="hear-image-swatch-"][aria-pressed="true"] {
+  border-color: var(--p);
+  color: var(--p);
+}
