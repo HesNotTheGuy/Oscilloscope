@@ -3,6 +3,7 @@
 import { KEYS } from './scale.js';
 import { mountRipplePad } from './ripple-pad.js';
 import { mountChordWheel } from './chord-wheel.js';
+import { mountHearImage } from './hear-image.js';
 
 const TOYS = [
   {
@@ -16,6 +17,12 @@ const TOYS = [
     title: 'Chord Wheel',
     hint: 'Turn speed. Pick a ratio.',
     mount: mountChordWheel,
+  },
+  {
+    id: 'hear-image',
+    title: 'Hear an Image',
+    hint: 'Scan color into tone. Black rests. White chords.',
+    mount: mountHearImage,
   },
 ];
 
@@ -105,6 +112,12 @@ export class SoundToysController {
       hz: () => (self._handle && self._handle.hz ? self._handle.hz() : ''),
       speed: () => (self._handle && self._handle.speed ? self._handle.speed() : null),
       ratioId: () => (self._handle && self._handle.ratioId ? self._handle.ratioId() : ''),
+      setSpeed: (value) => { if (self._handle && self._handle.setSpeed) self._handle.setSpeed(value); },
+      preset: () => (self._handle && self._handle.preset ? self._handle.preset() : ''),
+      setPreset: (id) => { if (self._handle && self._handle.setPreset) self._handle.setPreset(id); },
+      columnVoices: () => (self._handle && self._handle.columnVoices ? self._handle.columnVoices() : []),
+      playheadX: () => (self._handle && self._handle.playheadX ? self._handle.playheadX() : 0),
+      setPlayhead: (x) => { if (self._handle && self._handle.setPlayhead) self._handle.setPlayhead(x); },
     };
   }
 
