@@ -13,7 +13,9 @@ export function paintPreset(id, width, height) {
 export function exhibitColumn(id, width) {
   const row = PRESETS.find((preset) => preset.id === id);
   if (!row) throw new Error('Unknown preset: ' + id);
-  return row.center ? Math.round(width / 2) : 0;
+  if (row.park === 'center') return Math.round(width / 2);
+  if (row.park === 'first-dot') return Math.round(width / 5);
+  return 0;
 }
 
 export function stampDisc(buffer, cx, cy, radius, rgb) {
@@ -150,9 +152,9 @@ function paintJapan(width, height) {
 export const PRESETS = Object.freeze([
   Object.freeze({ id: 'vertical-stripes', label: 'Vertical stripes', paint: paintVerticalStripes }),
   Object.freeze({ id: 'horizontal-stripes', label: 'Horizontal stripes', paint: paintHorizontalStripes }),
-  Object.freeze({ id: 'circle', label: 'Circle', center: true, paint: paintCircle }),
-  Object.freeze({ id: 'dots', label: 'Dots', paint: paintDots }),
+  Object.freeze({ id: 'circle', label: 'Circle', park: 'center', paint: paintCircle }),
+  Object.freeze({ id: 'dots', label: 'Dots', park: 'first-dot', paint: paintDots }),
   Object.freeze({ id: 'france', label: 'France', paint: paintFrance }),
   Object.freeze({ id: 'germany', label: 'Germany', paint: paintGermany }),
-  Object.freeze({ id: 'japan', label: 'Japan', center: true, paint: paintJapan }),
+  Object.freeze({ id: 'japan', label: 'Japan', park: 'center', paint: paintJapan }),
 ]);

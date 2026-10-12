@@ -226,7 +226,7 @@ describe('hear image voices', () => {
   it('parks circle and japan on the center column', () => {
     expect(exhibitColumn('vertical-stripes', 480), 'vertical exhibit').toBe(0);
     expect(exhibitColumn('horizontal-stripes', 480), 'horizontal exhibit').toBe(0);
-    expect(exhibitColumn('dots', 480), 'dots exhibit').toBe(0);
+    expect(exhibitColumn('dots', 480), 'dots exhibit').toBe(96);
     expect(exhibitColumn('france', 480), 'france exhibit').toBe(0);
     expect(exhibitColumn('germany', 480), 'germany exhibit').toBe(0);
     expect(exhibitColumn('circle', 480), 'circle exhibit').toBe(240);
