@@ -39,6 +39,7 @@ export const DEFAULT_KEY_BINDINGS = {
   '4':   'scope.modeVS',
   '5':   'scope.modeFS',
   '6':   'scope.modeSG',
+  '7':   'scope.modeNV',
   'r':   'scope.runStop',
   's':   'scope.single',
   'a':   'scope.autoSet',

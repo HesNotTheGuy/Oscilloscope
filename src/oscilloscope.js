@@ -9,6 +9,7 @@ import { SnakeGame } from './snake-game.js';
 import { computeVectorscopePoints } from './vectorscope.js';
 import { computeSpectrumPoints } from './spectrum.js';
 import { Spectrogram } from './spectrogram.js';
+import { NeonViz, getPlaybackTimeline } from './neon-viz.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Oscilloscope renderer
@@ -46,6 +47,7 @@ export class Oscilloscope {
     this.isRunning  = true;
     this.frozenData = null;
     this.mode       = 'YT';
+    this._neonViz   = new NeonViz();
 
     // Channels
     this.ch1 = { coupling: 'AC', vdiv: VDIV[VD_DEFAULT], vdivIdx: VD_DEFAULT, pos: 0 };
@@ -633,6 +635,30 @@ export class Oscilloscope {
     }
   }
 
+  _fillNeonFromAnalyser() {
+    const viz = this._neonViz;
+    if (!viz) return;
+    if (this.engine.analyserL) {
+      if (!this._freqBuf || this._freqBuf.length !== this.engine.analyserL.frequencyBinCount) {
+        this._freqBuf = new Float32Array(this.engine.analyserL.frequencyBinCount);
+      }
+      this.engine.analyserL.getFloatFrequencyData(this._freqBuf);
+      const sampleRate = this.engine.sampleRate || 48000;
+      viz.step(this._freqBuf, sampleRate, getPlaybackTimeline(this.engine));
+    } else {
+      viz.step(new Float32Array(8), 44100, getPlaybackTimeline(this.engine));
+    }
+  }
+
+  _renderNeon(glr, W, H) {
+    this._fillNeonFromAnalyser();
+    // decay=1 → uDk=0, wipe leftover phosphor from YT/FS/etc.
+    glr.frame([], '#000000', 0, 1, 1, 0, null, 0, null, null, 0);
+    const octx = glr.octx;
+    octx.clearRect(0, 0, W, H);
+    this._neonViz.draw(octx, W, H);
+  }
+
   // ── WebGL render path ────────────────────────────────────────────────
   _renderGL() {
     const W = this.canvas.width, H = this.canvas.height;
@@ -664,6 +690,11 @@ export class Oscilloscope {
         octx.textAlign = 'start';
       }
       octx.shadowBlur = 0;
+      return;
+    }
+
+    if (this.mode === 'NV') {
+      this._renderNeon(glr, W, H);
       return;
     }
 
@@ -865,8 +896,8 @@ export class Oscilloscope {
       pctx.globalAlpha = 1.0;
     }
 
-    // ② Grid
-    if (this.showGrid) this.drawGrid(pctx);
+    // ② Grid (hidden in neon tree — the spine is the reference)
+    if (this.showGrid && this.mode !== 'NV') this.drawGrid(pctx);
 
     // ③ Get data
     let rawL = this.engine.getDataL(), rawR = this.engine.getDataR();
@@ -890,7 +921,7 @@ export class Oscilloscope {
     this._updateFX(dataL);
 
     // ⑤ Rotation
-    const rotActive = this.fx.rotation && this.fx._angle !== 0;
+    const rotActive = this.fx.rotation && this.fx._angle !== 0 && this.mode !== 'NV';
     if (rotActive) {
       pctx.save();
       pctx.translate(W/2, H/2); pctx.rotate(this.fx._angle); pctx.translate(-W/2, -H/2);
@@ -940,12 +971,17 @@ export class Oscilloscope {
         this._spectrogram.push(this._freqBuf, sampleRate);
         this._spectrogram.draw(pctx, W, H, this._renderColor());
       }
+    } else if (this.mode === 'NV') {
+      this._fillNeonFromAnalyser();
+      pctx.fillStyle = '#03050a';
+      pctx.fillRect(0, 0, W, H);
+      this._neonViz.draw(pctx, W, H);
     }
     if (rotActive) pctx.restore();
 
     // ⑦ Beat flash overlay
     const fx = this.fx;
-    if (fx._flash > 0.01) {
+    if (fx._flash > 0.01 && this.mode !== 'NV') {
       pctx.save();
       pctx.globalAlpha = fx._flash * fx.beatStr;
       pctx.fillStyle   = fx.beatInvert ? '#ffffff' : this._renderColor();
@@ -966,11 +1002,11 @@ export class Oscilloscope {
     this.ctx.drawImage(this._phBuf, 0, 0);
 
     // ⑩ Post-effects
-    if (this.crtCurve) this.applyCRTCurve();
-    this.drawMeasurements(this.ctx);
+    if (this.crtCurve && this.mode !== 'NV') this.applyCRTCurve();
+    if (this.mode !== 'NV') this.drawMeasurements(this.ctx);
 
     // ⑪ Image trace (2D fallback path) — draw phosphor dots for each trace point
-    if (this.objMode && !this.obj3dMode && this._imgScene.loaded) {
+    if (this.objMode && !this.obj3dMode && this._imgScene.loaded && this.mode !== 'NV') {
       const tracePts = this._imgScene.getTracePoints(W, H, this.fx._rms, this._lastBeat || false, rawL);
       if (tracePts.length) {
         const color = (this.sceneColor && this.sceneColor !== '') ? this.sceneColor : this._renderColor();

@@ -1,7 +1,7 @@
 'use strict';
 
 import { LISSAJOUS_RATIOS } from '../constants.js';
-import { resetPhosphor } from './ui-utils.js';
+import { resetPhosphor, syncModeButtons } from './ui-utils.js';
 
 // ─────────────────────────────────────────────────────────────
 //  SignalGenController — oscillator, ratios, shape presets
@@ -98,11 +98,7 @@ export class SignalGenController {
         btnGenStart.classList.remove('accent'); btnGenStop.classList.add('active');
         if (s.mode !== 'XY') {
           s.mode = 'XY';
-          document.getElementById('btn-xy').classList.add('active');
-          document.getElementById('btn-yt').classList.remove('active');
-          document.getElementById('btn-vs').classList.remove('active');
-          document.getElementById('btn-fs').classList.remove('active');
-          document.getElementById('btn-sg').classList.remove('active');
+          syncModeButtons('XY');
           resetPhosphor(s);
         }
         document.getElementById('st-src').textContent = 'Signal Gen';
