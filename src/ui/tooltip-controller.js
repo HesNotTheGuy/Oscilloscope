@@ -131,6 +131,11 @@ export class TooltipController {
     if (id === 'btn-vs')       return 'Vectorscope — L/R stereo correlation as a polar plot';
     if (id === 'btn-fs')       return 'Spectrum analyzer — 64 log-spaced frequency bars (20 Hz – 20 kHz)';
     if (id === 'btn-sg')       return 'Spectrogram — scrolling frequency-over-time waterfall heatmap (20 Hz – 20 kHz)';
+    if (id === 'btn-nv')       return 'Neon tree — branch view (frequency bands) or spiral view (song timeline)';
+    if (id === 'nv-view-branch') return 'Branch view — one arm per frequency band, bass at the bottom';
+    if (id === 'nv-view-spiral') return 'Spiral view — the song wrapped in time, with a glowing playhead';
+    if (id === 'nv-mark-a')    return 'Drop time marker A at the playhead';
+    if (id === 'nv-mark-b')    return 'Drop time marker B at the playhead';
     if (id === 'btn-synth')    return 'Keyboard synth — press K to toggle, then play notes with your keyboard';
     if (id === 'btn-patch')    return 'Patch mode — route audio through a modular rack of filters, echo, and modulators';
     if (el.classList.contains('st-mode') || el.dataset.scopeMode) {
@@ -141,6 +146,7 @@ export class TooltipController {
         VS: 'VS — vectorscope (stereo correlation)',
         FS: 'FS — spectrum analyzer',
         SG: 'SG — spectrogram waterfall',
+        NV: 'NV — neon tree (branch and spiral)',
       };
       return map[mode] || null;
     }

@@ -87,6 +87,16 @@
           <div class="crt-screen">
             <canvas id="scope" width="1800" height="1000"></canvas>
             <div class="crt-overlay" id="crt-overlay"></div>
+            <div id="nv-hud" class="nv-hud" hidden>
+              <div class="nv-toggle" role="group" aria-label="Visualizer view">
+                <button type="button" class="nv-toggle-btn active" id="nv-view-branch" aria-pressed="true">Branch</button>
+                <button type="button" class="nv-toggle-btn" id="nv-view-spiral" aria-pressed="false">Spiral</button>
+              </div>
+              <div id="nv-ab" class="nv-ab" hidden>
+                <button type="button" class="nv-ab-btn" id="nv-mark-a" title="Drop marker A at the playhead">A</button>
+                <button type="button" class="nv-ab-btn" id="nv-mark-b" title="Drop marker B at the playhead">B</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -98,6 +108,7 @@
           <button type="button" class="st-mode" data-scope-mode="VS" title="VS — vectorscope (stereo correlation)">VS</button>
           <button type="button" class="st-mode" data-scope-mode="FS" title="FS — spectrum analyzer">FS</button>
           <button type="button" class="st-mode" data-scope-mode="SG" title="SG — spectrogram waterfall">SG</button>
+          <button type="button" class="st-mode" data-scope-mode="NV" title="NV — neon tree (branch and spiral)">NV</button>
         </div>
         <span class="st-item" id="st-ch1">CH1: 500mV/div</span>
         <span class="st-item" id="st-tb">1ms/div</span>
@@ -201,8 +212,9 @@
         <button class="mode-btn" id="btn-vs" aria-label="Vectorscope, stereo correlation">VS</button>
         <button class="mode-btn" id="btn-fs" aria-label="Spectrum analyzer">FS</button>
         <button class="mode-btn" id="btn-sg" aria-label="Spectrogram waterfall">SG</button>
+        <button class="mode-btn" id="btn-nv" aria-label="Neon tree, branch and spiral views">NV</button>
       </div>
-      <div class="mode-legend">wave · xy · vector · spec · spectrogram</div>
+      <div class="mode-legend">wave · xy · vector · spec · spectrogram · neon</div>
     </div>
 
     <!-- Trigger -->
