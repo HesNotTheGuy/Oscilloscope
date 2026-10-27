@@ -10,6 +10,7 @@ import { KeyboardSynth } from '../keyboard-synth.js';
 export class KeyboardSynthController {
   constructor(ctx) {
     this.sigGen      = ctx.sigGen;
+    this.shapes      = ctx.shapes || null;
     this.scope       = ctx.scope;
     this.engine      = ctx.engine;
     this.ensureAudio = ctx.ensureAudio;
@@ -38,6 +39,15 @@ export class KeyboardSynthController {
         const stSrc = document.getElementById('st-src');
         if (stSrc) stSrc.textContent = 'No signal';
       } else {
+        if (this.shapes && this.shapes.active) {
+          this.shapes.stop();
+          this.scope.shapeTrace = null;
+          this.scope.figureTitle = '';
+          this.scope.figureFormula = '';
+          this.scope.dualView = false;
+          const shapeSelect = document.getElementById('shape-select');
+          if (shapeSelect) shapeSelect.value = '';
+        }
         this._synth.enable();
         btnSynth?.classList.add('synth-active');
         this._showPanel(true);

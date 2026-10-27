@@ -27,10 +27,11 @@ import { Notifier } from './ui/notifier.js';
 //  controllers. Each domain owns its own DOM bindings.
 // ─────────────────────────────────────────────────────────────
 export class UIController {
-  constructor(engine, scope, sigGen, recorder, store, inputMap) {
+  constructor(engine, scope, sigGen, recorder, store, inputMap, shapes) {
     this.engine   = engine;
     this.scope    = scope;
     this.sigGen   = sigGen;
+    this.shapes   = shapes || null;
     this.recorder = recorder;
     this.store    = store || null;
     this.inputMap = inputMap || null;
@@ -59,6 +60,7 @@ export class UIController {
       engine:      this.engine,
       scope:       this.scope,
       sigGen:      this.sigGen,
+      shapes:      this.shapes,
       recorder:    this.recorder,
       store:       this.store,
       knobs:       this.knobs,

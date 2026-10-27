@@ -3,6 +3,7 @@
 import { AudioEngine } from './audio-engine.js';
 import { Oscilloscope } from './oscilloscope.js';
 import { SignalGenerator } from './signal-generator.js';
+import { ShapePlayer } from './shape-player.js';
 import { VideoRecorder } from './video-recorder.js';
 import { UIController } from './ui-controller.js';
 import { StateStore, STATE_SCHEMA } from './state-store.js';
@@ -15,6 +16,7 @@ import { InputMapper } from './input-mapper.js';
   const engine   = new AudioEngine();
   const scope    = new Oscilloscope(canvas, engine);
   const sigGen   = new SignalGenerator();
+  const shapes   = new ShapePlayer();
   const recorder = new VideoRecorder(canvas);
   recorder.setAudioEngine(engine);
   const store    = new StateStore(STATE_SCHEMA);
@@ -31,6 +33,7 @@ import { InputMapper } from './input-mapper.js';
     if (audioReady) return;
     await engine.init();
     sigGen.init(engine.actx);
+    shapes.init(engine.actx);
     audioReady = true;
   }
 
@@ -40,7 +43,7 @@ import { InputMapper } from './input-mapper.js';
   engine.startMic  = async () => { await ensureAudio(); return origMic(); };
   document.addEventListener('click', ensureAudio, { once: true });
 
-  const ui = new UIController(engine, scope, sigGen, recorder, store, inputMap);
+  const ui = new UIController(engine, scope, sigGen, recorder, store, inputMap, shapes);
   ui._audioReady = false;
   ui._ensureAudio = ensureAudio;
   try {
@@ -52,6 +55,6 @@ import { InputMapper } from './input-mapper.js';
   }
 
   // Expose internals for screenshot automation (harmless on desktop)
-  window._dso = { engine, scope, sigGen, recorder, ui, store, inputMap, ensureAudio,
+  window._dso = { engine, scope, sigGen, shapes, recorder, ui, store, inputMap, ensureAudio,
                   tour: ui._tour };
 })();
