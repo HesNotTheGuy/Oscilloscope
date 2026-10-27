@@ -2,7 +2,7 @@
 
 import { Knob } from '../knob.js';
 import { TIMEBASE, VDIV, TB_DEFAULT, VD_DEFAULT } from '../constants.js';
-import { bindRange, updateStatus, setScopeMode, syncModeButtons, SCOPE_MODES } from './ui-utils.js';
+import { bindRange, updateStatus, setScopeMode, syncModeButtons, syncNvHud, SCOPE_MODES } from './ui-utils.js';
 
 // ─────────────────────────────────────────────────────────────
 //  ScopeController — channels, timebase, trigger, run/stop
@@ -71,10 +71,10 @@ export class ScopeController {
       }));
     });
 
-    // ── YT / XY / VS / FS / SG — panel buttons and the status-strip ──
+    // ── YT / XY / VS / FS / SG / NV — panel buttons and the status-strip ──
     // Display mode used to live only in HORIZONTAL, on a tab the default
     // layout does not show. The status strip is always visible, so the
-    // same five modes are clickable there too.
+    // same modes are clickable there too.
     Object.keys(SCOPE_MODES).forEach(mode => {
       const btn = document.getElementById(SCOPE_MODES[mode].btn);
       if (btn) btn.addEventListener('click', () => setScopeMode(s, mode));
@@ -83,6 +83,26 @@ export class ScopeController {
       btn.addEventListener('click', () => setScopeMode(s, btn.dataset.scopeMode));
     });
     syncModeButtons(s.mode || 'YT');
+    syncNvHud(s.mode || 'YT', s._neonViz ? s._neonViz.view : 'branch');
+
+    const setNvView = (view) => {
+      if (!s._neonViz) return;
+      s._neonViz.setView(view);
+      if (s.mode !== 'NV') setScopeMode(s, 'NV');
+      else syncNvHud('NV', view);
+    };
+    document.getElementById('nv-view-branch')?.addEventListener('click', () => setNvView('branch'));
+    document.getElementById('nv-view-spiral')?.addEventListener('click', () => setNvView('spiral'));
+    document.getElementById('nv-mark-a')?.addEventListener('click', () => {
+      if (!s._neonViz) return;
+      const tl = s._neonViz._timeline;
+      s._neonViz.markA(tl ? tl.t : 0);
+    });
+    document.getElementById('nv-mark-b')?.addEventListener('click', () => {
+      if (!s._neonViz) return;
+      const tl = s._neonViz._timeline;
+      s._neonViz.markB(tl ? tl.t : 0);
+    });
 
     // ── Trigger source / slope / mode ──
     document.getElementById('trig-source').addEventListener('change', e => {

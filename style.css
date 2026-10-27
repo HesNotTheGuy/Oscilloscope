@@ -530,6 +530,69 @@ body {
   );
 }
 
+/* Neon tree HUD — one Branch / Spiral toggle on the screen itself */
+.nv-hud {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.nv-hud[hidden] { display: none !important; }
+.nv-toggle {
+  display: flex;
+  background: rgba(4, 8, 14, 0.72);
+  border: 1px solid rgba(120, 255, 230, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(80, 255, 220, 0.28);
+}
+.nv-toggle-btn {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  padding: 6px 18px;
+  border: 0;
+  background: transparent;
+  color: rgba(200, 255, 245, 0.55);
+  cursor: pointer;
+}
+.nv-toggle-btn:hover { color: rgba(220, 255, 250, 0.9); }
+.nv-toggle-btn.active {
+  background: rgba(80, 255, 220, 0.2);
+  color: #bffff6;
+  text-shadow: 0 0 8px rgba(80, 255, 220, 0.9);
+}
+.nv-ab {
+  display: flex;
+  gap: 8px;
+}
+.nv-ab[hidden] { display: none !important; }
+.nv-ab-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 210, 120, 0.45);
+  background: rgba(4, 8, 14, 0.72);
+  color: #ffe7a8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(255, 210, 120, 0.25);
+}
+.nv-ab-btn:hover { filter: brightness(1.15); }
+#nv-mark-b {
+  border-color: rgba(255, 130, 210, 0.5);
+  color: #ffc4ec;
+  box-shadow: 0 0 12px rgba(255, 130, 210, 0.25);
+}
+
 /* ─── Front Panel (legacy — panels now live in zones) ─── */
 
 .fp-section {

@@ -44,6 +44,7 @@ export const SCOPE_MODES = {
   VS: { btn: 'btn-vs', label: 'vectorscope (stereo correlation)' },
   FS: { btn: 'btn-fs', label: 'spectrum analyzer' },
   SG: { btn: 'btn-sg', label: 'spectrogram waterfall' },
+  NV: { btn: 'btn-nv', label: 'neon tree (branch and spiral)' },
 };
 
 /** Keep the HORIZONTAL buttons and the always-visible status-strip in sync. */
@@ -57,11 +58,32 @@ export function syncModeButtons(mode) {
   });
 }
 
+/** Show the on-screen Branch / Spiral toggle only in NV mode. */
+export function syncNvHud(mode, view) {
+  const hud = document.getElementById('nv-hud');
+  if (hud) hud.hidden = mode !== 'NV';
+  const v = view === 'spiral' ? 'spiral' : 'branch';
+  const branch = document.getElementById('nv-view-branch');
+  const spiral = document.getElementById('nv-view-spiral');
+  if (branch) {
+    branch.classList.toggle('active', v === 'branch');
+    branch.setAttribute('aria-pressed', v === 'branch' ? 'true' : 'false');
+  }
+  if (spiral) {
+    spiral.classList.toggle('active', v === 'spiral');
+    spiral.setAttribute('aria-pressed', v === 'spiral' ? 'true' : 'false');
+  }
+  const ab = document.getElementById('nv-ab');
+  if (ab) ab.hidden = mode !== 'NV' || v !== 'spiral';
+}
+
 export function setScopeMode(scope, mode) {
   if (!scope || !SCOPE_MODES[mode]) return;
   scope.mode = mode;
   syncModeButtons(mode);
   if (mode === 'SG' && scope._spectrogram) scope._spectrogram.clear();
+  const view = scope._neonViz ? scope._neonViz.view : 'branch';
+  syncNvHud(mode, view);
   resetPhosphor(scope);
 }
 

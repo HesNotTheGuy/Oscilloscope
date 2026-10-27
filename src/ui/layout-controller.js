@@ -83,7 +83,7 @@ export class LayoutController {
     const PANEL_ALIASES = {
       ch1:     ['channel 1', 'voltage', 'v/div', 'vdiv', 'probe', 'input 1', 'coupling', 'ac', 'dc'],
       ch2:     ['channel 2', 'voltage', 'v/div', 'vdiv', 'probe', 'input 2', 'coupling', 'ac', 'dc'],
-      horiz:   ['horizontal', 'timebase', 'time/div', 'time div', 'sweep', 'speed', 'yt', 'xy', 'lissajous', 'vectorscope', 'spectrum', 'spectrogram', 'waterfall', 'fft', 'vs', 'fs', 'sg', 'waveform'],
+      horiz:   ['horizontal', 'timebase', 'time/div', 'time div', 'sweep', 'speed', 'yt', 'xy', 'lissajous', 'vectorscope', 'spectrum', 'spectrogram', 'waterfall', 'fft', 'vs', 'fs', 'sg', 'nv', 'waveform', 'neon', 'branch', 'spiral'],
       trig:    ['trigger', 'edge', 'rising', 'falling', 'slope', 'threshold', 'level'],
       ctrl:    ['control', 'system', 'grid', 'crt', 'scanlines', 'screenshot', 'fullscreen', 'popout', 'measure', 'auto set', 'midi', 'learn', 'idle'],
       beamfx:  ['beam fx', 'beam effects', 'color', 'colour', 'phosphor', 'gradient', 'reactive', 'beat flash', 'bloom', 'halation', 'afterglow', 'invert'],
