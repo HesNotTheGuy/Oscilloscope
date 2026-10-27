@@ -1,0 +1,32 @@
+{
+  "title": "DSO-1 Oscilloscope",
+  "brand": "DSO‑1",
+  "firstRun": false,
+  "firstRunTitle": null,
+  "tabbed": true,
+  "scopeTabActive": true,
+  "modes": {
+    "yt": true,
+    "xy": false,
+    "vs": false,
+    "fs": false,
+    "sg": false
+  },
+  "runStopText": "RUN",
+  "runStopRunning": true,
+  "measureActive": true,
+  "idleSigActive": false,
+  "stSrc": "No signal",
+  "stCh1": "CH1: 500mV/div",
+  "themeSelect": "classic-lab",
+  "bodyTheme": "classic-lab",
+  "rigSelect": "default",
+  "patchOpen": false,
+  "patchBtnActive": false,
+  "synthPanelHidden": true,
+  "synthBtnActive": false,
+  "genStartDisabled": false,
+  "genStopDisabled": true,
+  "dsoReady": true,
+  "scopeMode": "YT"
+}
