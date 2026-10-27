@@ -1,6 +1,6 @@
 'use strict';
 
-import { syncModeButtons } from './ui/ui-utils.js';
+import { syncModeButtons, syncNvHud } from './ui/ui-utils.js';
 
 // ─────────────────────────────────────────────────────────────
 //  KeyboardSynth — polyphonic synth driven by computer keyboard.
@@ -370,6 +370,7 @@ export class KeyboardSynth {
 
   _syncModeButtons(mode) {
     syncModeButtons(mode);
+    syncNvHud(mode, this.scope._neonViz ? this.scope._neonViz.view : 'branch');
   }
 
   _notify() {

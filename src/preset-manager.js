@@ -1,7 +1,7 @@
 'use strict';
 
 import { getPresetPack } from './preset-packs.js';
-import { syncModeButtons } from './ui/ui-utils.js';
+import { syncModeButtons, syncNvHud } from './ui/ui-utils.js';
 
 export class PresetManager {
   constructor(scope) {
@@ -509,10 +509,11 @@ export class PresetManager {
     s.fx.rotation       = fx.rotation;
     s.fx.rotSpeed       = fx.rotSpeed       ?? 0.003;
 
-    // 5. Apply mode (YT / XY / VS / FS / SG)
+    // 5. Apply mode (YT / XY / VS / FS / SG / NV)
     if (sc.mode) {
       s.mode = sc.mode;
       syncModeButtons(sc.mode);
+      syncNvHud(sc.mode, s._neonViz ? s._neonViz.view : 'branch');
     }
 
     // 6. Signal generator

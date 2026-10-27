@@ -108,8 +108,12 @@ async function writeSession(session) {
 }
 
 function electronBin() {
-  const name = process.platform === 'win32' ? 'electron.cmd' : 'electron';
-  return path.join(REPO_ROOT, 'node_modules', '.bin', name);
+  // Node refuses to spawn .cmd shims without a shell (EINVAL), so on Windows
+  // launch the real binary that the electron package downloaded.
+  if (process.platform === 'win32') {
+    return path.join(REPO_ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
+  }
+  return path.join(REPO_ROOT, 'node_modules', '.bin', 'electron');
 }
 
 function freePort() {
