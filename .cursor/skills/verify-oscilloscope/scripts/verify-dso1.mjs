@@ -171,7 +171,7 @@ function pickAppTarget(targets) {
   const pages = targets.filter((t) => t && t.webSocketDebuggerUrl);
   const byIndex = pages.find((t) => typeof t.url === 'string' && /index\.html(?:[?#].*)?$/.test(t.url));
   if (byIndex) return byIndex;
-  const byTitle = pages.find((t) => typeof t.title === 'string' && t.title.includes('DSO-1'));
+  const byTitle = pages.find((t) => typeof t.title === 'string' && t.title.includes('Sound Lab'));
   if (byTitle) return byTitle;
   return pages[0] || null;
 }
@@ -415,15 +415,15 @@ async function cmdDoctor() {
     const listed = await listTargets(session.cdpPort);
     target = pickAppTarget(listed);
     cdp = { targetCount: listed.length, url: target?.url || null, title: target?.title || null };
-    if (!target) reasons.push('CDP has no index.html / DSO-1 page');
+    if (!target) reasons.push('CDP has no index.html / Sound Lab page');
     else {
       const { wsUrl } = await appWsUrl(session);
       snap = await evaluate(wsUrl, SNAPSHOT_JS);
-      if (!snap || snap.title !== 'DSO-1 Oscilloscope') {
+      if (!snap || snap.title !== 'Sound Lab') {
         reasons.push(`document.title is ${JSON.stringify(snap && snap.title)}`);
       }
       if (!snap || !snap.dsoReady) reasons.push('window._dso.scope is missing');
-      if (!snap || snap.brand == null || !String(snap.brand).includes('DSO')) {
+      if (!snap || snap.brand == null || !String(snap.brand).includes('Sound Lab')) {
         reasons.push('topbar .brand is missing');
       }
     }
@@ -621,7 +621,7 @@ async function cmdCleanup() {
   });
 }
 
-const USAGE = `verify-dso1.mjs. DSO-1 Oscilloscope verification driver (CDP)
+const USAGE = `verify-dso1.mjs. Sound Lab verification driver (CDP)
 
 Usage:
   node .cursor/skills/verify-oscilloscope/scripts/verify-dso1.mjs <command>

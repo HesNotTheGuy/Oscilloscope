@@ -7,7 +7,7 @@ description: Drive DSO-1 Oscilloscope, the desktop Electron audio visualizer in 
 
 This skill is for the next agent that has to prove DSO-1 the way a user uses it. Read it cold. Do not import another app's driver, selectors, or paths.
 
-The user-facing product is the **desktop Electron window** loaded from `index.html` (title `DSO-1 Oscilloscope`). Secondary windows exist: `splash.html` on boot, `display.html` after **POP OUT**. The MJPEG server at `127.0.0.1:8420` exists only after the user clicks **STREAM** in PATCH. Vitest under `test/` is unit-only and does not drive the UI.
+The user-facing product is the **desktop Electron window** loaded from `index.html` (title `Sound Lab`). Secondary windows exist: `splash.html` on boot, `display.html` after **POP OUT**. The MJPEG server at `127.0.0.1:8420` exists only after the user clicks **STREAM** in PATCH. Vitest under `test/` is unit-only and does not drive the UI.
 
 Keep the map honest with `/maintain-verification-skill` as the app changes.
 
@@ -25,7 +25,7 @@ Ready signal, same predicate `screenshot.js` uses, observed over CDP on the `ind
 
 `typeof window._dso !== 'undefined' && window._dso.scope != null`
 
-The helper also checks `document.title === 'DSO-1 Oscilloscope'`. Launch prints JSON with `pid`, `cdpPort`, `userDataDir`, and `logPath`. Session file: `$DSO1_VERIFY_DIR/session.json` (default `/tmp/dso1-verify/session.json`).
+The helper also checks `document.title === 'Sound Lab'`. Launch prints JSON with `pid`, `cdpPort`, `userDataDir`, and `logPath`. Session file: `$DSO1_VERIFY_DIR/session.json` (default `/tmp/dso1-verify/session.json`).
 
 Linux Chromium flags the helper adds, verification-only, removed when the process dies:
 
@@ -50,10 +50,10 @@ Worth driving only when all of these hold:
 - The session pid is alive.
 - On Linux, `/proc/<pid>/cmdline` contains this run's `--user-data-dir`.
 - CDP `/json` has a page whose URL ends in `index.html` (ignore `splash.html`).
-- `document.title` is `DSO-1 Oscilloscope` and `.brand` contains `DSO`.
+- `document.title` is `Sound Lab` and `.brand` contains `Sound Lab`.
 - `window._dso.scope` is present.
 
-A first-run card (`.first-run-hint`, title `Welcome to DSO-1`) does not fail doctor. Dismiss it before clicking other controls:
+A first-run card (`.first-run-hint`, title `Welcome to Sound Lab`) does not fail doctor. Dismiss it before clicking other controls:
 
 ```bash
 node .cursor/skills/verify-oscilloscope/scripts/verify-dso1.mjs dismiss-first-run
@@ -102,7 +102,7 @@ Minimum for a UI claim:
 
 1. A real user path (click, key, or select from the table above).
 2. State before the action and state after (`before.json` / `after.json` from `snapshot`).
-3. A screenshot of the window after the action (`Page.captureScreenshot`). The topbar brand `DSO-1` must be visible.
+3. A screenshot of the window after the action (`Page.captureScreenshot`). The topbar brand `Sound Lab` must be visible.
 4. Side effects that the action is supposed to cause. Mode click: `#btn-xy.active` and `scope.mode === 'XY'`. Theme change: `body.dataset.theme`. Generator start: `#st-src` is `Signal Gen`. STREAM: `curl -I` the URL the UI reported.
 
 Mocks are not available and not allowed. Do not treat `npm test` as UI proof. Do not treat files under `docs/screenshots/` as proof of this run.
