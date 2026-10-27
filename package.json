@@ -1,7 +1,16 @@
 {
-  "name": "dso1-oscilloscope",
+  "name": "sound-lab",
+  "productName": "Sound Lab",
   "version": "1.7.1",
-  "description": "DSO-1 Oscilloscope — real-time audio visualization",
+  "description": "Sound Lab: see and play with sound",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HesNotTheGuy/sound-lab.git"
+  },
+  "homepage": "https://github.com/HesNotTheGuy/sound-lab",
+  "bugs": {
+    "url": "https://github.com/HesNotTheGuy/sound-lab/issues"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -14,8 +23,9 @@
     "test:watch": "vitest"
   },
   "build": {
-    "appId": "com.dso1.oscilloscope",
-    "productName": "DSO-1 Oscilloscope",
+    "appId": "com.hesnottheguy.soundlab",
+    "productName": "Sound Lab",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "copyright": "Copyright © 2025",
     "directories": {
       "output": "dist",
@@ -79,7 +89,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DSO-1 Oscilloscope",
+      "shortcutName": "Sound Lab",
       "installerHeader": "",
       "deleteAppDataOnUninstall": false
     }

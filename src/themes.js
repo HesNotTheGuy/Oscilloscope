@@ -1,7 +1,7 @@
 'use strict';
 
 // ─────────────────────────────────────────────────────────────
-//  Theme definitions — 10 visual themes for the DSO-1
+//  Theme definitions — 10 visual themes for Sound Lab
 // ─────────────────────────────────────────────────────────────
 
 /**

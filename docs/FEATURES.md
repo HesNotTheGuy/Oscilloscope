@@ -1,10 +1,10 @@
 This page holds the long notes that used to live in README.md.
 
 <p align="center">
-  <img src="../logo.svg" alt="DSO-1 Logo" width="180">
+  <img src="../logo.svg" alt="Sound Lab logo" width="180">
 </p>
 
-<h1 align="center">DSO-1 Oscilloscope</h1>
+<h1 align="center">Sound Lab</h1>
 
 <p align="center">
   <b>Real-time audio visualizer built as a fully functional digital oscilloscope</b><br>
@@ -22,7 +22,7 @@ This page holds the long notes that used to live in README.md.
 ---
 
 <p align="center">
-  <img src="screenshots/01-overview.png" alt="DSO-1 full overview" width="900">
+  <img src="screenshots/01-overview.png" alt="Sound Lab full overview" width="900">
 </p>
 
 ---
@@ -30,7 +30,7 @@ This page holds the long notes that used to live in README.md.
 ## Table of Contents
 
 - [Why This Exists](#why-this-exists)
-- [What is DSO-1?](#what-is-dso-1)
+- [What is Sound Lab?](#what-is-sound-lab)
 - [Quick Start](#quick-start)
 - [The Scope Display](#the-scope-display)
 - [Audio Input](#audio-input)
@@ -62,9 +62,9 @@ Oscilloscope music has been around for a while. The idea of routing audio throug
 
 I wanted something I could open, drop a song into, and immediately get something that looked cool. I also wanted features I hadn't seen elsewhere: image tracing, generative motion effects, a real signal generator for Lissajous figures, beat-reactive visuals, tiling and radial symmetry. And honestly, I partially just wanted to see if I could build something this polished working with Claude. Turns out you can.
 
-## What is DSO-1?
+## What is Sound Lab?
 
-DSO-1 is a desktop oscilloscope visualizer that renders audio as real-time phosphor beam graphics. Feed it music, a microphone, or the built-in signal generator and watch it trace waveforms, Lissajous figures, 3D wireframes, and image silhouettes, all with authentic CRT glow and persistence.
+Sound Lab is a place to see and play with sound. It draws audio as real-time phosphor beam graphics on a desktop scope. Feed it music, a microphone, or the built-in signal generator and watch it trace waveforms, Lissajous figures, 3D wireframes, and image silhouettes, all with authentic CRT glow and persistence.
 
 It's a real oscilloscope first. Every control maps to something an actual oscilloscope does: dual channels, adjustable V/DIV, timebase, trigger system, AC/DC coupling, frequency measurements. Then it goes further with GPU shaders, beat detection, 3D models, image tracing, tiling grids, and generative motion effects.
 
@@ -75,13 +75,13 @@ And in **[PATCH mode](#patch-mode)** it stops being only a visualizer and become
 ## Quick Start
 
 ```bash
-git clone https://github.com/HesNotTheGuy/Oscilloscope.git
-cd Oscilloscope
+git clone https://github.com/HesNotTheGuy/sound-lab.git
+cd sound-lab
 npm install
 npm start
 ```
 
-Or grab the installer from the [Releases](https://github.com/HesNotTheGuy/Oscilloscope/releases) page — no Node.js required.
+Or grab the installer from the [Releases](https://github.com/HesNotTheGuy/sound-lab/releases) page — no Node.js required.
 
 On first launch a welcome card points you at the essentials: drag in an audio file, press **K** for the keyboard synth, or **?** for the full shortcut list. It also offers a short **guided tour** that spotlights each control in turn — entirely optional, skippable at any step, and PATCH mode has its own tour the first time you open it (replay it any time from the **?** button in the rack header).
 
@@ -152,7 +152,7 @@ Toggle measurements with **M** or the measurements checkbox.
 
 ## Audio Input
 
-DSO-1 accepts four signal sources:
+Sound Lab accepts four signal sources:
 
 ### File Playback
 
@@ -745,7 +745,7 @@ Keyboard shortcuts are also remappable through the same InputMapper.
   <img src="screenshots/54-patch-lights.png" alt="Lights and stream output" width="860">
 </p>
 
-Two outputs for using DSO-1 in a live or production context. Both use only Node built-ins — no
+Two outputs for using Sound Lab in a live or production context. Both use only Node built-ins — no
 extra dependencies, nothing to install.
 
 ### Stage lighting (Art-Net / DMX)
@@ -784,8 +784,8 @@ Enter the **Konami code** (↑ ↑ ↓ ↓ ← → ← → B A) to launch a Snak
 ### From Source
 
 ```bash
-git clone https://github.com/HesNotTheGuy/Oscilloscope.git
-cd Oscilloscope
+git clone https://github.com/HesNotTheGuy/sound-lab.git
+cd sound-lab
 npm install
 npm start
 ```
