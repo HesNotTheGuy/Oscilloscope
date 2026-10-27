@@ -75,13 +75,13 @@ And in **[PATCH mode](#patch-mode)** it stops being only a visualizer and become
 ## Quick Start
 
 ```bash
-git clone https://github.com/HesNotTheGuy/sound-lab.git
-cd sound-lab
+git clone https://github.com/HesNotTheGuy/Oscilloscope.git
+cd Oscilloscope
 npm install
 npm start
 ```
 
-Or grab the installer from the [Releases](https://github.com/HesNotTheGuy/sound-lab/releases) page — no Node.js required.
+Or grab the installer from the [Releases](https://github.com/HesNotTheGuy/Oscilloscope/releases) page — no Node.js required.
 
 On first launch a welcome card points you at the essentials: drag in an audio file, press **K** for the keyboard synth, or **?** for the full shortcut list. It also offers a short **guided tour** that spotlights each control in turn — entirely optional, skippable at any step, and PATCH mode has its own tour the first time you open it (replay it any time from the **?** button in the rack header).
 
@@ -784,8 +784,8 @@ Enter the **Konami code** (↑ ↑ ↓ ↓ ← → ← → B A) to launch a Snak
 ### From Source
 
 ```bash
-git clone https://github.com/HesNotTheGuy/sound-lab.git
-cd sound-lab
+git clone https://github.com/HesNotTheGuy/Oscilloscope.git
+cd Oscilloscope
 npm install
 npm start
 ```
